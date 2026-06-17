@@ -2049,3 +2049,37 @@ Work Log:
 
 Stage Summary:
 - All maintenance endpoints responded correctly. No data required processing this cycle (all assessments are either completed or actively collecting with future end dates; no stuck processing assessments; no expired sessions/tokens/logs). System is healthy.
+
+---
+Task ID: IMPROVE-1
+Agent: orchestrator
+Task: Targeted visual + UX improvements
+
+## Improvements made
+
+### 1. Fixed pluralization bug in painel company rows
+- **Bug:** "1 GHE · aval.ões" / "2 GHEs · aval.ões" — the abbreviated "aval." + suffix produced a broken-looking "aval.ões"
+- **Fix:** Changed to "1 GHE · 1 avaliação" / "2 GHEs · 2 avaliações" — full word with correct singular/plural
+
+### 2. Made "Nova empresa" CTA more prominent
+- **Before:** outline button with pine border/text (low visual weight for the page's primary action)
+- **After:** solid pine button (#2F4A43 bg, #FAF8F4 text) — clearly the primary CTA
+
+### 3. Improved company row status dot visibility
+- **Before:** h-2 w-2 (8px) bare dot — easy to miss
+- **After:** h-2.5 w-2.5 (10px) dot with `ring-2 ring-[var(--surface)]` — slightly larger with a subtle ring that separates it from the background
+
+### 4. Cleaned up recent assessments sidebar
+- **Removed** redundant status icon (the dot + icon was duplicative — kept just the dot for a cleaner look)
+- **Enlarged** status dot from h-1.5 w-1.5 (6px) to h-2 w-2 (8px) for consistency with company rows
+- **Changed** label from "Ativos" (inaccurate — shows all recent, not just active) to "{count} recente(s)" (accurate count)
+- **Changed** status label from `text-[10px] uppercase tracking-wider` to `text-[11px]` (cleaner, less aggressive)
+- **Cleaned up** imports — removed unused `Activity`, `History`, `ShieldCheck`, `Loader2` icons + the `assessmentStatusIcon` function that used them
+
+## Verification
+- `bun run lint` → exit 0
+- Dev server HTTP 200, no console errors
+- Verified via agent-browser:
+  - "Nova empresa" button: bg #2F4A43 (pine), color #FAF8F4 (warm paper) — solid primary CTA
+  - Company rows: "1 GHE · 1 avaliação" / "2 GHEs · 2 avaliações" — correct pluralization
+  - Recent assessments sidebar: "3 recentes" label, clean dot-only status indicator

@@ -5,17 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
   Building2,
   ClipboardList,
-  History,
-  Loader2,
   MapPin,
   Plus,
   RefreshCw,
-  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -233,9 +229,8 @@ function HeroHeader({ onAddCompany }: { onAddCompany: () => void }) {
         </p>
       </div>
       <Button
-        variant="outline"
         onClick={onAddCompany}
-        className="shrink-0 border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--surface)] hover:text-[var(--brand)]"
+        className="shrink-0 bg-[var(--brand)] text-[var(--accent-foreground)] hover:bg-[var(--brand-light)]"
       >
         <Plus className="h-4 w-4" />
         Nova empresa
@@ -338,7 +333,7 @@ function CompanyRow({
         {/* Status dot + name/CNPJ/location */}
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <span
-            className="mt-1.5 h-2 w-2 rounded-full shrink-0"
+            className="mt-1.5 h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-[var(--surface)]"
             style={{ backgroundColor: accent }}
             aria-hidden="true"
           />
@@ -378,8 +373,8 @@ function CompanyRow({
           <div className="text-xs text-muted-foreground font-mono-numeric">
             {company.summary.departmentsCount} GHE
             {company.summary.departmentsCount !== 1 ? "s" : ""} ·{" "}
-            {company.summary.assessmentsCount} aval.
-            {company.summary.assessmentsCount !== 1 ? "ões" : "ão"}
+            {company.summary.assessmentsCount} avalia
+            {company.summary.assessmentsCount !== 1 ? "ções" : "ção"}
           </div>
           <Button
             size="sm"
@@ -399,22 +394,6 @@ function CompanyRow({
 // ─── Recent assessments sidebar (compact, max 5 items, list rows) ───────────
 
 type RecentAssessmentItem = ProfessionalDashboard["recentAssessments"][number];
-
-function assessmentStatusIcon(status: AssessmentStatus): React.ElementType {
-  switch (status) {
-    case "collecting":
-      return Activity;
-    case "processing":
-      return Loader2;
-    case "completed":
-      return ShieldCheck;
-    case "archived":
-      return History;
-    case "draft":
-    default:
-      return ClipboardList;
-  }
-}
 
 function statusDotColor(status: AssessmentStatus): string {
   switch (status) {
@@ -446,7 +425,7 @@ function RecentAssessmentsSidebar({
         <h2 className="font-display text-base sm:text-lg tracking-tight text-foreground">
           Avaliações recentes
         </h2>
-        <span className="text-xs text-muted-foreground">Ativos</span>
+        <span className="text-xs text-muted-foreground">{top.length} recente{top.length !== 1 ? "s" : ""}</span>
       </div>
 
       {top.length === 0 ? (
@@ -456,7 +435,6 @@ function RecentAssessmentsSidebar({
       ) : (
         <ol className="divide-y divide-border border-y border-border">
           {top.map((a) => {
-            const Icon = assessmentStatusIcon(a.status);
             const statusLabel =
               ASSESSMENT_STATUS_LABELS[a.status] ?? a.status;
             return (
@@ -466,12 +444,8 @@ function RecentAssessmentsSidebar({
                   className="w-full text-left flex gap-2.5 py-3 px-1 -mx-1 cursor-pointer rounded-sm transition-colors hover:bg-[var(--surface)]"
                 >
                   <span
-                    className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0"
+                    className="mt-1.5 h-2 w-2 rounded-full shrink-0"
                     style={{ backgroundColor: statusDotColor(a.status) }}
-                    aria-hidden="true"
-                  />
-                  <Icon
-                    className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/70"
                     aria-hidden="true"
                   />
                   <div className="min-w-0 flex-1">
@@ -484,10 +458,10 @@ function RecentAssessmentsSidebar({
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground">
                         {statusLabel}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground/70">
                         · {relativeTime(a.updatedAt)}
                       </span>
                     </div>
