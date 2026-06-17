@@ -115,6 +115,22 @@ export const api = {
     },
   },
 
+  sessions: {
+    list: () =>
+      req<{
+        data: Array<{
+          id: string;
+          createdAt: string;
+          expiresAt: string;
+          tokenPreview: string;
+          isCurrent: boolean;
+        }>;
+      }>("/sessions"),
+    revokeOthers: () => req<{ revoked: number }>("/sessions/others", { method: "DELETE" }),
+    revoke: (sessionId: string) =>
+      req<{ ok: true }>(`/sessions/${sessionId}`, { method: "DELETE" }),
+  },
+
   companies: {
     list: (params: { page?: number; limit?: number; q?: string } = {}) => {
       const q = new URLSearchParams({
@@ -155,6 +171,8 @@ export const api = {
     }) => req<Assessment>(`/companies/${companyId}/assessments`, { method: "POST", json: body }),
     update: (id: string, body: Partial<Assessment>) =>
       req<Assessment>(`/assessments/${id}`, { method: "PATCH", json: body }),
+    duplicate: (id: string, body?: { title?: string }) =>
+      req<Assessment>(`/assessments/${id}/duplicate`, { method: "POST", json: body ?? {} }),
     launch: (id: string) =>
       req<{ status: string; totalTokens: number }>(`/assessments/${id}/launch`, { method: "POST" }),
     close: (id: string) =>

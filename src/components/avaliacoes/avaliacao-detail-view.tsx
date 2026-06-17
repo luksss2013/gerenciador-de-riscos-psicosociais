@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Clock,
   Copy,
+  CopyPlus,
   ExternalLink,
   FileText,
   ListChecks,
@@ -232,10 +233,14 @@ function AssessmentHeader({
   assessment,
   progress,
   onEdit,
+  onDuplicate,
+  duplicating,
 }: {
   assessment: Assessment;
   progress: AssessmentProgress | null;
   onEdit: () => void;
+  onDuplicate: () => void;
+  duplicating: boolean;
 }) {
   const showRing =
     (assessment.status === "collecting" ||
@@ -266,6 +271,20 @@ function AssessmentHeader({
           <div className="flex items-center gap-3 shrink-0">
             <StatusBadge status={assessment.status} />
             {showRing && <AdesaoRing pct={progress!.globalAdesao} />}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDuplicate}
+              disabled={duplicating}
+              aria-label="Duplicar avaliação"
+            >
+              {duplicating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CopyPlus className="h-3.5 w-3.5" />
+              )}
+              <span className="hidden sm:inline">Duplicar</span>
+            </Button>
             {canEdit && (
               <Button variant="outline" size="sm" onClick={onEdit}>
                 <Pencil className="h-3.5 w-3.5" />
@@ -887,6 +906,130 @@ function StatusActions({
   );
 }
 
+// ─── DuplicateAssessmentDialog ──────────────────────────────────────────────
+
+function DuplicateAssessmentDialog({
+  open,
+  onOpenChange,
+  assessment,
+  onSuccess,
+  onSavingChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  assessment: Assessment;
+  onSuccess: (a: Assessment) => void;
+  onSavingChange: (v: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Duplicar avaliação</DialogTitle>
+          <DialogDescription>
+            Será criada uma nova avaliação em rascunho com os mesmos GHEs e
+            respostas esperadas. As respostas anteriores não serão copiadas.
+          </DialogDescription>
+        </DialogHeader>
+        {open && (
+          <DuplicateAssessmentForm
+            key={assessment.id}
+            assessment={assessment}
+            onSavingChange={onSavingChange}
+            onSuccess={(a) => {
+              onSuccess(a);
+              onOpenChange(false);
+            }}
+            onCancel={() => onOpenChange(false)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DuplicateAssessmentForm({
+  assessment,
+  onSuccess,
+  onCancel,
+  onSavingChange,
+}: {
+  assessment: Assessment;
+  onSuccess: (a: Assessment) => void;
+  onCancel: () => void;
+  onSavingChange: (v: boolean) => void;
+}) {
+  const [title, setTitle] = useState(`${assessment.title} (cópia)`);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    if (!title.trim() || title.trim().length < 2) {
+      setErr("Título deve ter ao menos 2 caracteres.");
+      return;
+    }
+    setSaving(true);
+    onSavingChange(true);
+    try {
+      const created = await api.assessments.duplicate(assessment.id, {
+        title: title.trim(),
+      });
+      toast.success("Avaliação duplicada com sucesso.");
+      onSuccess(created);
+    } catch (e2) {
+      const msg =
+        e2 instanceof ApiError
+          ? e2.message
+          : "Falha ao duplicar a avaliação.";
+      setErr(msg);
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+      onSavingChange(false);
+    }
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="duplicate-title">Título da nova avaliação</Label>
+        <Input
+          id="duplicate-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={120}
+          autoFocus
+        />
+      </div>
+      {err && (
+        <p className="text-sm text-destructive" role="alert">
+          {err}
+        </p>
+      )}
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={saving}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+          Duplicar
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
 // ─── EditAssessmentDialog ────────────────────────────────────────────────────
 
 function EditAssessmentDialog({
@@ -1077,6 +1220,8 @@ export function AvaliacaoDetailView() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [editOpen, setEditOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [closing, setClosing] = useState(false);
   const [simulatingId, setSimulatingId] = useState<string | null>(null);
@@ -1321,6 +1466,27 @@ export function AvaliacaoDetailView() {
         assessment={assessment}
         progress={progress}
         onEdit={() => setEditOpen(true)}
+        onDuplicate={() => setDuplicateOpen(true)}
+        duplicating={duplicating}
+      />
+
+      {/* Duplicate dialog */}
+      <DuplicateAssessmentDialog
+        open={duplicateOpen}
+        onOpenChange={(v) => {
+          setDuplicateOpen(v);
+          if (!v) setDuplicating(false);
+        }}
+        assessment={assessment}
+        onSavingChange={setDuplicating}
+        onSuccess={(newA) => {
+          setDuplicating(false);
+          setDuplicateOpen(false);
+          go("avaliacao", {
+            assessmentId: newA.id,
+            companyId: newA.companyId,
+          });
+        }}
       />
 
       {isCollecting && (

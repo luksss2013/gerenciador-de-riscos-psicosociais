@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   BadgeInfo,
@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Cookie,
+  CopyPlus,
   Download,
   FileText,
   History,
@@ -18,10 +19,13 @@ import {
   Loader2,
   Lock,
   LogIn,
+  MonitorSmartphone,
   RefreshCw,
   Rocket,
   Save,
   ShieldCheck,
+  ShieldOff,
+  Trash2,
   User,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -68,6 +72,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const APP_VERSION = "1.0.0-sandbox";
 
@@ -94,6 +110,7 @@ export function ConfiguracoesView() {
         <ProfileSection />
         <AccountSection />
         <SecuritySection />
+        <SessionSection />
         <AboutSection />
         <AuditLogSection />
       </div>
@@ -370,6 +387,315 @@ function SecuritySection() {
   );
 }
 
+// ─── Sessões ativas ────────────────────────────────────────────────────────
+
+interface SessionRow {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  tokenPreview: string;
+  isCurrent: boolean;
+}
+
+function safeDate(iso: string): Date {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
+function SessionSection() {
+  const [data, setData] = useState<SessionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.sessions.list();
+      setData(res.data);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setError(e.message);
+      } else {
+        setError("Não foi possível carregar as sessões ativas.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const onRevoke = async (sessionId: string) => {
+    setRevokingId(sessionId);
+    try {
+      await api.sessions.revoke(sessionId);
+      toast.success("Sessão encerrada.");
+      await load();
+    } catch (e) {
+      if (e instanceof ApiError) {
+        toast.error(e.message);
+      } else {
+        toast.error("Falha ao encerrar a sessão.");
+      }
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  const onRevokeOthers = async () => {
+    setRevokingOthers(true);
+    try {
+      const res = await api.sessions.revokeOthers();
+      const n = res.revoked;
+      toast.success(
+        `${n} sessão${n === 1 ? "" : "ões"} encerrada${n === 1 ? "" : "s"}.`,
+      );
+      setBulkOpen(false);
+      await load();
+    } catch (e) {
+      if (e instanceof ApiError) {
+        toast.error(e.message);
+      } else {
+        toast.error("Falha ao encerrar as sessões.");
+      }
+    } finally {
+      setRevokingOthers(false);
+    }
+  };
+
+  const othersCount = data.filter((s) => !s.isCurrent).length;
+  const showBulkButton = data.length >= 2;
+
+  return (
+    <Card id="sessoes">
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <MonitorSmartphone className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-base">Sessões ativas</CardTitle>
+            </div>
+            <CardDescription className="mt-1">
+              Gerencie os dispositivos conectados à sua conta. Você pode
+              encerrar sessões individuais ou todas as outras.
+            </CardDescription>
+          </div>
+          {showBulkButton && (
+            <AlertDialog open={bulkOpen} onOpenChange={setBulkOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                  disabled={revokingOthers || othersCount === 0}
+                  aria-label="Encerrar todas as outras sessões"
+                >
+                  <ShieldOff className="h-3.5 w-3.5" />
+                  <span className="ml-1.5 hidden sm:inline">
+                    Encerrar todas as outras
+                  </span>
+                  <span className="ml-1.5 sm:hidden">Encerrar outras</span>
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Encerrar todas as outras sessões?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza? Todas as outras sessões serão encerradas
+                    imediatamente. Esta ação não pode ser desfeita. A sessão
+                    atual será mantida.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={revokingOthers}>
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void onRevokeOthers();
+                    }}
+                    disabled={revokingOthers}
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                  >
+                    {revokingOthers ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Encerrando…
+                      </>
+                    ) : (
+                      <>
+                        <ShieldOff className="h-4 w-4" />
+                        Encerrar {othersCount} sessão
+                        {othersCount === 1 ? "" : "ões"}
+                      </>
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <div className="py-10 flex flex-col items-center text-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+              <ShieldOff className="h-4 w-4 text-destructive" />
+            </div>
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Tentar novamente
+            </Button>
+          </div>
+        ) : loading ? (
+          <SessionListSkeleton />
+        ) : data.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            Nenhuma sessão ativa.
+          </div>
+        ) : (
+          <ul
+            className="space-y-2 max-h-96 overflow-y-auto scroll-area"
+            aria-label="Lista de sessões ativas"
+          >
+            {data.map((s) => (
+              <SessionCard
+                key={s.id}
+                session={s}
+                revoking={revokingId === s.id}
+                onRevoke={() => void onRevoke(s.id)}
+              />
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SessionCard({
+  session,
+  revoking,
+  onRevoke,
+}: {
+  session: SessionRow;
+  revoking: boolean;
+  onRevoke: () => void;
+}) {
+  const created = safeDate(session.createdAt);
+  const expires = safeDate(session.expiresAt);
+  return (
+    <li className="rounded-lg border border-border bg-muted/20 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono-numeric text-sm font-medium">
+            {session.tokenPreview}
+          </span>
+          {session.isCurrent ? (
+            <Badge
+              className="bg-brand-light text-white border-transparent"
+              aria-label="Sessão atual"
+            >
+              Sessão atual
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-muted-foreground font-normal"
+            >
+              Outra sessão
+            </Badge>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground space-y-0.5">
+          <div>
+            <span className="font-medium text-foreground/80">Criada em</span>{" "}
+            {format(created, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}{" "}
+            <span className="text-muted-foreground/70">
+              ({formatDistanceToNow(created, { addSuffix: true, locale: ptBR })})
+            </span>
+          </div>
+          <div>
+            <span className="font-medium text-foreground/80">Expira em</span>{" "}
+            {format(expires, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+          </div>
+        </div>
+      </div>
+      <div className="shrink-0">
+        {session.isCurrent ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span tabIndex={0} className="inline-flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  aria-label="Não é possível encerrar a sessão atual — use Sair"
+                  className="text-muted-foreground"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Encerrar
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              Não é possível encerrar a sessão atual — use Sair
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={revoking}
+            onClick={onRevoke}
+            aria-label={`Encerrar sessão ${session.tokenPreview}`}
+          >
+            {revoking ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            Encerrar
+          </Button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function SessionListSkeleton() {
+  return (
+    <ul className="space-y-2" aria-hidden="true">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <li
+          key={i}
+          className="rounded-lg border border-border bg-muted/20 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+        >
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-48" />
+            <Skeleton className="h-3 w-44" />
+          </div>
+          <Skeleton className="h-8 w-24 rounded-md" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ─── Sobre ──────────────────────────────────────────────────────────────────
 
 function AboutSection() {
@@ -447,16 +773,22 @@ const ACTION_LABELS: Record<string, string> = {
   "company.create": "Empresa criada",
   "assessment.launch": "Avaliação lançada",
   "assessment.close": "Avaliação encerrada",
+  "assessment.duplicate": "Avaliação duplicada",
   "report.generate": "Relatório gerado",
   "auth.login": "Login realizado",
+  "sessions.revoke_others": "Outras sessões encerradas",
+  "sessions.revoke": "Sessão encerrada",
 };
 
 const ACTION_OPTIONS: Array<{ value: string; label: string; icon: React.ElementType }> = [
   { value: "company.create", label: "Empresa criada", icon: Building2 },
   { value: "assessment.launch", label: "Avaliação lançada", icon: Rocket },
   { value: "assessment.close", label: "Avaliação encerrada", icon: Lock },
+  { value: "assessment.duplicate", label: "Avaliação duplicada", icon: CopyPlus },
   { value: "report.generate", label: "Relatório gerado", icon: FileText },
   { value: "auth.login", label: "Login realizado", icon: LogIn },
+  { value: "sessions.revoke_others", label: "Outras sessões encerradas", icon: ShieldOff },
+  { value: "sessions.revoke", label: "Sessão encerrada", icon: Trash2 },
 ];
 
 const RESOURCE_TYPE_LABELS: Record<string, string> = {
