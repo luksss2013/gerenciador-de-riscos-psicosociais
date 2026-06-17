@@ -264,6 +264,8 @@ export interface AuditLogEntry {
   resourceType: string;
   resourceId: string | null;
   metadata: Record<string, unknown> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
   createdAt: string;
 }
 

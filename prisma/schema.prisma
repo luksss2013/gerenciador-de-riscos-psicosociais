@@ -276,6 +276,8 @@ model AuditLog {
   resourceType  String
   resourceId    String?
   metadataJson  String?
+  ipAddress     String?
+  userAgent     String?
   createdAt     DateTime @default(now())
 
   professional Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)

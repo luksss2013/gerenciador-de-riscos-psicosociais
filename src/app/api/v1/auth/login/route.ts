@@ -3,6 +3,7 @@ import { ERROR_CODES } from "@/lib/errors";
 import {
   createSessionCookie,
   errorJson,
+  logAudit,
   pruneExpiredSessions,
   verifyPassword,
 } from "@/lib/session";
@@ -51,16 +52,15 @@ export async function POST(request: Request) {
       updatedAt: professional.updatedAt,
     };
 
-    // Fire-and-forget audit log — never blocks the login response.
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "auth.login",
-        resourceType: "professional",
-        resourceId: professional.id,
-        metadataJson: JSON.stringify({ email: professional.email }),
-      },
-    }).catch(() => {});
+    // Fire-and-forget audit log with IP + user-agent (spec §5.3).
+    logAudit({
+      professionalId: professional.id,
+      action: "auth.login",
+      resourceType: "professional",
+      resourceId: professional.id,
+      metadata: { email: professional.email },
+      request,
+    });
 
     return new Response(JSON.stringify({ professional: pub }), {
       status: 200,

@@ -2083,3 +2083,93 @@ Task: Targeted visual + UX improvements
   - "Nova empresa" button: bg #2F4A43 (pine), color #FAF8F4 (warm paper) — solid primary CTA
   - Company rows: "1 GHE · 1 avaliação" / "2 GHEs · 2 avaliações" — correct pluralization
   - Recent assessments sidebar: "3 recentes" label, clean dot-only status indicator
+
+---
+Task ID: SPEC-AUDIT-1
+Agent: orchestrator
+Task: Spec compliance audit — verify implementation follows upload/spec_nr1_copsoq_saas_v3.md
+
+## Audit method
+Read the full spec (2096 lines) and checked each section against the implementation. Verified all 10 business rules (RB-01 to RB-10), all API endpoints (§3.4–§3.13), all error codes (§3.1), security headers (§5.1), and observability requirements (§5.3).
+
+## Gaps found + fixed
+
+### 1. Security headers (spec §5.1 item 10) — WAS MISSING
+The spec requires: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` (app) / `no-referrer` (worker portal).
+- **Fix**: Added `async headers()` to `next.config.ts` with:
+  - Global security headers on all routes: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-DNS-Prefetch-Control: on`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
+  - Worker portal override (`/api/v1/respond/:path*`): `Referrer-Policy: no-referrer` + `Cache-Control: no-store` (stricter anti-fingerprinting per spec §3.7).
+- **Verified**: `curl -sI` confirms all headers present on both main routes and worker routes.
+
+### 2. AuditLog missing ip_address + user_agent (spec §5.3) — WAS MISSING
+The spec's audit_logs table schema includes `ip_address inet` and `user_agent text` columns for authenticated professional actions. The Prisma AuditLog model lacked these fields.
+- **Fix**:
+  - Added `ipAddress String?` + `userAgent String?` to the AuditLog Prisma model. Ran `bun run db:push`.
+  - Added `getClientIp(request)` helper to `session.ts` — extracts client IP from `X-Forwarded-For` (first entry) or `X-Real-IP` headers.
+  - Added `logAudit({ professionalId, action, resourceType, resourceId?, metadata?, request })` helper to `session.ts` — fire-and-forget audit log creation that captures IP + user-agent.
+  - Updated 5 critical routes to use `logAudit` with IP + user-agent capture:
+    - `auth/login` (login audit)
+    - `companies` POST (company.create)
+    - `assessments/[id]/launch` (assessment.launch)
+    - `assessments/[id]/close` (assessment.close)
+    - `assessments/[id]/reports/generate` (report.generate)
+  - Updated `audit-logs` list endpoint + `AuditLogEntry` type to include the new fields in the response.
+- **Verified**: Login with `X-Forwarded-For: 192.168.1.100` + `User-Agent: TestBrowser/1.0` → audit log entry shows `ipAddress: 192.168.1.100, userAgent: TestBrowser/1.0`.
+
+## Spec compliance verification (all rules)
+
+### RB-01 (response immutability after token used) — ✅
+`/respond/token/:token/answer` returns `TOKEN_ALREADY_USED` (403) if `token.isUsed = true`.
+
+### RB-02 (tenant isolation) — ✅
+All business entity routes call `requireProfessional()` + `requireTenantOwnership(resourceProfessionalId, professional.id)`.
+
+### RB-03 (anonymity — no individual response_answers exposed) — ✅
+No route returns individual `response_answer` rows. The `/respond/token/:token/status` endpoint returns only a `count`. The dashboard returns only aggregated `dimension_results`.
+
+### RB-04 (report prerequisites) — ✅
+`/assessments/:id/reports/generate` validates: status='completed', participationRegistration non-empty, ≥1 eligible dept. Returns `REPORT_PREREQUISITES_UNMET` (422) with failedChecks.
+
+### RB-05 (COPSOQ items immutable) — ✅
+No PATCH/POST/DELETE routes for `copsoq_items`. Only `POST /system/seed-copsoq` (idempotent insert-if-empty).
+
+### RB-06 (scoring idempotency) — ✅
+`runScoring()` uses delete-then-insert upsert pattern (SQLite-safe). Re-running produces identical results.
+
+### RB-07 (auto-close expired assessments) — ✅
+`POST /system/close-expired` endpoint + hourly cron job (job 212820). Finds `status='collecting' AND endDate < today`, runs scoring, sets to 'completed'.
+
+### RB-08 (soft delete with protection) — ✅
+Company DELETE + Department DELETE check for active assessments (`status IN ('collecting', 'processing')`). Returns `DEPARTMENT_HAS_ACTIVE_ASSESSMENT` (409).
+
+### RB-09 (low adhesion report note) — ✅
+Report preview includes "nota de limitação interpretativa" when `globalAdesao < 60%`.
+
+### RB-10 (GHE eligibility k≥5) — ✅
+Scoring engine sets `isEligible = responseCount >= 5`. Ineligible GHEs: `dimensions: null` in dashboard heatmap (RB-03).
+
+### Error code taxonomy (§3.1) — ✅ all 20 codes defined in errors.ts
+All spec-listed error codes exist with correct HTTP status mappings.
+
+### API endpoints (§3.4–§3.13) — ✅ all implemented
+44 API routes covering all spec endpoints + bonus features (duplicate, simulate, sessions, search, companies-breakdown, score/status, reports/download, close-expired, run-pending-scoring, cleanup).
+
+### Security headers (§5.1) — ✅ fixed this task
+
+### Audit log ip_address + user_agent (§5.3) — ✅ fixed this task
+
+## Remaining sandbox adaptations (documented, not gaps)
+- No R2/PDF/DOCX binary generation (HTML preview + print-to-PDF covers use case)
+- No Resend email service
+- No idempotency_keys table (inline validation + upsert handle idempotency)
+- No Prometheus/OpenTelemetry (observability infrastructure out of sandbox scope)
+- No OpenAPI /docs/api endpoint
+- SQLite instead of PostgreSQL (RLS enforced at app layer via professionalId)
+- Single Next.js app instead of 3 apps (apps/web + apps/worker + apps/api)
+
+## Verification
+- `bun run lint` → exit 0
+- Dev server HTTP 200, no console errors
+- Security headers verified via curl on both main + worker routes
+- Audit log IP + user-agent capture verified via curl with custom headers
+- Schema pushed successfully (new AuditLog fields live)

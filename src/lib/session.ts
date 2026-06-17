@@ -200,3 +200,54 @@ export function workerErrorJson(
     headers: WORKER_ANTI_FINGERPRINT_HEADERS,
   });
 }
+
+// ─── Audit log helper (spec §5.3) ────────────────────────────────────────────
+// Captures professional_id + ip_address + user_agent for authenticated actions.
+// Worker portal (/respond/*) routes must NOT use this — they never log
+// professional_id or ip_address (RB-03 privacy invariant).
+
+/**
+ * Extract the client IP address from a Request, respecting X-Forwarded-For
+ * and X-Real-IP headers (set by reverse proxies / load balancers).
+ */
+export function getClientIp(request: Request): string | null {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    // X-Forwarded-For: client, proxy1, proxy2 — take the first (client)
+    return forwarded.split(",")[0].trim() || null;
+  }
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim() || null;
+  return null;
+}
+
+/**
+ * Create an audit log entry for an authenticated professional action.
+ * Captures ip_address + user_agent per spec §5.3.
+ * Fire-and-forget — never blocks or fails the response.
+ */
+export function logAudit(opts: {
+  professionalId: string;
+  action: string;
+  resourceType: string;
+  resourceId?: string;
+  metadata?: Record<string, unknown>;
+  request: Request;
+}): void {
+  const { professionalId, action, resourceType, resourceId, metadata, request } = opts;
+  db.auditLog
+    .create({
+      data: {
+        professionalId,
+        action,
+        resourceType,
+        resourceId: resourceId ?? null,
+        metadataJson: metadata ? JSON.stringify(metadata) : null,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get("user-agent") ?? null,
+      },
+    })
+    .catch(() => {
+      // Fire-and-forget — audit log failure must never fail the request.
+    });
+}

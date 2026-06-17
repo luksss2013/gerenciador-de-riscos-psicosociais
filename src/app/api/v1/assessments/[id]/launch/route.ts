@@ -3,6 +3,7 @@ import { ERROR_CODES } from "@/lib/errors";
 import {
   errorJson,
   jsonResponse,
+  logAudit,
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
@@ -11,7 +12,7 @@ interface RouteCtx {
   params: Promise<{ id: string }>;
 }
 
-export async function POST(_request: Request, { params }: RouteCtx) {
+export async function POST(request: Request, { params }: RouteCtx) {
   try {
     const professional = await requireProfessional();
     const { id } = await params;
@@ -72,16 +73,15 @@ export async function POST(_request: Request, { params }: RouteCtx) {
       },
     });
 
-    // Fire-and-forget audit log — never blocks the response.
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "assessment.launch",
-        resourceType: "assessment",
-        resourceId: assessment.id,
-        metadataJson: JSON.stringify({ totalTokens }),
-      },
-    }).catch(() => {});
+    // Fire-and-forget audit log with IP + user-agent (spec §5.3).
+    logAudit({
+      professionalId: professional.id,
+      action: "assessment.launch",
+      resourceType: "assessment",
+      resourceId: assessment.id,
+      metadata: { totalTokens },
+      request,
+    });
 
     return jsonResponse({ status: "collecting", totalTokens });
   } catch (e) {

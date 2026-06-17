@@ -13,6 +13,8 @@ interface AuditLogRow {
   resourceType: string;
   resourceId: string | null;
   metadataJson: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
   createdAt: Date;
 }
 
@@ -61,6 +63,8 @@ export async function GET(request: Request) {
       resourceType: row.resourceType,
       resourceId: row.resourceId,
       metadata: parseMetadata(row.metadataJson),
+      ipAddress: row.ipAddress,
+      userAgent: row.userAgent,
       createdAt: row.createdAt.toISOString(),
     }));
 

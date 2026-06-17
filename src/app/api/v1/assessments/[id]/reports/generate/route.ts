@@ -3,6 +3,7 @@ import { ERROR_CODES } from "@/lib/errors";
 import {
   errorJson,
   jsonResponse,
+  logAudit,
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
@@ -92,16 +93,15 @@ export async function POST(request: Request, { params }: RouteCtx) {
       },
     });
 
-    // Fire-and-forget audit log — never blocks the response.
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "report.generate",
-        resourceType: "assessment",
-        resourceId: assessment.id,
-        metadataJson: JSON.stringify({ type, reportId: report.id }),
-      },
-    }).catch(() => {});
+    // Fire-and-forget audit log with IP + user-agent (spec §5.3).
+    logAudit({
+      professionalId: professional.id,
+      action: "report.generate",
+      resourceType: "assessment",
+      resourceId: assessment.id,
+      metadata: { type, reportId: report.id },
+      request,
+    });
 
     return jsonResponse(
       { reportId: report.id, status: report.status, type: report.type, storageKey: report.storageKey },

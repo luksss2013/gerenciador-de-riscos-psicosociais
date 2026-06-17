@@ -4,6 +4,7 @@ import { isValidCnpj, sanitizeCnpj, formatCnpj } from "@/lib/cnpj";
 import {
   errorJson,
   jsonResponse,
+  logAudit,
   parsePagination,
   requireProfessional,
 } from "@/lib/session";
@@ -193,16 +194,15 @@ export async function POST(request: Request) {
       },
     });
 
-    // Fire-and-forget audit log — never blocks the response.
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "company.create",
-        resourceType: "company",
-        resourceId: company.id,
-        metadataJson: JSON.stringify({ name: company.name, cnpj: company.cnpj }),
-      },
-    }).catch(() => {});
+    // Fire-and-forget audit log with IP + user-agent (spec §5.3).
+    logAudit({
+      professionalId: professional.id,
+      action: "company.create",
+      resourceType: "company",
+      resourceId: company.id,
+      metadata: { name: company.name, cnpj: company.cnpj },
+      request,
+    });
 
     return jsonResponse(
       { ...serializeCompany(company), summary: await buildCompanySummary(company.id) },
