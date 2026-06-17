@@ -50,14 +50,6 @@ import {
 import { formatCnpj } from "@/lib/cnpj";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -179,7 +171,7 @@ function riskHex(level: RiskLevel): string {
 }
 
 function riskFg(level: RiskLevel): string {
-  return level === "MEDIUM" ? "#1A2535" : "#ffffff";
+  return level === "MEDIUM" ? "#2A2620" : "#FAF8F4";
 }
 
 function classifyPS(prob: number, sev: number): RiskLevel {
@@ -218,22 +210,20 @@ const FAILED_CHECK_LABELS: Record<string, string> = {
 function EmptyState({ onBack }: { onBack: () => void }) {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
-      <Card className="border-dashed">
-        <CardContent className="py-12 flex flex-col items-center justify-center text-center gap-3">
-          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-            <FileText className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
-          </div>
-          <h2 className="text-lg font-semibold">Nenhuma avaliação selecionada</h2>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Selecione uma avaliação concluída para gerar o Relatório PGR
-            (Programa de Gerenciamento de Riscos Psicossociais).
-          </p>
-          <Button onClick={onBack} variant="outline" className="mt-2">
-            <ChevronLeft className="h-4 w-4" />
-            Voltar ao painel
-          </Button>
-        </CardContent>
-      </Card>
+      <section className="border border-dashed border-border rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-3">
+        <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center">
+          <FileText className="h-6 w-6 text-[var(--brand)]" aria-hidden="true" />
+        </div>
+        <h2 className="font-display text-lg tracking-tight">Nenhuma avaliação selecionada</h2>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Selecione uma avaliação concluída para gerar o Relatório PGR
+          (Programa de Gerenciamento de Riscos Psicossociais).
+        </p>
+        <Button onClick={onBack} variant="outline" className="mt-2">
+          <ChevronLeft className="h-4 w-4" />
+          Voltar ao painel
+        </Button>
+      </section>
     </div>
   );
 }
@@ -242,7 +232,7 @@ function EmptyState({ onBack }: { onBack: () => void }) {
 
 function LoadingState() {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-8">
       <div className="flex items-center justify-between">
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-9 w-36" />
@@ -271,30 +261,35 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
   const allRequiredMet = requiredMet === requiredItems.length;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ListChecks className="h-4 w-4" aria-hidden="true" />
-          Pré-requisitos
-        </CardTitle>
-        <CardDescription>
-          {allRequiredMet
-            ? "Todos os pré-requisitos obrigatórios foram atendidos."
-            : `${requiredMet}/${requiredItems.length} pré-requisitos obrigatórios atendidos.`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 pt-0">
+    <section
+      aria-label="Pré-requisitos"
+      className="border-t border-border pt-5 pb-5"
+    >
+      <div className="flex items-start gap-2 mb-4">
+        <ListChecks className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 className="font-display text-xl tracking-tight text-foreground">
+            Pré-requisitos
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {allRequiredMet
+              ? "Todos os pré-requisitos obrigatórios foram atendidos."
+              : `${requiredMet}/${requiredItems.length} pré-requisitos obrigatórios atendidos.`}
+          </p>
+        </div>
+      </div>
+      <ul className="border-t border-border divide-y divide-border">
         {items.map((item) => {
           const Icon = item.met ? CheckCircle2 : XCircle;
           const iconColor = item.met
-            ? "text-risk-low"
+            ? "text-[var(--risk-low)]"
             : item.required
-              ? "text-risk-high"
-              : "text-warning";
+              ? "text-[var(--risk-high)]"
+              : "text-[var(--risk-medium)]";
           return (
-            <div
+            <li
               key={item.id}
-              className="flex items-start gap-3 rounded-md border border-border p-3"
+              className="flex items-start gap-3 py-3"
               role="status"
               aria-label={`${item.met ? "Concluído" : "Pendente"}: ${item.label}`}
             >
@@ -308,7 +303,7 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
                   {!item.required && (
                     <Badge
                       variant="outline"
-                      className="text-[10px] uppercase tracking-wider"
+                      className="text-[10px] uppercase tracking-wider bg-[var(--surface)] text-muted-foreground border-border"
                     >
                       Recomendado
                     </Badge>
@@ -321,11 +316,11 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
               <span className="sr-only">
                 {item.met ? "Concluído" : "Pendente"}
               </span>
-            </div>
+            </li>
           );
         })}
-      </CardContent>
-    </Card>
+      </ul>
+    </section>
   );
 }
 
@@ -333,12 +328,12 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
 
 function LowAdhesionWarning({ adesaoPct }: { adesaoPct: number }) {
   return (
-    <Alert className="border-warning/40 bg-warning/10">
+    <Alert className="border-[var(--risk-medium)]/40 bg-[var(--surface)]">
       <AlertTriangle
-        className="h-4 w-4 text-warning"
+        className="h-4 w-4 text-[var(--risk-medium)]"
         aria-hidden="true"
       />
-      <AlertTitle className="text-warning">
+      <AlertTitle className="text-[var(--risk-medium)]">
         Taxa de adesão baixa
       </AlertTitle>
       <AlertDescription className="text-sm">
@@ -369,18 +364,23 @@ interface ReportMetadataFormProps {
 
 function ReportMetadataForm({ values, onChange, disabled }: ReportMetadataFormProps) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <User className="h-4 w-4" aria-hidden="true" />
-          Dados do relatório
-        </CardTitle>
-        <CardDescription>
-          Metadados que serão impressos no cabeçalho e na assinatura do
-          documento.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-0">
+    <section
+      aria-label="Dados do relatório"
+      className="border-t border-border pt-5 pb-5"
+    >
+      <div className="flex items-start gap-2 mb-4">
+        <User className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 className="font-display text-xl tracking-tight text-foreground">
+            Dados do relatório
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Metadados que serão impressos no cabeçalho e na assinatura do
+            documento.
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="rep-responsible">Responsável técnico</Label>
           <Input
@@ -436,8 +436,8 @@ function ReportMetadataForm({ values, onChange, disabled }: ReportMetadataFormPr
             placeholder="Notas adicionais que aparecerão ao final do relatório."
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -455,19 +455,24 @@ function GenerateButtons({
   onGenerate,
 }: GenerateButtonsProps) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <FileDown className="h-4 w-4" aria-hidden="true" />
-          Gerar relatório
-        </CardTitle>
-        <CardDescription>
-          {disabled
-            ? "Atenda aos pré-requisitos obrigatórios para habilitar a geração."
-            : "Escolha o formato desejado. O relatório será gerado e aberto para pré-visualização."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-3 pt-0">
+    <section
+      aria-label="Gerar relatório"
+      className="border-t border-border pt-5 pb-5"
+    >
+      <div className="flex items-start gap-2 mb-4">
+        <FileDown className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 className="font-display text-xl tracking-tight text-foreground">
+            Gerar relatório
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {disabled
+              ? "Atenda aos pré-requisitos obrigatórios para habilitar a geração."
+              : "Escolha o formato desejado. O relatório será gerado e aberto para pré-visualização."}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-3">
         <Button
           onClick={() => onGenerate("pdf")}
           disabled={disabled || generatingType !== null}
@@ -509,8 +514,8 @@ function GenerateButtons({
           )}
           Gerar HTML
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -580,45 +585,52 @@ function ReportOutline() {
   const [open, setOpen] = useState(true);
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <Card>
+    <Collapsible open={open} onOpenChange={setOpen} asChild>
+      <section
+        aria-label="Estrutura do documento"
+        className="border-t border-border"
+      >
         <CollapsibleTrigger asChild>
-          <CardHeader className="pb-3 cursor-pointer hover:bg-muted/40 transition-colors">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Info className="h-4 w-4" aria-hidden="true" />
+          <button
+            type="button"
+            className="group w-full text-left pt-5 pb-4 flex items-start justify-between gap-3 hover:bg-[var(--surface)] transition-colors -mx-2 px-2 rounded-sm"
+            aria-label="Alternar estrutura do documento"
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <Info className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
+              <div className="min-w-0">
+                <h2 className="font-display text-xl tracking-tight text-foreground">
                   Estrutura do documento
-                </CardTitle>
-                <CardDescription className="mt-1">
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
                   Seções e apêndices do Relatório PGR (NR-1 / COPSOQ II-BR).
-                </CardDescription>
+                </p>
               </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  open ? "rotate-180" : ""
-                }`}
-                aria-hidden="true"
-              />
             </div>
-          </CardHeader>
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+              aria-hidden="true"
+            />
+          </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="pt-0 space-y-4">
-            <ol className="space-y-2">
+          <div className="border-t border-border pt-4 pb-6 space-y-6">
+            <ol className="space-y-1">
               {OUTLINE_SECTIONS.map((s) => (
                 <li
                   key={s.num}
-                  className="flex items-start gap-3 rounded-md border border-border p-3"
+                  className="flex items-start gap-3 py-2"
                 >
                   <span
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-mono-numeric"
+                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--brand)] text-xs font-mono-numeric border border-border"
                     aria-hidden="true"
                   >
                     {s.num}
                   </span>
                   <div className="min-w-0">
-                    <div className="text-sm font-medium">{s.title}</div>
+                    <div className="font-display text-sm font-medium text-foreground">{s.title}</div>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {s.description}
                     </p>
@@ -631,31 +643,31 @@ function ReportOutline() {
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
                 Apêndices
               </p>
-              <ol className="space-y-2">
+              <ol className="space-y-1">
                 {OUTLINE_APPENDICES.map((s) => (
                   <li
                     key={s.num}
-                    className="flex items-start gap-3 rounded-md border border-dashed border-border p-3"
+                    className="flex items-start gap-3 py-2"
                   >
                     <span
-                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-mono-numeric"
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-transparent text-muted-foreground text-xs font-mono-numeric border border-dashed border-border"
                       aria-hidden="true"
                     >
                       {s.num}
                     </span>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium">{s.title}</div>
+                      <div className="font-display text-sm font-medium text-foreground">{s.title}</div>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {s.description}
                       </p>
-                      </div>
+                    </div>
                   </li>
                 ))}
               </ol>
             </div>
-          </CardContent>
+          </div>
         </CollapsibleContent>
-      </Card>
+      </section>
     </Collapsible>
   );
 }
@@ -678,25 +690,30 @@ function ReportsHistory({
   regeneratingId,
 }: ReportsHistoryProps) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          Histórico de relatórios
-        </CardTitle>
-        <CardDescription>
-          Relatórios gerados anteriormente para esta avaliação.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : reports.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border p-8 text-center">
+    <section
+      aria-label="Histórico de relatórios"
+      className="border-t border-border pt-5"
+    >
+      <div className="flex items-start gap-2 mb-4">
+        <RefreshCw className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <h2 className="font-display text-xl tracking-tight text-foreground">
+            Histórico de relatórios
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Relatórios gerados anteriormente para esta avaliação.
+          </p>
+        </div>
+      </div>
+      {loading ? (
+        <div className="space-y-2 border-t border-border pt-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : reports.length === 0 ? (
+        <div className="border-t border-border pt-6">
+          <div className="border border-dashed border-border rounded-lg p-8 text-center">
             <FileText
               className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2"
               aria-hidden="true"
@@ -709,75 +726,87 @@ function ReportsHistory({
               &ldquo;Gerar DOCX&rdquo; ou &ldquo;Gerar HTML&rdquo; acima.
             </p>
           </div>
-        ) : (
-          <div className="overflow-x-auto scroll-area">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Gerado em</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tamanho</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reports.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-mono-numeric text-xs">
-                      {formatDateTime(r.generatedAt)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono-numeric">
-                        {REPORT_TYPE_LABELS[r.type]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`border-transparent ${STATUS_BADGE_CLASS[r.status]}`}
+        </div>
+      ) : (
+        <div className="overflow-x-auto scroll-area border-t border-border">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent border-b border-border">
+                <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Gerado em
+                </TableHead>
+                <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Tipo
+                </TableHead>
+                <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Status
+                </TableHead>
+                <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Tamanho
+                </TableHead>
+                <TableHead className="text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Ações
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reports.map((r) => (
+                <TableRow key={r.id} className="border-b border-border hover:bg-[var(--surface)] transition-colors">
+                  <TableCell className="font-mono-numeric text-xs py-3">
+                    {formatDateTime(r.generatedAt)}
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Badge variant="outline" className="font-mono-numeric bg-transparent">
+                      {REPORT_TYPE_LABELS[r.type]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Badge
+                      className={`border-transparent ${STATUS_BADGE_CLASS[r.status]}`}
+                    >
+                      {STATUS_LABELS[r.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs font-mono-numeric py-3">
+                    {formatFileSize(r.fileSizeBytes)}
+                  </TableCell>
+                  <TableCell className="text-right py-3">
+                    <div className="inline-flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onPreview(r)}
+                        disabled={r.status !== "ready"}
+                        aria-label={`Visualizar relatório ${REPORT_TYPE_LABELS[r.type]} gerado em ${formatDateTime(r.generatedAt)}`}
+                        className="text-muted-foreground hover:text-[var(--brand)]"
                       >
-                        {STATUS_LABELS[r.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs font-mono-numeric">
-                      {formatFileSize(r.fileSizeBytes)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onPreview(r)}
-                          disabled={r.status !== "ready"}
-                          aria-label={`Visualizar relatório ${REPORT_TYPE_LABELS[r.type]} gerado em ${formatDateTime(r.generatedAt)}`}
-                        >
-                          <FileText className="h-4 w-4" />
-                          <span className="hidden sm:inline">Visualizar</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onRegenerate(r)}
-                          disabled={regeneratingId === r.id}
-                          aria-label={`Regerar relatório ${REPORT_TYPE_LABELS[r.type]}`}
-                        >
-                          {regeneratingId === r.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RotateCcw className="h-4 w-4" />
-                          )}
-                          <span className="hidden sm:inline">Regerar</span>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                        <FileText className="h-4 w-4" />
+                        <span className="hidden sm:inline">Visualizar</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onRegenerate(r)}
+                        disabled={regeneratingId === r.id}
+                        aria-label={`Regerar relatório ${REPORT_TYPE_LABELS[r.type]}`}
+                        className="text-muted-foreground hover:text-[var(--brand)]"
+                      >
+                        {regeneratingId === r.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                        <span className="hidden sm:inline">Regerar</span>
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -834,8 +863,8 @@ function ReportPreviewDialog({
         aria-describedby="report-preview-desc"
       >
         <DialogHeader className="no-print">
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" aria-hidden="true" />
+          <DialogTitle className="font-display text-xl flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[var(--brand)]" aria-hidden="true" />
             Pré-visualização do Relatório PGR
           </DialogTitle>
           <DialogDescription id="report-preview-desc">
@@ -847,32 +876,32 @@ function ReportPreviewDialog({
 
         {report && (
           <div
-            className="print-area bg-white text-black rounded-md border border-border p-6 sm:p-8 space-y-6 text-sm leading-relaxed"
+            className="print-area bg-white text-[var(--foreground)] rounded-sm shadow-2xl px-6 sm:px-12 py-10 space-y-10 text-sm leading-relaxed"
             aria-label="Conteúdo do relatório PGR"
           >
             {/* Header */}
-            <header className="border-b-2 border-black pb-4">
+            <header className="border-b-2 border-[var(--foreground)] pb-5">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
-                  <h1 className="text-2xl font-bold tracking-tight">
+                  <h1 className="font-display text-3xl font-semibold tracking-tight text-[var(--foreground)]">
                     Relatório PGR
                   </h1>
-                  <p className="text-sm">
+                  <p className="text-sm mt-1 text-[var(--foreground)]">
                     Programa de Gerenciamento de Riscos Psicossociais
                   </p>
-                  <p className="text-[11px] mt-2 text-gray-700">
+                  <p className="text-[11px] mt-3 text-[var(--muted-foreground)]">
                     Conforme NR-1 / Portaria MTE 1.419/2024 · Instrumento
                     COPSOQ II-BR
                   </p>
                 </div>
                 <div className="text-right text-xs">
-                  <div className="font-semibold">
+                  <div className="font-semibold font-mono-numeric">
                     {formatLongDate(reportDate)}
                   </div>
-                  <div className="mt-2 text-gray-700">
+                  <div className="mt-2 text-[var(--muted-foreground)] font-mono-numeric">
                     Relatório #{report.id.slice(0, 8).toUpperCase()}
                   </div>
-                  <div className="mt-1 text-gray-700">
+                  <div className="mt-1 text-[var(--muted-foreground)]">
                     Formato: {REPORT_TYPE_LABELS[report.type]}
                   </div>
                 </div>
@@ -881,48 +910,48 @@ function ReportPreviewDialog({
 
             {/* Section 1 — Identificação */}
             <section>
-              <h2 className="text-lg font-bold border-b border-black pb-1 mb-3">
+              <h2 className="font-display text-xl font-semibold border-b border-[var(--foreground)] pb-2 mb-4 text-[var(--foreground)]">
                 1. Identificação
               </h2>
               <table className="w-full text-sm">
                 <tbody>
                   <tr>
-                    <td className="font-semibold w-1/3 py-1 align-top">
+                    <td className="font-semibold w-1/3 py-1.5 align-top">
                       Empresa
                     </td>
-                    <td className="py-1">{company?.name ?? "—"}</td>
+                    <td className="py-1.5">{company?.name ?? "—"}</td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">CNPJ</td>
-                    <td className="py-1 font-mono-numeric">
+                    <td className="font-semibold py-1.5 align-top">CNPJ</td>
+                    <td className="py-1.5 font-mono-numeric">
                       {company ? formatCnpj(company.cnpj) : "—"}
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">CNAE</td>
-                    <td className="py-1">{company?.cnaePrimary ?? "—"}</td>
+                    <td className="font-semibold py-1.5 align-top">CNAE</td>
+                    <td className="py-1.5">{company?.cnaePrimary ?? "—"}</td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">Localidade</td>
-                    <td className="py-1">
+                    <td className="font-semibold py-1.5 align-top">Localidade</td>
+                    <td className="py-1.5">
                       {company?.city ?? "—"}
                       {company?.state ? ` / ${company.state}` : ""}
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">Avaliação</td>
-                    <td className="py-1">{assessment?.title ?? "—"}</td>
+                    <td className="font-semibold py-1.5 align-top">Avaliação</td>
+                    <td className="py-1.5">{assessment?.title ?? "—"}</td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">Período</td>
-                    <td className="py-1">
+                    <td className="font-semibold py-1.5 align-top">Período</td>
+                    <td className="py-1.5 font-mono-numeric">
                       {formatDateShort(assessment?.startDate ?? null)} a{" "}
                       {formatDateShort(assessment?.endDate ?? null)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">Status</td>
-                    <td className="py-1">
+                    <td className="font-semibold py-1.5 align-top">Status</td>
+                    <td className="py-1.5">
                       {assessment
                         ? ASSESSMENT_STATUS_LABELS[assessment.status] ??
                           assessment.status
@@ -930,50 +959,50 @@ function ReportPreviewDialog({
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">
+                    <td className="font-semibold py-1.5 align-top">
                       Concluída em
                     </td>
-                    <td className="py-1">
+                    <td className="py-1.5">
                       {formatDateShort(assessment?.completedAt ?? null)}
                     </td>
                   </tr>
                 </tbody>
               </table>
 
-              <h3 className="text-base font-bold mt-4 mb-2">
+              <h3 className="font-display text-lg font-semibold mt-6 mb-3 text-[var(--foreground)]">
                 Responsável técnico
               </h3>
               <table className="w-full text-sm">
                 <tbody>
                   <tr>
-                    <td className="font-semibold w-1/3 py-1 align-top">
+                    <td className="font-semibold w-1/3 py-1.5 align-top">
                       Profissional
                     </td>
-                    <td className="py-1">
+                    <td className="py-1.5">
                       {metadata?.responsibleName ?? "—"}
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">
+                    <td className="font-semibold py-1.5 align-top">
                       Profissão
                     </td>
-                    <td className="py-1">
+                    <td className="py-1.5">
                       {professionalProfessionType
                         ? PROFESSION_TYPE_LABELS[professionalProfessionType]
                         : "—"}
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">
+                    <td className="font-semibold py-1.5 align-top">
                       Registro
                     </td>
-                    <td className="py-1 font-mono-numeric">
+                    <td className="py-1.5 font-mono-numeric">
                       {metadata?.credentialNumber || "—"}
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1 align-top">E-mail</td>
-                    <td className="py-1">{professionalEmail ?? "—"}</td>
+                    <td className="font-semibold py-1.5 align-top">E-mail</td>
+                    <td className="py-1.5">{professionalEmail ?? "—"}</td>
                   </tr>
                 </tbody>
               </table>
@@ -981,7 +1010,7 @@ function ReportPreviewDialog({
 
             {/* Section 2 — Metodologia */}
             <section>
-              <h2 className="text-lg font-bold border-b border-black pb-1 mb-3">
+              <h2 className="font-display text-xl font-semibold border-b border-[var(--foreground)] pb-2 mb-4 text-[var(--foreground)]">
                 2. Metodologia
               </h2>
               <p className="text-sm leading-relaxed">
@@ -994,7 +1023,7 @@ function ReportPreviewDialog({
                 10.11606/s1518-8787.2021055003123), sob licença CC BY-NC-ND
                 4.0.
               </p>
-              <p className="text-sm leading-relaxed mt-2">
+              <p className="text-sm leading-relaxed mt-3">
                 O instrumento é composto por <strong>40 itens</strong>{" "}
                 distribuídos em <strong>11 dimensões</strong> psicossociais,
                 respondidos em <strong>escala Likert de 5 pontos</strong> (1 =
@@ -1002,22 +1031,22 @@ function ReportPreviewDialog({
                 segue o protocolo da NR-1 (Portaria MTE 1.419/2024) para
                 identificação e avaliação de riscos psicossociais no trabalho.
               </p>
-              <table className="w-full text-xs mt-3 border border-black border-collapse">
-                <thead className="bg-gray-100">
+              <table className="w-full text-xs mt-5 border border-[var(--foreground)] border-collapse">
+                <thead className="bg-[var(--surface)]">
                   <tr>
-                    <th className="text-left p-1.5 border border-black">
+                    <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                       Código
                     </th>
-                    <th className="text-left p-1.5 border border-black">
+                    <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                       Dimensão
                     </th>
-                    <th className="text-left p-1.5 border border-black">
+                    <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                       Grupo
                     </th>
-                    <th className="text-center p-1.5 border border-black">
+                    <th className="text-center p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                       Itens
                     </th>
-                    <th className="text-left p-1.5 border border-black">
+                    <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                       Fatores MTE
                     </th>
                   </tr>
@@ -1025,19 +1054,19 @@ function ReportPreviewDialog({
                 <tbody>
                   {COPSOQ_DIMENSIONS.map((dim) => (
                     <tr key={dim.code}>
-                      <td className="p-1.5 border border-black font-mono-numeric">
+                      <td className="p-2 border border-[var(--foreground)] font-mono-numeric">
                         {dim.code}
                       </td>
-                      <td className="p-1.5 border border-black">
+                      <td className="p-2 border border-[var(--foreground)]">
                         {dim.namePtBr}
                       </td>
-                      <td className="p-1.5 border border-black">
+                      <td className="p-2 border border-[var(--foreground)]">
                         {dim.groupName}
                       </td>
-                      <td className="p-1.5 border border-black text-center font-mono-numeric">
+                      <td className="p-2 border border-[var(--foreground)] text-center font-mono-numeric">
                         {dim.itemCount}
                       </td>
-                      <td className="p-1.5 border border-black">
+                      <td className="p-2 border border-[var(--foreground)]">
                         {dim.mteFactorsCovered.length > 0
                           ? dim.mteFactorsCovered.join(", ")
                           : "—"}
@@ -1050,35 +1079,35 @@ function ReportPreviewDialog({
 
             {/* Section 3 — Identificação de Perigos */}
             <section>
-              <h2 className="text-lg font-bold border-b border-black pb-1 mb-3">
+              <h2 className="font-display text-xl font-semibold border-b border-[var(--foreground)] pb-2 mb-4 text-[var(--foreground)]">
                 3. Identificação de Perigos
               </h2>
-              <p className="text-sm leading-relaxed mb-2">
+              <p className="text-sm leading-relaxed mb-4">
                 Inventário de riscos psicossociais elaborado a partir das
                 dimensões classificadas como Intermediário ou Desfavorável nos
                 GHES elegíveis, complementado por itens manuais registrados
                 pelo responsável técnico.
               </p>
               {allInventoryItems.length > 0 ? (
-                <table className="w-full text-xs border border-black border-collapse">
-                  <thead className="bg-gray-100">
+                <table className="w-full text-xs border border-[var(--foreground)] border-collapse">
+                  <thead className="bg-[var(--surface)]">
                     <tr>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         GHE
                       </th>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Perigo
                       </th>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Possíveis danos
                       </th>
-                      <th className="text-center p-1.5 border border-black">
+                      <th className="text-center p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         P
                       </th>
-                      <th className="text-center p-1.5 border border-black">
+                      <th className="text-center p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         S
                       </th>
-                      <th className="text-center p-1.5 border border-black">
+                      <th className="text-center p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Nível
                       </th>
                     </tr>
@@ -1091,23 +1120,23 @@ function ReportPreviewDialog({
                       );
                       return (
                         <tr key={item.id} className="align-top">
-                          <td className="p-1.5 border border-black">
+                          <td className="p-2 border border-[var(--foreground)]">
                             {item.departmentName ?? "Toda a empresa"}
                           </td>
-                          <td className="p-1.5 border border-black">
+                          <td className="p-2 border border-[var(--foreground)]">
                             {item.hazardDescription}
                           </td>
-                          <td className="p-1.5 border border-black">
+                          <td className="p-2 border border-[var(--foreground)]">
                             {item.possibleHarms}
                           </td>
-                          <td className="p-1.5 border border-black text-center font-mono-numeric">
+                          <td className="p-2 border border-[var(--foreground)] text-center font-mono-numeric">
                             {item.probability}
                           </td>
-                          <td className="p-1.5 border border-black text-center font-mono-numeric">
+                          <td className="p-2 border border-[var(--foreground)] text-center font-mono-numeric">
                             {item.severity}
                           </td>
                           <td
-                            className="p-1.5 border border-black text-center"
+                            className="p-2 border border-[var(--foreground)] text-center font-semibold"
                             style={{
                               backgroundColor: riskHex(level),
                               color: riskFg(level),
@@ -1121,7 +1150,7 @@ function ReportPreviewDialog({
                   </tbody>
                 </table>
               ) : (
-                <p className="text-sm italic text-gray-600">
+                <p className="text-sm italic text-[var(--muted-foreground)]">
                   Nenhum item de inventário registrado para esta avaliação.
                 </p>
               )}
@@ -1129,12 +1158,12 @@ function ReportPreviewDialog({
 
             {/* Section 4 — Avaliação de Riscos */}
             <section>
-              <h2 className="text-lg font-bold border-b border-black pb-1 mb-3">
+              <h2 className="font-display text-xl font-semibold border-b border-[var(--foreground)] pb-2 mb-4 text-[var(--foreground)]">
                 4. Avaliação de Riscos
               </h2>
               {dashboard ? (
                 <>
-                  <p className="text-sm leading-relaxed mb-3">
+                  <p className="text-sm leading-relaxed mb-4">
                     A avaliação considera o escore de risco (0&ndash;100) por
                     dimensão, classificado em três níveis:{" "}
                     <strong>Favorável</strong> (0&ndash;39),{" "}
@@ -1144,56 +1173,56 @@ function ReportPreviewDialog({
                     total de {dashboard.heatmap.length} GHE(s) cadastrado(s).
                   </p>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                    <div className="border border-black p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-gray-600">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--foreground)] border border-[var(--foreground)] mb-5">
+                    <div className="bg-white p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
                         Adesão global
                       </div>
-                      <div className="text-xl font-bold font-mono-numeric">
+                      <div className="text-xl font-semibold font-mono-numeric mt-1 text-[var(--foreground)]">
                         {dashboard.kpis.globalAdesao}%
                       </div>
                     </div>
-                    <div className="border border-black p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-gray-600">
+                    <div className="bg-white p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
                         Respondentes
                       </div>
-                      <div className="text-xl font-bold font-mono-numeric">
+                      <div className="text-xl font-semibold font-mono-numeric mt-1 text-[var(--foreground)]">
                         {dashboard.kpis.totalRespondents}
                       </div>
                     </div>
-                    <div className="border border-black p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-gray-600">
+                    <div className="bg-white p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
                         GHEs alto risco
                       </div>
-                      <div className="text-xl font-bold font-mono-numeric">
+                      <div className="text-xl font-semibold font-mono-numeric mt-1 text-[var(--foreground)]">
                         {dashboard.kpis.ghesHighRisk}
                       </div>
                     </div>
-                    <div className="border border-black p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-gray-600">
+                    <div className="bg-white p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--muted-foreground)]">
                         GHEs médio risco
                       </div>
-                      <div className="text-xl font-bold font-mono-numeric">
+                      <div className="text-xl font-semibold font-mono-numeric mt-1 text-[var(--foreground)]">
                         {dashboard.kpis.ghesMediumRisk}
                       </div>
                     </div>
                   </div>
 
                   {/* Heatmap */}
-                  <h3 className="text-base font-bold mb-2">
+                  <h3 className="font-display text-lg font-semibold mb-3 text-[var(--foreground)]">
                     Heatmap por GHE × Dimensão
                   </h3>
                   <div className="overflow-x-auto">
-                    <table className="text-xs border border-black border-collapse">
-                      <thead className="bg-gray-100">
+                    <table className="text-xs border border-[var(--foreground)] border-collapse">
+                      <thead className="bg-[var(--surface)]">
                         <tr>
-                          <th className="text-left p-1.5 border border-black sticky left-0 bg-gray-100">
+                          <th className="text-left p-1.5 border border-[var(--foreground)] sticky left-0 bg-[var(--surface)]">
                             GHE
                           </th>
                           {COPSOQ_DIMENSIONS.map((dim) => (
                             <th
                               key={dim.code}
-                              className="text-center p-1.5 border border-black"
+                              className="text-center p-1.5 border border-[var(--foreground)] font-mono-numeric"
                               style={{ minWidth: 38 }}
                               title={dim.namePtBr}
                             >
@@ -1205,9 +1234,9 @@ function ReportPreviewDialog({
                       <tbody>
                         {dashboard.heatmap.map((row) => (
                           <tr key={row.deptId}>
-                            <td className="p-1.5 border border-black text-xs sticky left-0 bg-white">
+                            <td className="p-1.5 border border-[var(--foreground)] text-xs sticky left-0 bg-white">
                               <div className="font-medium">{row.deptName}</div>
-                              <div className="text-[10px] text-gray-600">
+                              <div className="text-[10px] text-[var(--muted-foreground)]">
                                 n={row.nResponses}
                                 {!row.isEligible && " · inelegível"}
                               </div>
@@ -1220,7 +1249,7 @@ function ReportPreviewDialog({
                                 return (
                                   <td
                                     key={dim.code}
-                                    className="p-1 border border-black text-center text-gray-400"
+                                    className="p-1 border border-[var(--foreground)] text-center text-[var(--muted-foreground)]"
                                   >
                                     —
                                   </td>
@@ -1229,7 +1258,7 @@ function ReportPreviewDialog({
                               return (
                                 <td
                                   key={dim.code}
-                                  className="p-1 border border-black text-center font-mono-numeric text-[10px]"
+                                  className="p-1 border border-[var(--foreground)] text-center font-mono-numeric text-[10px]"
                                   style={{
                                     backgroundColor: riskHex(cell.riskLevel),
                                     color: riskFg(cell.riskLevel),
@@ -1247,22 +1276,22 @@ function ReportPreviewDialog({
                   </div>
 
                   {/* Company averages */}
-                  <h3 className="text-base font-bold mb-2 mt-4">
+                  <h3 className="font-display text-lg font-semibold mb-3 mt-6 text-[var(--foreground)]">
                     Médias por dimensão (empresa)
                   </h3>
-                  <table className="w-full text-xs border border-black border-collapse">
-                    <thead className="bg-gray-100">
+                  <table className="w-full text-xs border border-[var(--foreground)] border-collapse">
+                    <thead className="bg-[var(--surface)]">
                       <tr>
-                        <th className="text-left p-1.5 border border-black">
+                        <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                           Código
                         </th>
-                        <th className="text-left p-1.5 border border-black">
+                        <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                           Dimensão
                         </th>
-                        <th className="text-center p-1.5 border border-black">
+                        <th className="text-center p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                           Escore médio
                         </th>
-                        <th className="text-center p-1.5 border border-black">
+                        <th className="text-center p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                           Nível
                         </th>
                       </tr>
@@ -1272,17 +1301,17 @@ function ReportPreviewDialog({
                         const dim = getDimension(c.code as DimensionCode);
                         return (
                           <tr key={c.code}>
-                            <td className="p-1.5 border border-black font-mono-numeric">
+                            <td className="p-2 border border-[var(--foreground)] font-mono-numeric">
                               {c.code}
                             </td>
-                            <td className="p-1.5 border border-black">
+                            <td className="p-2 border border-[var(--foreground)]">
                               {dim.namePtBr}
                             </td>
-                            <td className="p-1.5 border border-black text-center font-mono-numeric">
+                            <td className="p-2 border border-[var(--foreground)] text-center font-mono-numeric">
                               {Math.round(c.weightedAvgRiskScore)}
                             </td>
                             <td
-                              className="p-1.5 border border-black text-center"
+                              className="p-2 border border-[var(--foreground)] text-center font-semibold"
                               style={{
                                 backgroundColor: riskHex(c.riskLevel),
                                 color: riskFg(c.riskLevel),
@@ -1299,19 +1328,19 @@ function ReportPreviewDialog({
                   {/* Critical dimensions */}
                   {dashboard.criticalDimensions.length > 0 && (
                     <>
-                      <h3 className="text-base font-bold mb-2 mt-4">
+                      <h3 className="font-display text-lg font-semibold mb-3 mt-6 text-[var(--foreground)]">
                         Dimensões críticas (Desfavorável)
                       </h3>
-                      <table className="w-full text-xs border border-black border-collapse">
-                        <thead className="bg-gray-100">
+                      <table className="w-full text-xs border border-[var(--foreground)] border-collapse">
+                        <thead className="bg-[var(--surface)]">
                           <tr>
-                            <th className="text-left p-1.5 border border-black">
+                            <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                               Dimensão
                             </th>
-                            <th className="text-center p-1.5 border border-black">
+                            <th className="text-center p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                               Escore médio
                             </th>
-                            <th className="text-left p-1.5 border border-black">
+                            <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                               GHEs afetados
                             </th>
                           </tr>
@@ -1319,13 +1348,13 @@ function ReportPreviewDialog({
                         <tbody>
                           {dashboard.criticalDimensions.map((c) => (
                             <tr key={c.code}>
-                              <td className="p-1.5 border border-black">
+                              <td className="p-2 border border-[var(--foreground)]">
                                 <strong>{c.code}</strong> — {c.name}
                               </td>
-                              <td className="p-1.5 border border-black text-center font-mono-numeric">
+                              <td className="p-2 border border-[var(--foreground)] text-center font-mono-numeric">
                                 {Math.round(c.avgRiskScore)}
                               </td>
-                              <td className="p-1.5 border border-black">
+                              <td className="p-2 border border-[var(--foreground)]">
                                 {c.affectedDepts.length} GHE(s)
                               </td>
                             </tr>
@@ -1336,7 +1365,7 @@ function ReportPreviewDialog({
                   )}
                 </>
               ) : (
-                <p className="text-sm italic text-gray-600">
+                <p className="text-sm italic text-[var(--muted-foreground)]">
                   Avaliação de riscos indisponível (a avaliação não foi
                   concluída ou os escores não foram calculados).
                 </p>
@@ -1345,32 +1374,32 @@ function ReportPreviewDialog({
 
             {/* Section 5 — Plano de Ação */}
             <section>
-              <h2 className="text-lg font-bold border-b border-black pb-1 mb-3">
+              <h2 className="font-display text-xl font-semibold border-b border-[var(--foreground)] pb-2 mb-4 text-[var(--foreground)]">
                 5. Plano de Ação 5W2H
               </h2>
               {actionPlan && actionPlan.actionItems.length > 0 ? (
-                <table className="w-full text-xs border border-black border-collapse">
-                  <thead className="bg-gray-100">
+                <table className="w-full text-xs border border-[var(--foreground)] border-collapse">
+                  <thead className="bg-[var(--surface)]">
                     <tr>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         O que (What)
                       </th>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Por que (Why)
                       </th>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Quem (Who)
                       </th>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Onde (Where)
                       </th>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Quando (When)
                       </th>
-                      <th className="text-left p-1.5 border border-black">
+                      <th className="text-left p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Como (How)
                       </th>
-                      <th className="text-right p-1.5 border border-black">
+                      <th className="text-right p-2 border border-[var(--foreground)] uppercase tracking-wider font-medium">
                         Custo
                       </th>
                     </tr>
@@ -1378,25 +1407,25 @@ function ReportPreviewDialog({
                   <tbody>
                     {actionPlan.actionItems.map((item) => (
                       <tr key={item.id} className="align-top">
-                        <td className="p-1.5 border border-black">
+                        <td className="p-2 border border-[var(--foreground)]">
                           {item.what}
                         </td>
-                        <td className="p-1.5 border border-black">
+                        <td className="p-2 border border-[var(--foreground)]">
                           {item.why}
                         </td>
-                        <td className="p-1.5 border border-black">
+                        <td className="p-2 border border-[var(--foreground)]">
                           {item.who}
                         </td>
-                        <td className="p-1.5 border border-black">
+                        <td className="p-2 border border-[var(--foreground)]">
                           {item.where}
                         </td>
-                        <td className="p-1.5 border border-black font-mono-numeric">
+                        <td className="p-2 border border-[var(--foreground)] font-mono-numeric">
                           {formatDateShort(item.whenDate)}
                         </td>
-                        <td className="p-1.5 border border-black">
+                        <td className="p-2 border border-[var(--foreground)]">
                           {item.how}
                         </td>
-                        <td className="p-1.5 border border-black text-right font-mono-numeric">
+                        <td className="p-2 border border-[var(--foreground)] text-right font-mono-numeric">
                           {formatBRL(item.estimatedCost)}
                         </td>
                       </tr>
@@ -1404,7 +1433,7 @@ function ReportPreviewDialog({
                   </tbody>
                 </table>
               ) : (
-                <p className="text-sm italic text-gray-600">
+                <p className="text-sm italic text-[var(--muted-foreground)]">
                   Nenhuma ação registrada no plano de ação para esta avaliação.
                 </p>
               )}
@@ -1412,14 +1441,14 @@ function ReportPreviewDialog({
 
             {/* Section 6 — Monitoramento e Revisão */}
             <section>
-              <h2 className="text-lg font-bold border-b border-black pb-1 mb-3">
+              <h2 className="font-display text-xl font-semibold border-b border-[var(--foreground)] pb-2 mb-4 text-[var(--foreground)]">
                 6. Monitoramento e Revisão
               </h2>
               <p className="text-sm leading-relaxed">
                 Conforme a NR-1, o Programa de Gerenciamento de Riscos (PGR)
                 deve ser revisado:
               </p>
-              <ul className="text-sm list-disc pl-6 mt-2 space-y-1">
+              <ul className="text-sm list-disc pl-6 mt-3 space-y-1.5">
                 <li>
                   No máximo a cada <strong>2 (dois) anos</strong> para riscos
                   psicossociais;
@@ -1437,21 +1466,23 @@ function ReportPreviewDialog({
                 </li>
               </ul>
               {assessment?.completedAt && (
-                <p className="text-sm mt-3">
+                <p className="text-sm mt-4">
                   <strong>Próximo ciclo recomendado:</strong>{" "}
-                  {formatDateShort(
-                    addYears(parseISO(assessment.completedAt), 2).toISOString(),
-                  )}
+                  <span className="font-mono-numeric">
+                    {formatDateShort(
+                      addYears(parseISO(assessment.completedAt), 2).toISOString(),
+                    )}
+                  </span>
                 </p>
               )}
             </section>
 
             {/* Apêndices — referência às seções anteriores + assinatura */}
             <section>
-              <h2 className="text-lg font-bold border-b border-black pb-1 mb-3">
+              <h2 className="font-display text-xl font-semibold border-b border-[var(--foreground)] pb-2 mb-4 text-[var(--foreground)]">
                 Apêndices
               </h2>
-              <ul className="text-sm list-disc pl-6 space-y-1">
+              <ul className="text-sm list-disc pl-6 space-y-1.5">
                 <li>
                   <strong>Apêndice A — Escores completos por GHE:</strong>{" "}
                   detalhados no heatmap da Seção 4.
@@ -1467,30 +1498,30 @@ function ReportPreviewDialog({
             </section>
 
             {/* Signature */}
-            <section className="mt-12 pt-8">
+            <section className="mt-16 pt-10">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
-                  <div className="border-t border-black pt-2 text-center text-xs">
+                  <div className="border-t border-[var(--foreground)] pt-3 text-center text-xs">
                     <p className="font-semibold">
                       {metadata?.responsibleName ?? "—"}
                     </p>
-                    <p>
+                    <p className="mt-0.5">
                       {professionalProfessionType
                         ? PROFESSION_TYPE_LABELS[professionalProfessionType]
                         : "—"}
                     </p>
-                    <p className="font-mono-numeric">
+                    <p className="font-mono-numeric mt-0.5">
                       Registro: {metadata?.credentialNumber || "—"}
                     </p>
                   </div>
                 </div>
                 <div>
-                  <div className="border-t border-black pt-2 text-center text-xs">
+                  <div className="border-t border-[var(--foreground)] pt-3 text-center text-xs">
                     <p className="font-semibold">{company?.name ?? "—"}</p>
-                    <p className="font-mono-numeric">
+                    <p className="font-mono-numeric mt-0.5">
                       CNPJ: {company ? formatCnpj(company.cnpj) : "—"}
                     </p>
-                    <p>{formatLongDate(reportDate)}</p>
+                    <p className="mt-0.5">{formatLongDate(reportDate)}</p>
                   </div>
                 </div>
               </div>
@@ -1498,8 +1529,8 @@ function ReportPreviewDialog({
 
             {/* Notes */}
             {metadata?.notes && (
-              <section className="mt-8 pt-4 border-t border-black">
-                <h3 className="text-sm font-bold mb-1">Observações</h3>
+              <section className="mt-8 pt-4 border-t border-[var(--foreground)]">
+                <h3 className="font-display text-sm font-semibold mb-2 text-[var(--foreground)]">Observações</h3>
                 <p className="text-xs whitespace-pre-wrap">
                   {metadata.notes}
                 </p>
@@ -1508,7 +1539,7 @@ function ReportPreviewDialog({
 
             {/* Low adhesion note */}
             {lowAdesao && globalAdesao != null && (
-              <section className="mt-4 p-3 border border-yellow-700 bg-yellow-50 text-black">
+              <section className="mt-4 p-3 border border-[var(--risk-medium)]/50 bg-[var(--surface)] text-[var(--foreground)]">
                 <p className="text-xs">
                   <strong>Nota de limitação interpretativa:</strong> A taxa de
                   adesão à pesquisa foi de{" "}
@@ -1520,7 +1551,7 @@ function ReportPreviewDialog({
               </section>
             )}
 
-            <footer className="pt-4 border-t border-black text-[10px] text-gray-600 text-center">
+            <footer className="pt-4 border-t border-[var(--foreground)] text-[10px] text-[var(--muted-foreground)] text-center">
               Documento gerado em {formatDateTime(report.generatedAt)} pelo
               sistema NR-1 Copsoq · Conforme NR-1 / Portaria MTE 1.419/2024 ·
               Instrumento COPSOQ II-BR (CC BY-NC-ND 4.0)
@@ -1865,12 +1896,13 @@ export function RelatorioView() {
 
   if (loading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-8">
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => go("avaliacao", { assessmentId })}
+            className="text-muted-foreground hover:text-[var(--brand)]"
           >
             <ChevronLeft className="h-4 w-4" />
             Voltar à avaliação
@@ -1884,31 +1916,30 @@ export function RelatorioView() {
   if (error) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
-        <Card className="border-destructive/40">
-          <CardContent className="py-10 flex flex-col items-center justify-center text-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle
-                className="h-6 w-6 text-destructive"
-                aria-hidden="true"
-              />
-            </div>
-            <h2 className="text-lg font-semibold">Falha ao carregar</h2>
-            <p className="text-sm text-muted-foreground max-w-md">{error}</p>
-            <div className="flex gap-2 mt-2">
-              <Button variant="outline" onClick={() => void fetchInitial()}>
-                <RefreshCw className="h-4 w-4" />
-                Tentar novamente
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => go("avaliacao", { assessmentId })}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Voltar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <section className="border border-dashed border-[var(--risk-high)]/30 rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-3">
+          <div className="h-12 w-12 rounded-full risk-high-bg flex items-center justify-center">
+            <AlertTriangle
+              className="h-6 w-6"
+              aria-hidden="true"
+            />
+          </div>
+          <h2 className="font-display text-lg tracking-tight">Falha ao carregar</h2>
+          <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" onClick={() => void fetchInitial()}>
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => go("avaliacao", { assessmentId })}
+              className="text-muted-foreground hover:text-[var(--brand)]"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Voltar
+            </Button>
+          </div>
+        </section>
       </div>
     );
   }
@@ -1952,15 +1983,15 @@ export function RelatorioView() {
         />
       )}
 
-      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-8">
         {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-6">
           <div className="flex items-start gap-3 min-w-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => go("avaliacao", { assessmentId })}
-              className="shrink-0"
+              className="shrink-0 text-muted-foreground hover:text-[var(--brand)]"
               aria-label="Voltar à avaliação"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -1969,14 +2000,14 @@ export function RelatorioView() {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <ShieldCheck
-                  className="h-5 w-5 text-primary shrink-0"
+                  className="h-5 w-5 text-[var(--brand)] shrink-0"
                   aria-hidden="true"
                 />
-                <h1 className="text-xl sm:text-2xl font-semibold tracking-tight truncate">
+                <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground truncate">
                   Relatório PGR
                 </h1>
               </div>
-              <p className="text-sm text-muted-foreground mt-0.5 truncate">
+              <p className="text-sm text-muted-foreground mt-1 truncate">
                 {assessment?.title ?? "—"} ·{" "}
                 {assessment
                   ? (ASSESSMENT_STATUS_LABELS[assessment.status] ??
@@ -1985,7 +2016,7 @@ export function RelatorioView() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono-numeric">
             <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
             <span>
               {formatDateShort(assessment?.startDate ?? null)} a{" "}

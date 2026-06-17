@@ -38,14 +38,6 @@ import type {
 import { ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -109,7 +101,7 @@ function statusBadgeClass(status: AssessmentStatus): string {
   switch (status) {
     case "collecting":
     case "processing":
-      return "bg-brand-light text-white border-transparent";
+      return "bg-[var(--sidebar-accent)] text-[var(--brand)] border-transparent";
     case "completed":
       return "risk-low-bg border-transparent";
     case "draft":
@@ -125,9 +117,9 @@ function safePct(pct: number): number {
 }
 
 function adesaoColorClass(pct: number): string {
-  if (pct < 30) return "text-muted-foreground";
-  if (pct < 70) return "text-risk-medium";
-  return "text-risk-low";
+  if (pct < 30) return "text-[var(--muted-foreground)]";
+  if (pct < 70) return "text-[var(--risk-medium)]";
+  return "text-[var(--risk-low)]";
 }
 
 function adesaoStroke(pct: number): string {
@@ -257,58 +249,65 @@ function AssessmentHeader({
   const canEdit =
     assessment.status === "draft" || assessment.status === "collecting";
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col lg:flex-row gap-4 lg:items-start lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-2">
-              <ClipboardList className="h-3.5 w-3.5" />
-              <span>Avaliação psicossocial</span>
-              <Badge variant="outline" className="font-mono-numeric">
-                COPSOQ II-BR · 40 itens
-              </Badge>
-            </div>
-            <CardTitle className="text-xl sm:text-2xl leading-tight">
-              {assessment.title}
-            </CardTitle>
-            <CardDescription className="flex items-center gap-1.5 mt-1.5">
-              <Calendar className="h-3.5 w-3.5" />
-              {fmtPeriod(assessment.startDate, assessment.endDate)}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <StatusBadge status={assessment.status} />
-            {showRing && <AdesaoRing pct={progress!.globalAdesao} />}
-            <Button
+    <header className="border-b border-border pb-6">
+      <div className="flex flex-col lg:flex-row gap-5 lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-2.5">
+            <ClipboardList className="h-3.5 w-3.5" />
+            <span>Avaliação psicossocial</span>
+            <Badge
               variant="outline"
-              size="sm"
-              onClick={onDuplicate}
-              disabled={duplicating}
-              aria-label="Duplicar avaliação"
+              className="font-mono-numeric text-[10px] px-1.5 py-0"
             >
-              {duplicating ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <CopyPlus className="h-3.5 w-3.5" />
-              )}
-              <span className="hidden sm:inline">Duplicar</span>
-            </Button>
-            {canEdit && (
-              <Button variant="outline" size="sm" onClick={onEdit}>
-                <Pencil className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Editar</span>
-              </Button>
-            )}
+              COPSOQ II-BR · 40 itens
+            </Badge>
           </div>
+          <h1 className="font-display text-2xl sm:text-3xl leading-tight tracking-tight text-foreground">
+            {assessment.title}
+          </h1>
+          <p className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground font-mono-numeric">
+            <Calendar className="h-3.5 w-3.5" />
+            {fmtPeriod(assessment.startDate, assessment.endDate)}
+          </p>
         </div>
-      </CardHeader>
-    </Card>
+        <div className="flex items-center gap-3 shrink-0">
+          <StatusBadge status={assessment.status} />
+          {showRing && <AdesaoRing pct={progress!.globalAdesao} />}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDuplicate}
+            disabled={duplicating}
+            aria-label="Duplicar avaliação"
+            className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+          >
+            {duplicating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <CopyPlus className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden sm:inline">Duplicar</span>
+          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEdit}
+              className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Editar</span>
+            </Button>
+          )}
+        </div>
+      </div>
+    </header>
   );
 }
 
-// ─── GheProgressCards ────────────────────────────────────────────────────────
+// ─── GheProgressRows ─────────────────────────────────────────────────────────
 
-function GheProgressCards({
+function GheProgressRows({
   byDept,
   status,
   onSimulate,
@@ -321,55 +320,59 @@ function GheProgressCards({
 }) {
   if (byDept.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-10 flex flex-col items-center text-center gap-2">
-          <Users className="h-5 w-5 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            Nenhum GHE vinculado a esta avaliação.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="border border-dashed border-border rounded-lg py-10 flex flex-col items-center text-center gap-2">
+        <Users className="h-5 w-5 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          Nenhum GHE vinculado a esta avaliação.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="max-h-96 overflow-y-auto scroll-area pr-1">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="max-h-96 overflow-y-auto scroll-area border-t border-border">
+      <ul className="divide-y divide-border">
         {byDept.map((d) => {
           const pct = safePct(d.pct);
           return (
-            <Card key={d.id} className="card-hover">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <CardTitle className="text-base truncate" title={d.name}>
-                      {d.name}
-                    </CardTitle>
-                    <CardDescription className="mt-0.5">GHE</CardDescription>
-                  </div>
-                  <EligibilityBadge isEligible={d.isEligible} />
+            <li
+              key={d.id}
+              className="surface-hover px-1 py-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
+            >
+              <div className="min-w-0 lg:flex-1 lg:max-w-[40%]">
+                <div
+                  className="font-display font-medium text-base truncate"
+                  title={d.name}
+                >
+                  {d.name}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                      Esperados
-                    </div>
-                    <div className="font-mono-numeric font-semibold">
-                      {d.expected.toLocaleString("pt-BR")}
-                    </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  GHE
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 lg:gap-8">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Esperados
                   </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                      Respondidos
-                    </div>
-                    <div className="font-mono-numeric font-semibold">
-                      {d.responded.toLocaleString("pt-BR")}
-                    </div>
+                  <div className="font-mono-numeric font-semibold text-foreground">
+                    {d.expected.toLocaleString("pt-BR")}
                   </div>
                 </div>
                 <div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    Respondidos
+                  </div>
+                  <div className="font-mono-numeric font-semibold text-foreground">
+                    {d.responded.toLocaleString("pt-BR")}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 lg:ml-auto">
+                <EligibilityBadge isEligible={d.isEligible} />
+                <div className="w-32 lg:w-40">
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="text-muted-foreground">Adesão</span>
                     <span
@@ -378,32 +381,34 @@ function GheProgressCards({
                       {pct}%
                     </span>
                   </div>
-                  <Progress value={pct} className="h-2" />
+                  <Progress
+                    value={pct}
+                    className="h-1.5"
+                    aria-label={`Adesão do GHE ${d.name}: ${pct} por cento`}
+                  />
                 </div>
-              </CardContent>
-              {status === "collecting" && (
-                <CardFooter className="pt-1">
+                {status === "collecting" && (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="w-full"
                     onClick={() => onSimulate({ id: d.id, name: d.name })}
                     disabled={simulatingId === d.id}
                     aria-label={`Simular respostas do GHE ${d.name}`}
+                    className="text-[var(--brand)] hover:text-[var(--brand-light)] shrink-0"
                   >
                     {simulatingId === d.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
                       <FlaskConical className="h-3.5 w-3.5" />
                     )}
-                    Simular respostas
+                    <span className="hidden sm:inline">Simular</span>
                   </Button>
-                </CardFooter>
-              )}
-            </Card>
+                )}
+              </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -468,58 +473,56 @@ function ParticipationField({
   }, []);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle className="text-base">Registro de participação</CardTitle>
-            <CardDescription>
-              Registre como os trabalhadores foram comunicados. Esta evidência
-              é exigida para a geração do relatório NR-1.
-            </CardDescription>
-          </div>
-          {status === "saving" && (
-            <span
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0"
-              role="status"
-              aria-live="polite"
-            >
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Salvando…
-            </span>
-          )}
-          {status === "saved" && (
-            <span
-              className="inline-flex items-center gap-1 text-xs text-risk-low shrink-0"
-              role="status"
-              aria-live="polite"
-            >
-              <CheckCircle2 className="h-3 w-3" />
-              Salvo
-            </span>
-          )}
+    <section className="border-b border-border pb-8">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-base text-foreground">
+            Registro de participação
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Registre como os trabalhadores foram comunicados. Esta evidência é
+            exigida para a geração do relatório NR-1.
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        <Label htmlFor="participation-registration" className="sr-only">
-          Registre como os trabalhadores foram comunicados.
-        </Label>
-        <Textarea
-          id="participation-registration"
-          value={value}
-          onChange={onChange}
-          disabled={disabled}
-          rows={5}
-          placeholder="Ex.: Reuniões de segurança em cada turno nos dias 12 e 13 de março; cartazes afixados nos murais; panfletos distribuídos nos vestiários; comunicado via e-mail corporativo."
-          className="resize-y"
-        />
-        <p className="text-xs text-muted-foreground mt-2">
-          {disabled
-            ? "Campo somente leitura — a avaliação não está em rascunho ou coleta."
-            : "Salvamento automático 1 segundo após você parar de digitar."}
-        </p>
-      </CardContent>
-    </Card>
+        {status === "saving" && (
+          <span
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0"
+            role="status"
+            aria-live="polite"
+          >
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Salvando…
+          </span>
+        )}
+        {status === "saved" && (
+          <span
+            className="inline-flex items-center gap-1 text-xs text-[var(--risk-low)] shrink-0"
+            role="status"
+            aria-live="polite"
+          >
+            <CheckCircle2 className="h-3 w-3" />
+            Salvo
+          </span>
+        )}
+      </div>
+      <Label htmlFor="participation-registration" className="sr-only">
+        Registre como os trabalhadores foram comunicados.
+      </Label>
+      <Textarea
+        id="participation-registration"
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        rows={5}
+        placeholder="Ex.: Reuniões de segurança em cada turno nos dias 12 e 13 de março; cartazes afixados nos murais; panfletos distribuídos nos vestiários; comunicado via e-mail corporativo."
+        className="resize-y bg-[var(--surface)]"
+      />
+      <p className="text-xs text-muted-foreground mt-2">
+        {disabled
+          ? "Campo somente leitura — a avaliação não está em rascunho ou coleta."
+          : "Salvamento automático 1 segundo após você parar de digitar."}
+      </p>
+    </section>
   );
 }
 
@@ -626,102 +629,104 @@ function CollectionLinks({
   if (departments.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Links de coleta</CardTitle>
-        <CardDescription>
+    <section className="border-b border-border pb-8">
+      <div className="mb-3">
+        <h2 className="font-display text-base text-foreground">
+          Links de coleta
+        </h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
           Distribua um link exclusivo por GHE. Cada link abre o portal do
           trabalhador e aceita uma única resposta anônima.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="max-h-96 overflow-y-auto scroll-area">
-          <ul className="divide-y divide-border">
-            {departments.map((ad) => {
-              const token = tokens[ad.id] ?? null;
-              const link = token ? buildLink(token) : null;
-              return (
-                <li
-                  key={ad.id}
-                  className="px-6 py-4 flex flex-col gap-2"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div
-                        className="font-medium truncate"
-                        title={ad.name}
-                      >
-                        {ad.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        GHE · {ad.expected} esperados ·{" "}
-                        {ad.responded} respondidos
-                      </div>
+        </p>
+      </div>
+      <div className="border-t border-border">
+        <ul className="divide-y divide-border">
+          {departments.map((ad) => {
+            const token = tokens[ad.id] ?? null;
+            const link = token ? buildLink(token) : null;
+            return (
+              <li
+                key={ad.id}
+                className="surface-hover py-4 flex flex-col gap-2"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div
+                      className="font-display font-medium truncate"
+                      title={ad.name}
+                    >
+                      {ad.name}
                     </div>
-                    <EligibilityBadge isEligible={ad.isEligible} />
+                    <div className="text-xs text-muted-foreground font-mono-numeric">
+                      GHE · {ad.expected} esperados · {ad.responded} respondidos
+                    </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <code
-                      className="flex-1 min-w-0 truncate rounded-md bg-muted px-2 py-1.5 text-xs font-mono-numeric text-muted-foreground"
-                      aria-label={
-                        link
-                          ? `Link do GHE ${ad.name}`
-                          : `Link do GHE ${ad.name} indisponível`
+                  <EligibilityBadge isEligible={ad.isEligible} />
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <code
+                    className="flex-1 min-w-0 truncate rounded-md bg-[var(--surface)] px-2 py-1.5 text-xs font-mono-numeric text-muted-foreground"
+                    aria-label={
+                      link
+                        ? `Link do GHE ${ad.name}`
+                        : `Link do GHE ${ad.name} indisponível`
+                    }
+                  >
+                    {loading ? "Gerando link…" : link ?? "Indisponível"}
+                  </code>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        token && void copyLink(token, ad.id)
                       }
+                      disabled={!token}
+                      aria-label={`Copiar link do GHE ${ad.name}`}
+                      className="text-[var(--brand)] hover:text-[var(--brand-light)]"
                     >
-                      {loading
-                        ? "Gerando link…"
-                        : link ?? "Indisponível"}
-                    </code>
-                    <div className="flex gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          token && void copyLink(token, ad.id)
-                        }
-                        disabled={!token}
-                        aria-label={`Copiar link do GHE ${ad.name}`}
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                        Copiar link
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          token && void copyWhatsApp(token, ad.id)
-                        }
-                        disabled={!token}
-                        aria-label={`Copiar mensagem de WhatsApp do GHE ${ad.name}`}
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" />
-                        WhatsApp
-                      </Button>
-                    </div>
+                      <Copy className="h-3.5 w-3.5" />
+                      Copiar link
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        token && void copyWhatsApp(token, ad.id)
+                      }
+                      disabled={!token}
+                      aria-label={`Copiar mensagem de WhatsApp do GHE ${ad.name}`}
+                      className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      WhatsApp
+                    </Button>
                   </div>
-                  {copied === ad.id && (
-                    <p
-                      className="text-xs text-risk-low inline-flex items-center gap-1"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <CheckCircle2 className="h-3 w-3" />
-                      Copiado.
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+                </div>
+                {copied === ad.id && (
+                  <p
+                    className="text-xs text-[var(--risk-low)] inline-flex items-center gap-1"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <CheckCircle2 className="h-3 w-3" />
+                    Copiado.
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      {error && (
+        <div
+          className="mt-3 text-xs text-[var(--risk-high)]"
+          role="alert"
+        >
+          {error}
         </div>
-        {error && (
-          <div className="px-6 py-3 text-xs text-destructive" role="alert">
-            {error}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </section>
   );
 }
 
@@ -750,201 +755,204 @@ function StatusActions({
 }) {
   if (status === "draft") {
     return (
-      <Card>
-        <CardContent className="py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-md bg-brand-light/15 flex items-center justify-center shrink-0">
-              <Rocket className="h-4 w-4 text-brand-light" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-medium">Avaliação pronta para lançar</p>
-              <p className="text-sm text-muted-foreground">
-                Ao lançar, os links de coleta serão gerados e o status mudará
-                para &quot;Coletando respostas&quot;.
-              </p>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-5">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="h-9 w-9 rounded-md bg-[var(--sidebar-accent)] flex items-center justify-center shrink-0">
+            <Rocket className="h-4 w-4 text-[var(--brand)]" />
           </div>
-          <Button
-            onClick={onLaunch}
-            disabled={launching}
-            className="shrink-0"
-          >
-            {launching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Rocket className="h-4 w-4" />
-            )}
-            Lançar Avaliação
-          </Button>
-        </CardContent>
-      </Card>
+          <div className="min-w-0">
+            <p className="font-display font-medium text-foreground">
+              Avaliação pronta para lançar
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Ao lançar, os links de coleta serão gerados e o status mudará
+              para &quot;Coletando respostas&quot;.
+            </p>
+          </div>
+        </div>
+        <Button
+          onClick={onLaunch}
+          disabled={launching}
+          className="shrink-0"
+        >
+          {launching ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Rocket className="h-4 w-4" />
+          )}
+          Lançar Avaliação
+        </Button>
+      </div>
     );
   }
 
   if (status === "collecting") {
     return (
-      <Card>
-        <CardContent className="py-5 flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="h-9 w-9 rounded-md bg-risk-medium/15 flex items-center justify-center shrink-0">
-                <Lock className="h-4 w-4 text-risk-medium" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium">Coleta em andamento</p>
-                <p className="text-sm text-muted-foreground">
-                  Encerre a coleta para calcular os escores. Esta ação é
-                  irreversível e bloqueará novas respostas.
-                </p>
-              </div>
+      <div className="flex flex-col gap-4 py-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-md bg-[var(--surface)] flex items-center justify-center shrink-0">
+              <Lock className="h-4 w-4 text-[var(--risk-medium)]" />
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" className="shrink-0">
-                  <Lock className="h-4 w-4" />
-                  Encerrar Coleta
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Encerrar coleta?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação é <strong>irreversível</strong>. Após o
-                    encerramento, novos respondentes não poderão participar, os
-                    escores serão calculados e o status mudará para
-                    &quot;Concluída&quot;. GHEs com menos de 5 respostas serão
-                    marcados como inelegíveis.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={closing}>
-                    Cancelar
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    disabled={closing}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      onClose();
-                    }}
-                  >
-                    {closing && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Encerrar e calcular
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-border pt-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="h-9 w-9 rounded-md bg-warning/15 flex items-center justify-center shrink-0">
-                <FlaskConical className="h-4 w-4 text-warning" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium">Simular respostas (demo)</p>
-                <p className="text-sm text-muted-foreground">
-                  Gere respostas fictícias em massa para demonstração e testes.
-                  Use apenas em ambientes de demonstração.
-                </p>
-              </div>
+            <div className="min-w-0">
+              <p className="font-display font-medium text-foreground">
+                Coleta em andamento
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Encerre a coleta para calcular os escores. Esta ação é
+                irreversível e bloqueará novas respostas.
+              </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={onSimulate}
-              disabled={simulating}
-              className="shrink-0"
-              aria-label="Simular respostas em todos os GHEs"
-            >
-              {simulating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FlaskConical className="h-4 w-4" />
-              )}
-              Simular respostas
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                className="shrink-0 bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+              >
+                <Lock className="h-4 w-4" />
+                Encerrar Coleta
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-display text-xl">
+                  Encerrar coleta?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação é <strong>irreversível</strong>. Após o
+                  encerramento, novos respondentes não poderão participar, os
+                  escores serão calculados e o status mudará para
+                  &quot;Concluída&quot;. GHEs com menos de 5 respostas serão
+                  marcados como inelegíveis.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={closing}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={closing}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onClose();
+                  }}
+                  className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+                >
+                  {closing && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Encerrar e calcular
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-border pt-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-md bg-[var(--surface)] flex items-center justify-center shrink-0">
+              <FlaskConical className="h-4 w-4 text-[var(--risk-medium)]" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-display font-medium text-foreground">
+                Simular respostas (demo)
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Gere respostas fictícias em massa para demonstração e testes.
+                Use apenas em ambientes de demonstração.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={onSimulate}
+            disabled={simulating}
+            className="shrink-0"
+            aria-label="Simular respostas em todos os GHEs"
+          >
+            {simulating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FlaskConical className="h-4 w-4" />
+            )}
+            Simular respostas
+          </Button>
+        </div>
+      </div>
     );
   }
 
   if (status === "completed") {
     return (
-      <Card>
-        <CardContent className="py-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="h-9 w-9 rounded-md bg-risk-low/15 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="h-4 w-4 text-risk-low" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium">Avaliação concluída</p>
-                <p className="text-sm text-muted-foreground">
-                  Acesse os resultados e dê continuidade ao ciclo NR-1.
-                </p>
-              </div>
+      <div className="py-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-md bg-[var(--surface)] flex items-center justify-center shrink-0">
+              <CheckCircle2 className="h-4 w-4 text-[var(--risk-low)]" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-display font-medium text-foreground">
+                Avaliação concluída
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Acesse os resultados e dê continuidade ao ciclo NR-1.
+              </p>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Button
-              onClick={() => onNavigate("resultados")}
-              className="w-full"
-            >
-              <BarChart3 className="h-4 w-4" />
-              Ver Resultados
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => onNavigate("inventario")}
-              className="w-full"
-            >
-              <ListChecks className="h-4 w-4" />
-              Inventário de Riscos
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => onNavigate("plano")}
-              className="w-full"
-            >
-              <ClipboardList className="h-4 w-4" />
-              Plano de Ação
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => onNavigate("relatorio")}
-              className="w-full"
-            >
-              <FileText className="h-4 w-4" />
-              Relatório
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Button
+            onClick={() => onNavigate("resultados")}
+            className="w-full"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Ver Resultados
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onNavigate("inventario")}
+            className="w-full"
+          >
+            <ListChecks className="h-4 w-4" />
+            Inventário de Riscos
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onNavigate("plano")}
+            className="w-full"
+          >
+            <ClipboardList className="h-4 w-4" />
+            Plano de Ação
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onNavigate("relatorio")}
+            className="w-full"
+          >
+            <FileText className="h-4 w-4" />
+            Relatório
+          </Button>
+        </div>
+      </div>
     );
   }
 
   if (status === "processing") {
     return (
-      <Card>
-        <CardContent className="py-5 flex items-center gap-3">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            Processando resultados…
-          </p>
-        </CardContent>
-      </Card>
+      <div className="py-5 flex items-center gap-3">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          Processando resultados…
+        </p>
+      </div>
     );
   }
 
   // archived or unknown
   return (
-    <Card>
-      <CardContent className="py-5 flex items-center gap-3">
-        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Esta avaliação foi arquivada.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="py-5 flex items-center gap-3">
+      <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">
+        Esta avaliação foi arquivada.
+      </p>
+    </div>
   );
 }
 
@@ -967,7 +975,9 @@ function DuplicateAssessmentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Duplicar avaliação</DialogTitle>
+          <DialogTitle className="font-display text-xl">
+            Duplicar avaliação
+          </DialogTitle>
           <DialogDescription>
             Será criada uma nova avaliação em rascunho com os mesmos GHEs e
             respostas esperadas. As respostas anteriores não serão copiadas.
@@ -1046,7 +1056,7 @@ function DuplicateAssessmentForm({
         />
       </div>
       {err && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-sm text-[var(--risk-high)]" role="alert">
           {err}
         </p>
       )}
@@ -1089,7 +1099,9 @@ function EditAssessmentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Editar avaliação</DialogTitle>
+          <DialogTitle className="font-display text-xl">
+            Editar avaliação
+          </DialogTitle>
           <DialogDescription>
             Ajuste os dados do ciclo. Disponível apenas em rascunho ou durante
             a coleta.
@@ -1205,10 +1217,11 @@ function EditAssessmentForm({
           value={participation}
           onChange={(e) => setParticipation(e.target.value)}
           placeholder="Como os trabalhadores foram comunicados."
+          className="bg-[var(--surface)]"
         />
       </div>
       {err && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-sm text-[var(--risk-high)]" role="alert">
           {err}
         </p>
       )}
@@ -1261,7 +1274,9 @@ function SimulateResponsesDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Simular respostas (demo)</DialogTitle>
+          <DialogTitle className="font-display text-xl">
+            Simular respostas (demo)
+          </DialogTitle>
           <DialogDescription>
             Gera respostas simuladas para demonstração e testes. Os dados são
             fictícios e não representam trabalhadores reais. Use apenas em
@@ -1410,16 +1425,16 @@ function SimulateResponsesForm({
         </p>
       </div>
 
-      <Alert className="border-warning/40 bg-warning/10 text-warning">
-        <AlertTriangle className="h-4 w-4 text-warning" />
-        <AlertDescription className="text-warning">
+      <Alert className="border-[var(--risk-medium)]/40 bg-[var(--surface)] text-[var(--risk-medium)]">
+        <AlertTriangle className="h-4 w-4 text-[var(--risk-medium)]" />
+        <AlertDescription className="text-[var(--risk-medium)]">
           As respostas simuladas não podem ser removidas individualmente. Se
           necessário, encerre e duplique a avaliação para recomeçar.
         </AlertDescription>
       </Alert>
 
       {err && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-sm text-[var(--risk-high)]" role="alert">
           {err}
         </p>
       )}
@@ -1452,11 +1467,12 @@ function DetailSkeleton() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6">
       <Skeleton className="h-8 w-40" />
+      <Skeleton className="h-24 w-full" />
       <Skeleton className="h-32 w-full" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Skeleton className="h-44" />
-        <Skeleton className="h-44" />
-        <Skeleton className="h-44" />
+      <div className="border-t border-border">
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-20 w-full" />
       </div>
       <Skeleton className="h-40 w-full" />
     </div>
@@ -1614,21 +1630,21 @@ export function AvaliacaoDetailView() {
   if (!assessmentId) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-3xl mx-auto w-full">
-        <Card className="border-dashed">
-          <CardContent className="py-12 flex flex-col items-center text-center gap-3">
-            <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="font-medium">Nenhuma avaliação selecionada</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Volte para a empresa e selecione uma avaliação para visualizar
-                seus detalhes.
-              </p>
-            </div>
-            <Button onClick={() => go("painel")}>Voltar ao painel</Button>
-          </CardContent>
-        </Card>
+        <div className="border border-dashed border-border rounded-lg py-12 flex flex-col items-center text-center gap-3">
+          <div className="h-11 w-11 rounded-full bg-[var(--surface)] flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-display text-lg text-foreground">
+              Nenhuma avaliação selecionada
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Volte para a empresa e selecione uma avaliação para visualizar
+              seus detalhes.
+            </p>
+          </div>
+          <Button onClick={() => go("painel")}>Voltar ao painel</Button>
+        </div>
       </div>
     );
   }
@@ -1638,28 +1654,28 @@ export function AvaliacaoDetailView() {
   if (error || !assessment) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-3xl mx-auto w-full">
-        <Card className="border-destructive/30">
-          <CardContent className="py-10 flex flex-col items-center text-center gap-3">
-            <div className="h-11 w-11 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <p className="font-medium">Falha ao carregar a avaliação</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {error ?? "Tente novamente."}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => go("painel")}>
-                Voltar ao painel
-              </Button>
-              <Button variant="outline" onClick={() => void load()}>
-                <RefreshCw className="h-4 w-4" />
-                Tentar novamente
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="border border-dashed border-border rounded-lg py-10 flex flex-col items-center text-center gap-3">
+          <div className="h-11 w-11 rounded-full risk-high-bg flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-display text-lg text-foreground">
+              Falha ao carregar a avaliação
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {error ?? "Tente novamente."}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => go("painel")}>
+              Voltar ao painel
+            </Button>
+            <Button variant="outline" onClick={() => void load()}>
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1761,7 +1777,7 @@ export function AvaliacaoDetailView() {
       )}
 
       {/* Status action buttons */}
-      <section className="mt-4" aria-label="Ações da avaliação">
+      <section className="mt-4 border-b border-border" aria-label="Ações da avaliação">
         <StatusActions
           status={status}
           launching={launching}
@@ -1774,34 +1790,32 @@ export function AvaliacaoDetailView() {
         />
       </section>
 
-      {/* GHE progress cards */}
+      {/* GHE progress rows */}
       <section className="mt-6" aria-label="Progresso por GHE">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+        <h2 className="font-display text-xl text-foreground mb-3">
           Progresso por GHE
         </h2>
         {progress ? (
-          <GheProgressCards
+          <GheProgressRows
             byDept={progress.byDept}
             status={status}
             onSimulate={(d) => onSimulatePerGhe(d)}
             simulatingId={simulating ? "__global__" : null}
           />
         ) : (
-          <Card>
-            <CardContent className="py-8 flex flex-col items-center text-center gap-2">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                {isDraft
-                  ? "Lance a avaliação para começar a acompanhar o progresso de coleta."
-                  : "Sem dados de progresso disponíveis."}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="border border-dashed border-border rounded-lg py-8 flex flex-col items-center text-center gap-2">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              {isDraft
+                ? "Lance a avaliação para começar a acompanhar o progresso de coleta."
+                : "Sem dados de progresso disponíveis."}
+            </p>
+          </div>
         )}
       </section>
 
       {/* Participation field */}
-      <section className="mt-6" aria-label="Registro de participação">
+      <section className="mt-8" aria-label="Registro de participação">
         <ParticipationField
           assessmentId={assessment.id}
           initial={assessment.participationRegistration ?? ""}
@@ -1813,7 +1827,7 @@ export function AvaliacaoDetailView() {
       {isCollecting &&
         assessment.departments &&
         assessment.departments.length > 0 && (
-          <section className="mt-6" aria-label="Links de coleta">
+          <section className="mt-8" aria-label="Links de coleta">
             <CollectionLinks
               departments={assessment.departments}
               assessmentId={assessment.id}

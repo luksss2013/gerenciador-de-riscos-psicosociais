@@ -36,13 +36,6 @@ import { classifyInventoryRisk } from "@/lib/scoring";
 import { RISK_LEVEL_LABELS } from "@/lib/errors";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -227,7 +220,7 @@ function EditableTextCell({
         setEditingCell({ itemId: item.id, field });
         setDraft(value ?? "");
       }}
-      className="group w-full text-left text-xs rounded-sm px-2 py-1.5 -mx-2 -my-1 hover:bg-accent/60 transition-colors min-h-[36px] flex items-start gap-1.5"
+      className="group w-full text-left text-xs rounded-sm px-2 py-1.5 -mx-2 -my-1 hover:bg-[var(--surface)] transition-colors min-h-[36px] flex items-start gap-1.5"
       aria-label={ariaLabel}
     >
       {value && value.trim().length > 0 ? (
@@ -245,7 +238,7 @@ function EditableTextCell({
           />
         ) : isSaved ? (
           <Check
-            className="h-3 w-3 text-risk-low"
+            className="h-3 w-3 text-[var(--risk-low)]"
             aria-label="Salvo"
           />
         ) : (
@@ -324,7 +317,7 @@ function EditableSelectCell({
     <button
       type="button"
       onClick={() => setEditingCell({ itemId: item.id, field })}
-      className="group w-full inline-flex items-center justify-between gap-1 text-xs rounded-sm px-2 py-1 -mx-2 -my-1 hover:bg-accent/60 transition-colors min-h-[28px]"
+      className="group w-full inline-flex items-center justify-between gap-1 text-xs rounded-sm px-2 py-1 -mx-2 -my-1 hover:bg-[var(--surface)] transition-colors min-h-[28px]"
       aria-label={ariaLabel}
     >
       <span className="font-mono-numeric font-medium">{currentLabel}</span>
@@ -335,7 +328,7 @@ function EditableSelectCell({
         />
       ) : isSaved ? (
         <Check
-          className="h-3 w-3 text-risk-low"
+          className="h-3 w-3 text-[var(--risk-low)]"
           aria-label="Salvo"
         />
       ) : (
@@ -383,284 +376,320 @@ function InventoryTable({
   }, [items]);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ListPlus className="h-4 w-4" />
-          Itens do inventário
-        </CardTitle>
-        <CardDescription>
-          {items.length} item(ns) no inventário. Clique em uma célula para
-          editar. Alterações são salvas automaticamente.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto scroll-area">
-          <Table className="min-w-[1280px]">
-            <caption className="sr-only">
-              Inventário de riscos psicossociais. Colunas: tipo (automático ou
-              manual), GHE, fator FRPRT MTE, dimensão COPSOQ, perigo
-              identificado, possíveis danos, probabilidade, severidade, nível de
-              risco calculado, controles existentes, medidas propostas, ações.
-            </caption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[80px]">Tipo</TableHead>
-                <TableHead className="w-[140px]">GHE</TableHead>
-                <TableHead className="w-[200px]">Fator FRPRT MTE</TableHead>
-                <TableHead className="w-[200px]">Dimensão</TableHead>
-                <TableHead className="w-[220px]">Perigo Identificado</TableHead>
-                <TableHead className="w-[220px]">Possíveis Danos</TableHead>
-                <TableHead className="w-[150px]">Probabilidade</TableHead>
-                <TableHead className="w-[150px]">Severidade</TableHead>
-                <TableHead className="w-[110px]">Nível</TableHead>
-                <TableHead className="w-[220px]">Controles Existentes</TableHead>
-                <TableHead className="w-[260px]">Medidas Propostas</TableHead>
-                <TableHead className="w-[80px] text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((item) => {
-                const mte = mteFactorInfo(item.mteFactorCode);
-                const dim = item.dimensionCode
-                  ? (() => {
-                      try {
-                        return getDimension(item.dimensionCode as DimensionCode);
-                      } catch {
-                        return null;
-                      }
-                    })()
-                  : null;
-                return (
-                  <TableRow key={item.id} className="align-top">
-                    <TableCell className="align-top">
-                      {item.isManual ? (
-                        <Badge className="bg-brand-light/10 text-brand-light border-transparent">
-                          Manual
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          Auto
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top font-medium">
-                      <div
-                        className="truncate max-w-[140px]"
-                        title={item.departmentName ?? "—"}
+    <section
+      aria-label="Itens do inventário"
+      className="border-t border-border"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 pt-4 pb-4">
+        <div className="min-w-0">
+          <h2 className="font-display text-xl tracking-tight text-foreground flex items-center gap-2">
+            <ListPlus className="h-4 w-4 text-[var(--brand)]" aria-hidden="true" />
+            Itens do inventário
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {items.length} item(ns) no inventário. Clique em uma célula para
+            editar — as alterações são salvas automaticamente.
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto scroll-area border-t border-border">
+        <Table className="min-w-[1280px]">
+          <caption className="sr-only">
+            Inventário de riscos psicossociais. Colunas: tipo (automático ou
+            manual), GHE, fator FRPRT MTE, dimensão COPSOQ, perigo
+            identificado, possíveis danos, probabilidade, severidade, nível de
+            risco calculado, controles existentes, medidas propostas, ações.
+          </caption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent border-b border-border">
+              <TableHead className="w-[80px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Tipo
+              </TableHead>
+              <TableHead className="w-[140px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                GHE
+              </TableHead>
+              <TableHead className="w-[200px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Fator FRPRT MTE
+              </TableHead>
+              <TableHead className="w-[200px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Dimensão
+              </TableHead>
+              <TableHead className="w-[220px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Perigo Identificado
+              </TableHead>
+              <TableHead className="w-[220px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Possíveis Danos
+              </TableHead>
+              <TableHead className="w-[150px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Probabilidade
+              </TableHead>
+              <TableHead className="w-[150px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Severidade
+              </TableHead>
+              <TableHead className="w-[110px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Nível
+              </TableHead>
+              <TableHead className="w-[220px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Controles Existentes
+              </TableHead>
+              <TableHead className="w-[260px] text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Medidas Propostas
+              </TableHead>
+              <TableHead className="w-[80px] text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Ações
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((item) => {
+              const mte = mteFactorInfo(item.mteFactorCode);
+              const dim = item.dimensionCode
+                ? (() => {
+                    try {
+                      return getDimension(item.dimensionCode as DimensionCode);
+                    } catch {
+                      return null;
+                    }
+                  })()
+                : null;
+              return (
+                <TableRow
+                  key={item.id}
+                  className="border-b border-border hover:bg-[var(--surface)] transition-colors"
+                >
+                  <TableCell className="py-3 align-top">
+                    {item.isManual ? (
+                      <Badge
+                        variant="outline"
+                        className="border-[var(--brand-light)]/40 text-[var(--brand-light)] bg-transparent"
                       >
-                        {item.departmentName ?? "—"}
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      {mte ? (
-                        <Badge
-                          variant="outline"
-                          className="font-mono-numeric gap-1 max-w-[200px]"
+                        Manual
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground border-border bg-transparent"
+                      >
+                        Auto
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3 align-top font-medium">
+                    <div
+                      className="truncate max-w-[140px] text-sm"
+                      title={item.departmentName ?? "—"}
+                    >
+                      {item.departmentName ?? "—"}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    {mte ? (
+                      <Badge
+                        variant="outline"
+                        className="font-mono-numeric gap-1 max-w-[200px] bg-transparent"
+                      >
+                        <span className="font-semibold">{mte.code}</span>
+                        <span className="text-muted-foreground font-sans">·</span>
+                        <span className="font-sans font-normal truncate">
+                          {mte.name}
+                        </span>
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    {dim ? (
+                      <Badge
+                        variant="outline"
+                        className="font-mono-numeric gap-1 max-w-[200px] bg-transparent"
+                      >
+                        <span className="font-semibold">{dim.code}</span>
+                        <span className="text-muted-foreground font-sans">·</span>
+                        <span className="font-sans font-normal truncate">
+                          {dim.namePtBr}
+                        </span>
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    <EditableTextCell
+                      item={item}
+                      field="hazardDescription"
+                      value={item.hazardDescription}
+                      placeholder="Clique para descrever o perigo…"
+                      ariaLabel="Editar perigo identificado"
+                      onPatch={onPatch}
+                      savingCell={savingCell}
+                      savedCell={savedCell}
+                      editingCell={editingCell}
+                      setEditingCell={setEditingCell}
+                      draft={draft}
+                      setDraft={setDraft}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    <EditableTextCell
+                      item={item}
+                      field="possibleHarms"
+                      value={item.possibleHarms}
+                      placeholder="Clique para descrever os danos…"
+                      ariaLabel="Editar possíveis danos"
+                      onPatch={onPatch}
+                      savingCell={savingCell}
+                      savedCell={savedCell}
+                      editingCell={editingCell}
+                      setEditingCell={setEditingCell}
+                      draft={draft}
+                      setDraft={setDraft}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    <EditableSelectCell
+                      item={item}
+                      field="probability"
+                      value={item.probability}
+                      options={PROB_OPTIONS}
+                      ariaLabel={`Editar probabilidade do item ${item.id}`}
+                      onPatch={onPatch}
+                      savingCell={savingCell}
+                      savedCell={savedCell}
+                      editingCell={editingCell}
+                      setEditingCell={setEditingCell}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    <EditableSelectCell
+                      item={item}
+                      field="severity"
+                      value={item.severity}
+                      options={SEV_OPTIONS}
+                      ariaLabel={`Editar severidade do item ${item.id}`}
+                      onPatch={onPatch}
+                      savingCell={savingCell}
+                      savedCell={savedCell}
+                      editingCell={editingCell}
+                      setEditingCell={setEditingCell}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    <RiskLevelCell
+                      probability={item.probability}
+                      severity={item.severity}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    <EditableTextCell
+                      item={item}
+                      field="existingControls"
+                      value={item.existingControls}
+                      placeholder="Clique para descrever controles…"
+                      ariaLabel="Editar controles existentes"
+                      onPatch={onPatch}
+                      savingCell={savingCell}
+                      savedCell={savedCell}
+                      editingCell={editingCell}
+                      setEditingCell={setEditingCell}
+                      draft={draft}
+                      setDraft={setDraft}
+                    />
+                  </TableCell>
+                  <TableCell className="py-3 align-top">
+                    <div className="flex flex-col gap-1.5">
+                      <EditableTextCell
+                        item={item}
+                        field="proposedMeasures"
+                        value={item.proposedMeasures}
+                        placeholder="Clique para propor medidas…"
+                        ariaLabel="Editar medidas propostas"
+                        onPatch={onPatch}
+                        savingCell={savingCell}
+                        savedCell={savedCell}
+                        editingCell={editingCell}
+                        setEditingCell={setEditingCell}
+                        draft={draft}
+                        setDraft={setDraft}
+                      />
+                      {item.proposedMeasures &&
+                      item.proposedMeasures.trim().length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => onCreateAction(item)}
+                          className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:text-[var(--brand-light)] hover:underline self-start font-medium"
+                          aria-label={`Criar ação a partir das medidas propostas do item ${item.id}`}
                         >
-                          <span className="font-semibold">{mte.code}</span>
-                          <span className="text-muted-foreground font-sans">·</span>
-                          <span className="font-sans font-normal truncate">
-                            {mte.name}
-                          </span>
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      {dim ? (
-                        <Badge
-                          variant="outline"
-                          className="font-mono-numeric gap-1 max-w-[200px]"
-                        >
-                          <span className="font-semibold">{dim.code}</span>
-                          <span className="text-muted-foreground font-sans">·</span>
-                          <span className="font-sans font-normal truncate">
-                            {dim.namePtBr}
-                          </span>
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <EditableTextCell
-                        item={item}
-                        field="hazardDescription"
-                        value={item.hazardDescription}
-                        placeholder="Clique para descrever o perigo…"
-                        ariaLabel="Editar perigo identificado"
-                        onPatch={onPatch}
-                        savingCell={savingCell}
-                        savedCell={savedCell}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                        draft={draft}
-                        setDraft={setDraft}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <EditableTextCell
-                        item={item}
-                        field="possibleHarms"
-                        value={item.possibleHarms}
-                        placeholder="Clique para descrever os danos…"
-                        ariaLabel="Editar possíveis danos"
-                        onPatch={onPatch}
-                        savingCell={savingCell}
-                        savedCell={savedCell}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                        draft={draft}
-                        setDraft={setDraft}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <EditableSelectCell
-                        item={item}
-                        field="probability"
-                        value={item.probability}
-                        options={PROB_OPTIONS}
-                        ariaLabel={`Editar probabilidade do item ${item.id}`}
-                        onPatch={onPatch}
-                        savingCell={savingCell}
-                        savedCell={savedCell}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <EditableSelectCell
-                        item={item}
-                        field="severity"
-                        value={item.severity}
-                        options={SEV_OPTIONS}
-                        ariaLabel={`Editar severidade do item ${item.id}`}
-                        onPatch={onPatch}
-                        savingCell={savingCell}
-                        savedCell={savedCell}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <RiskLevelCell
-                        probability={item.probability}
-                        severity={item.severity}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <EditableTextCell
-                        item={item}
-                        field="existingControls"
-                        value={item.existingControls}
-                        placeholder="Clique para descrever controles…"
-                        ariaLabel="Editar controles existentes"
-                        onPatch={onPatch}
-                        savingCell={savingCell}
-                        savedCell={savedCell}
-                        editingCell={editingCell}
-                        setEditingCell={setEditingCell}
-                        draft={draft}
-                        setDraft={setDraft}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="flex flex-col gap-1.5">
-                        <EditableTextCell
-                          item={item}
-                          field="proposedMeasures"
-                          value={item.proposedMeasures}
-                          placeholder="Clique para propor medidas…"
-                          ariaLabel="Editar medidas propostas"
-                          onPatch={onPatch}
-                          savingCell={savingCell}
-                          savedCell={savedCell}
-                          editingCell={editingCell}
-                          setEditingCell={setEditingCell}
-                          draft={draft}
-                          setDraft={setDraft}
-                        />
-                        {item.proposedMeasures &&
-                        item.proposedMeasures.trim().length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => onCreateAction(item)}
-                            className="inline-flex items-center gap-1 text-xs text-brand-light hover:underline self-start font-medium"
-                            aria-label={`Criar ação a partir das medidas propostas do item ${item.id}`}
+                          <ArrowRight className="h-3 w-3" />
+                          Criar Ação
+                        </button>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3 align-top text-right">
+                    {item.isManual ? (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-[var(--risk-high)]"
+                            aria-label="Excluir item manual do inventário"
                           >
-                            <ArrowRight className="h-3 w-3" />
-                            Criar Ação
-                          </button>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top text-right">
-                      {item.isManual ? (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="font-display text-xl">
+                              Excluir item do inventário?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação remove o risco manual do inventário
+                              e não pode ser desfeita.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => {
+                                void onDelete(item.id);
+                              }}
+                              className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span tabIndex={0} className="inline-flex">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              aria-label="Excluir item manual do inventário"
+                              className="h-8 w-8 text-muted-foreground/40 cursor-not-allowed"
+                              disabled
+                              aria-label="Itens automáticos não podem ser excluídos"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>
-                                Excluir item do inventário?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação remove o risco manual do inventário
-                                e não pode ser desfeita.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => {
-                                  void onDelete(item.id);
-                                }}
-                                className="bg-destructive text-white hover:bg-destructive/90"
-                              >
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span tabIndex={0} className="inline-flex">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground/40 cursor-not-allowed"
-                                disabled
-                                aria-label="Itens automáticos não podem ser excluídos"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Itens automáticos não podem ser excluídos
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Itens automáticos não podem ser excluídos
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
         </div>
-      </CardContent>
-    </Card>
+    </section>
   );
 }
 
@@ -685,8 +714,8 @@ function ManualRiskForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
+          <DialogTitle className="font-display text-xl flex items-center gap-2">
+            <Plus className="h-4 w-4 text-[var(--brand)]" />
             Adicionar Risco Manual
           </DialogTitle>
           <DialogDescription>
@@ -819,7 +848,7 @@ function ManualRiskFormContents({
 
       <div className="space-y-1.5">
         <Label htmlFor="manual-mte">
-          Fator FRPRT MTE <span className="text-destructive">*</span>
+          Fator FRPRT MTE <span className="text-[var(--risk-high)]">*</span>
         </Label>
         <Select value={mteFactorCode} onValueChange={setMteFactorCode}>
           <SelectTrigger
@@ -839,7 +868,7 @@ function ManualRiskFormContents({
           </SelectContent>
         </Select>
         {errors.mteFactorCode ? (
-          <p className="text-xs text-destructive">{errors.mteFactorCode}</p>
+          <p className="text-xs text-[var(--risk-high)]">{errors.mteFactorCode}</p>
         ) : null}
       </div>
 
@@ -865,7 +894,7 @@ function ManualRiskFormContents({
 
       <div className="space-y-1.5">
         <Label htmlFor="manual-hazard">
-          Perigo Identificado <span className="text-destructive">*</span>
+          Perigo Identificado <span className="text-[var(--risk-high)]">*</span>
         </Label>
         <Textarea
           id="manual-hazard"
@@ -876,13 +905,13 @@ function ManualRiskFormContents({
           aria-invalid={!!errors.hazardDescription}
         />
         {errors.hazardDescription ? (
-          <p className="text-xs text-destructive">{errors.hazardDescription}</p>
+          <p className="text-xs text-[var(--risk-high)]">{errors.hazardDescription}</p>
         ) : null}
       </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="manual-harms">
-          Possíveis Danos <span className="text-destructive">*</span>
+          Possíveis Danos <span className="text-[var(--risk-high)]">*</span>
         </Label>
         <Textarea
           id="manual-harms"
@@ -893,14 +922,14 @@ function ManualRiskFormContents({
           aria-invalid={!!errors.possibleHarms}
         />
         {errors.possibleHarms ? (
-          <p className="text-xs text-destructive">{errors.possibleHarms}</p>
+          <p className="text-xs text-[var(--risk-high)]">{errors.possibleHarms}</p>
         ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="manual-prob">
-            Probabilidade <span className="text-destructive">*</span>
+            Probabilidade <span className="text-[var(--risk-high)]">*</span>
           </Label>
           <Select value={probability} onValueChange={setProbability}>
             <SelectTrigger
@@ -921,7 +950,7 @@ function ManualRiskFormContents({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="manual-sev">
-            Severidade <span className="text-destructive">*</span>
+            Severidade <span className="text-[var(--risk-high)]">*</span>
           </Label>
           <Select value={severity} onValueChange={setSeverity}>
             <SelectTrigger
@@ -942,8 +971,8 @@ function ManualRiskFormContents({
         </div>
       </div>
 
-      <div className="rounded-md border border-border bg-muted/30 p-3 text-xs flex items-center gap-2 flex-wrap">
-        <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <div className="rounded-md border border-[var(--brand-light)]/30 bg-[var(--surface)] p-3 text-xs flex items-center gap-2 flex-wrap">
+        <Info className="h-3.5 w-3.5 text-[var(--brand)] shrink-0" />
         <span className="text-muted-foreground">Nível calculado (P × S):</span>
         <RiskLevelCell probability={probNum} severity={sevNum} />
       </div>
@@ -1005,74 +1034,77 @@ function UncoveredFactorsSection({
   );
 
   return (
-    <Collapsible defaultOpen={false}>
-      <Card>
+    <Collapsible defaultOpen={false} asChild>
+      <section
+        aria-label="Fatores MTE não cobertos pelo COPSOQ II-BR"
+        className="border-t border-border"
+      >
         <CollapsibleTrigger asChild>
-          <CardHeader className="group cursor-pointer hover:bg-accent/40 transition-colors">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2.5 min-w-0">
-                <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="min-w-0">
-                  <CardTitle className="text-base">
-                    Fatores MTE não cobertos pelo COPSOQ II-BR
-                  </CardTitle>
-                  <CardDescription className="mt-0.5">
-                    {uncovered.length} fator(es) FRPRT do MTE não são medidos
-                    pelo instrumento. Clique em &ldquo;Adicionar&rdquo; para
-                    incluí-los manualmente no inventário.
-                  </CardDescription>
-                </div>
+          <button
+            type="button"
+            className="group w-full text-left pt-5 pb-4 flex items-start justify-between gap-3 hover:bg-[var(--surface)] transition-colors -mx-2 px-2 rounded-sm"
+            aria-label="Alternar fatores MTE não cobertos"
+          >
+            <div className="flex items-start gap-2.5 min-w-0">
+              <Info className="h-4 w-4 text-[var(--brand)] mt-0.5 shrink-0" aria-hidden="true" />
+              <div className="min-w-0">
+                <h2 className="font-display text-base tracking-tight text-foreground">
+                  Fatores MTE não cobertos pelo COPSOQ II-BR
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {uncovered.length} fator(es) FRPRT do MTE não são medidos
+                  pelo instrumento. Clique em &ldquo;Adicionar&rdquo; para
+                  incluí-los manualmente no inventário.
+                </p>
               </div>
-              <ChevronDown
-                className="h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 group-data-[state=open]:rotate-180"
-                aria-hidden="true"
-              />
             </div>
-          </CardHeader>
+            <ChevronDown
+              className="h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 group-data-[state=open]:rotate-180"
+              aria-hidden="true"
+            />
+          </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="pt-0">
-            <ul className="divide-y divide-border">
-              {uncovered.map((f) => (
-                <li
-                  key={f.code}
-                  className="py-3 flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        variant="outline"
-                        className="font-mono-numeric font-semibold"
-                      >
-                        {f.code}
-                      </Badge>
-                      <span className="font-medium text-sm">{f.name}</span>
-                      <Badge
-                        variant="outline"
-                        className="text-muted-foreground text-[10px] font-normal"
-                      >
-                        {f.category}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Não coberto pelo COPSOQ II-BR.
-                    </p>
+          <ul className="border-t border-border divide-y divide-border">
+            {uncovered.map((f) => (
+              <li
+                key={f.code}
+                className="py-3 flex items-start justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className="font-mono-numeric font-semibold bg-transparent"
+                    >
+                      {f.code}
+                    </Badge>
+                    <span className="font-medium text-sm">{f.name}</span>
+                    <Badge
+                      variant="outline"
+                      className="text-muted-foreground text-[10px] font-normal bg-[var(--surface)] border-border"
+                    >
+                      {f.category}
+                    </Badge>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onAddFactor(f.code)}
-                    className="shrink-0"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Adicionar
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Não coberto pelo COPSOQ II-BR.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onAddFactor(f.code)}
+                  className="shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Adicionar
+                </Button>
+              </li>
+            ))}
+          </ul>
         </CollapsibleContent>
-      </Card>
+      </section>
     </Collapsible>
   );
 }
@@ -1081,7 +1113,7 @@ function UncoveredFactorsSection({
 
 function InventarioSkeleton() {
   return (
-    <div className="space-y-6" aria-hidden="true">
+    <div className="space-y-8" aria-hidden="true">
       <div className="flex flex-wrap gap-2">
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-6 w-28" />
@@ -1089,7 +1121,7 @@ function InventarioSkeleton() {
       </div>
       <Skeleton className="h-12" />
       <Skeleton className="h-96" />
-      <Skeleton className="h-48" />
+      <Skeleton className="h-32" />
     </div>
   );
 }
@@ -1257,26 +1289,24 @@ export function InventarioView() {
   if (!assessmentId) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <ShieldAlert className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold">
-                Nenhuma avaliação selecionada
-              </h2>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Acesse uma avaliação concluída para visualizar o inventário de
-                riscos psicossociais.
-              </p>
-            </div>
-            <Button onClick={() => go("painel")}>
-              <ChevronLeft className="h-4 w-4" />
-              Voltar ao painel
-            </Button>
-          </CardContent>
-        </Card>
+        <section className="border border-dashed border-border rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-4">
+          <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center">
+            <ShieldAlert className="h-6 w-6 text-[var(--brand)]" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="font-display text-lg tracking-tight">
+              Nenhuma avaliação selecionada
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Acesse uma avaliação concluída para visualizar o inventário de
+              riscos psicossociais.
+            </p>
+          </div>
+          <Button onClick={() => go("painel")}>
+            <ChevronLeft className="h-4 w-4" />
+            Voltar ao painel
+          </Button>
+        </section>
       </div>
     );
   }
@@ -1285,22 +1315,22 @@ export function InventarioView() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
       <TooltipProvider delayDuration={200}>
         {/* Header */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
           <div className="flex items-start gap-2 min-w-0">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => go("avaliacao", { assessmentId })}
               aria-label="Voltar à avaliação"
-              className="shrink-0 -ml-2"
+              className="shrink-0 -ml-2 text-muted-foreground hover:text-[var(--brand)]"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight">
+              <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
                 Inventário de Riscos
               </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
+              <p className="text-sm text-muted-foreground mt-1">
                 Identificação de perigos e avaliação prioritária (NR-1)
               </p>
               {assessment ? (
@@ -1336,13 +1366,13 @@ export function InventarioView() {
 
         {/* Summary chips */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
-          <Badge variant="outline" className="gap-1.5">
+          <Badge variant="outline" className="gap-1.5 bg-transparent">
             <span className="font-mono-numeric font-semibold">
               {autoItems.length}
             </span>
             <span className="text-muted-foreground">automáticos</span>
           </Badge>
-          <Badge variant="outline" className="gap-1.5">
+          <Badge variant="outline" className="gap-1.5 bg-transparent">
             <span className="font-mono-numeric font-semibold">
               {manualItems.length}
             </span>
@@ -1359,56 +1389,52 @@ export function InventarioView() {
 
         {/* Main content */}
         {error ? (
-          <Card className="border-destructive/50">
-            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
-              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-destructive" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold">
-                  Não foi possível carregar o inventário
-                </h2>
-                <p className="text-sm text-muted-foreground max-w-md">{error}</p>
-              </div>
-              <div className="flex flex-wrap gap-2 justify-center">
-                <Button
-                  variant="outline"
-                  onClick={() => go("avaliacao", { assessmentId })}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Voltar à avaliação
-                </Button>
-                <Button onClick={refresh}>
-                  <RefreshCw className="h-4 w-4" />
-                  Tentar novamente
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <section className="border border-dashed border-[var(--risk-high)]/30 rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-4">
+            <div className="h-12 w-12 rounded-full risk-high-bg flex items-center justify-center">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-display text-lg tracking-tight">
+                Não foi possível carregar o inventário
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => go("avaliacao", { assessmentId })}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Voltar à avaliação
+              </Button>
+              <Button onClick={refresh}>
+                <RefreshCw className="h-4 w-4" />
+                Tentar novamente
+              </Button>
+            </div>
+          </section>
         ) : loading ? (
           <InventarioSkeleton />
         ) : allItems.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <ListPlus className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold">Inventário vazio</h2>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Nenhum item automático foi gerado (nenhum GHE elegível
-                  apresentou dimensão com risco médio ou alto). Adicione riscos
-                  manualmente ou verifique o resultado da avaliação.
-                </p>
-              </div>
-              <Button onClick={() => openManualForm()}>
-                <Plus className="h-4 w-4" />
-                Adicionar Risco Manual
-              </Button>
-            </CardContent>
-          </Card>
+          <section className="border border-dashed border-border rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center">
+              <ListPlus className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-display text-lg tracking-tight">Inventário vazio</h2>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Nenhum item automático foi gerado (nenhum GHE elegível
+                apresentou dimensão com risco médio ou alto). Adicione riscos
+                manualmente ou verifique o resultado da avaliação.
+              </p>
+            </div>
+            <Button onClick={() => openManualForm()}>
+              <Plus className="h-4 w-4" />
+              Adicionar Risco Manual
+            </Button>
+          </section>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-10">
             <InventoryTable
               items={allItems}
               onPatch={handlePatch}

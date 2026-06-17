@@ -28,15 +28,6 @@ import { ASSESSMENT_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
 import { formatCnpj } from "@/lib/cnpj";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -53,16 +44,22 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// ─── Color helpers (mirror resultados heatmap) ──────────────────────────────
+// ─── Color helpers (muted sage → ochre → clay ramp) ──────────────────────────
 
 function riskScoreBg(score: number): string {
-  // Interpolate hue 120 (green) → 60 (yellow) → 0 (red) across 0..100.
-  const h = score <= 50 ? 120 - (score / 50) * 60 : 60 - ((score - 50) / 50) * 60;
-  return `hsl(${h}, 65%, 45%)`;
+  // Interpolate hue 120° (sage) → 45° (ochre) → 10° (clay) across 0..100.
+  // Lower saturation (~45%) and ~48% lightness for the muted ramp.
+  const clamped = Math.max(0, Math.min(100, score));
+  const h =
+    clamped <= 50
+      ? 120 - (clamped / 50) * 75 // 120 → 45 (sage → ochre)
+      : 45 - ((clamped - 50) / 50) * 35; // 45 → 10 (ochre → clay)
+  return `hsl(${h}, 45%, 48%)`;
 }
 
 function riskScoreFg(score: number): string {
-  return score > 50 ? "#ffffff" : "#1A2535";
+  // Warm paper on the darker clay end, warm ink on the lighter sage end.
+  return score > 55 ? "#FAF8F4" : "#2A2620";
 }
 
 function riskBg(level: RiskLevel): string {
@@ -106,278 +103,247 @@ function fmtShortDate(iso: string | null): string {
   }
 }
 
-// ─── KPI Card ───────────────────────────────────────────────────────────────
-
-interface KpiCardProps {
-  label: string;
-  value: string;
-  icon: React.ElementType;
-  accentClass: string;
-  tintClass: string;
-  borderClass: string;
-  description?: string;
-}
-
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  accentClass,
-  tintClass,
-  borderClass,
-  description,
-}: KpiCardProps) {
-  return (
-    <Card
-      className={`card-hover py-4 overflow-hidden relative ${tintClass} ${borderClass}`}
-      role="group"
-      aria-label={`${label}: ${value}${description ? `. ${description}` : ""}`}
-    >
-      <CardContent className="flex items-start gap-3">
-        <div
-          className={`h-10 w-10 shrink-0 rounded-md flex items-center justify-center ${accentClass}`}
-          aria-hidden="true"
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs font-medium text-muted-foreground leading-tight">
-            {label}
-          </div>
-          <div className="text-2xl md:text-4xl font-semibold font-mono-numeric mt-1 leading-tight">
-            {value}
-          </div>
-          {description ? (
-            <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
-              {description}
-            </div>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// ─── Stat strip (replaces gradient-tinted KPI cards) ────────────────────────
 
 function SummaryKpis({ data }: { data: CompanyBreakdown[] }) {
   const highRisk = data.filter((c) => c.overallRiskLevel === "HIGH").length;
   const mediumRisk = data.filter((c) => c.overallRiskLevel === "MEDIUM").length;
   const atRiskGhesTotal = data.reduce((s, c) => s + c.atRiskGhes, 0);
 
+  const stats: {
+    value: number;
+    label: string;
+    secondary?: string;
+    ariaLabel: string;
+  }[] = [
+    {
+      value: data.length,
+      label: "Total de empresas",
+      secondary: "Clientes ativos",
+      ariaLabel: `Total de empresas: ${data.length}. Clientes ativos sob sua gestão.`,
+    },
+    {
+      value: highRisk,
+      label: "Em risco alto",
+      secondary: "overallRiskLevel = HIGH",
+      ariaLabel: `Empresas em risco alto: ${highRisk}.`,
+    },
+    {
+      value: mediumRisk,
+      label: "Em risco intermediário",
+      secondary: "overallRiskLevel = MEDIUM",
+      ariaLabel: `Empresas em risco intermediário: ${mediumRisk}.`,
+    },
+    {
+      value: atRiskGhesTotal,
+      label: "GHEs em risco",
+      secondary: "≥1 dimensão HIGH",
+      ariaLabel: `GHEs em risco: ${atRiskGhesTotal}. GHEs elegíveis com ao menos uma dimensão HIGH.`,
+    },
+  ];
+
   return (
     <section
       aria-label="Indicadores-chave"
-      className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
+      className="bg-[var(--surface)] rounded-lg p-5"
     >
-      <KpiCard
-        label="Total de empresas"
-        value={String(data.length)}
-        icon={Building2}
-        accentClass="bg-brand/10 text-brand"
-        tintClass="bg-gradient-to-br from-brand/5 to-transparent"
-        borderClass="border-b-2 border-brand"
-        description="Clientes ativos sob sua gestão"
-      />
-      <KpiCard
-        label="Empresas em risco alto"
-        value={String(highRisk)}
-        icon={ShieldAlert}
-        accentClass="risk-high-bg"
-        tintClass="bg-gradient-to-br from-risk-high/5 to-transparent"
-        borderClass="border-b-2 border-risk-high"
-        description="overallRiskLevel = HIGH"
-      />
-      <KpiCard
-        label="Empresas em risco intermediário"
-        value={String(mediumRisk)}
-        icon={AlertTriangle}
-        accentClass="risk-medium-bg"
-        tintClass="bg-gradient-to-br from-risk-medium/5 to-transparent"
-        borderClass="border-b-2 border-risk-medium"
-        description="overallRiskLevel = MEDIUM"
-      />
-      <KpiCard
-        label="GHEs em risco"
-        value={String(atRiskGhesTotal)}
-        icon={Users}
-        accentClass="bg-risk-high/10 text-risk-high"
-        tintClass="bg-gradient-to-br from-risk-high/5 to-transparent"
-        borderClass="border-b-2 border-risk-high/60"
-        description="GHEs elegíveis com ≥1 dimensão HIGH"
-      />
+      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
+        {stats.map((s, i) => (
+          <div
+            key={i}
+            className={`px-4 sm:px-6 py-1 ${i === 0 ? "pl-0" : ""}`}
+            role="group"
+            aria-label={s.ariaLabel}
+          >
+            <div className="font-mono-numeric text-2xl leading-none text-foreground">
+              {s.value}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              {s.label}
+            </div>
+            {s.secondary && (
+              <div className="text-[11px] text-muted-foreground/80 mt-1">
+                {s.secondary}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
 
-// ─── Heatmap table (companies × D1..D11 + Geral) ────────────────────────────
+// ─── Heatmap table (companies × D1..D11 + Geral) — no Card wrapper ──────────
 
 function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
   const go = useView((s) => s.go);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-muted-foreground" />
+    <section aria-label="Mapa de calor por dimensão">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl tracking-tight text-foreground">
           Mapa de calor — Empresa × Dimensão
-        </CardTitle>
-        <CardDescription>
-          Escore médio ponderado (0 a 100) por dimensão COPSOQ II-BR para cada
-          cliente. Clique em uma linha para acessar o detalhe da empresa.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="max-h-[32rem] overflow-auto scroll-area rounded-md border">
-          <table className="w-full text-sm border-collapse" role="grid">
-            <caption className="sr-only">
-              Mapa de calor dos escores médios ponderados de risco por empresa
-              (linha) e dimensão psicossocial D1 a D11 (coluna). A última
-              coluna apresenta o escore geral da empresa.
-            </caption>
-            <thead className="sticky top-0 z-20">
-              <TableRow>
+        </h2>
+        <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Escore médio ponderado (0 a 100) por dimensão COPSOQ II-BR para cada
+        cliente. Clique em uma linha para acessar o detalhe da empresa.
+      </p>
+
+      <div className="max-h-[32rem] overflow-auto scroll-area rounded-md border border-border">
+        <table className="w-full text-sm border-collapse" role="grid">
+          <caption className="sr-only">
+            Mapa de calor dos escores médios ponderados de risco por empresa
+            (linha) e dimensão psicossocial D1 a D11 (coluna). A última
+            coluna apresenta o escore geral da empresa.
+          </caption>
+          <thead className="sticky top-0 z-20">
+            <TableRow>
+              <TableHead
+                scope="col"
+                className="sticky left-0 z-30 bg-card px-3 py-3 text-left font-medium border-b border-r border-border min-w-[12rem] shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+              >
+                Empresa
+              </TableHead>
+              {COPSOQ_DIMENSIONS.map((d) => (
                 <TableHead
+                  key={d.code}
                   scope="col"
-                  className="sticky left-0 z-30 bg-card px-3 py-2 text-left font-medium border-b border-r border-border/60 min-w-[12rem] shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+                  className="px-2 py-3 text-center font-medium border-b border-border min-w-[3.5rem]"
                 >
-                  Empresa
+                  <div className="font-mono-numeric text-xs">{d.code}</div>
+                  <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+                    {DIM_SHORT_NAMES[d.code]}
+                  </div>
                 </TableHead>
-                {COPSOQ_DIMENSIONS.map((d) => (
-                  <TableHead
-                    key={d.code}
-                    scope="col"
-                    className="px-2 py-2 text-center font-medium border-b border-border/60 min-w-[3.5rem]"
-                  >
-                    <div className="font-mono-numeric text-xs">{d.code}</div>
-                    <div className="text-[10px] text-muted-foreground font-normal leading-tight">
-                      {DIM_SHORT_NAMES[d.code]}
+              ))}
+              <TableHead
+                scope="col"
+                className="px-3 py-3 text-center font-medium border-b border-border min-w-[4rem] sticky right-0 z-30 bg-card shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+              >
+                Geral
+              </TableHead>
+            </TableRow>
+          </thead>
+          <TableBody>
+            {data.map((c) => {
+              const dimMap = new Map(
+                c.dimensions.map((d) => [d.code, d])
+              );
+              return (
+                <TableRow
+                  key={c.companyId}
+                  className="border-b border-border hover:bg-[var(--surface)] transition-colors cursor-pointer"
+                  onClick={() => go("empresa", { companyId: c.companyId })}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      go("empresa", { companyId: c.companyId });
+                    }
+                  }}
+                >
+                  <TableCell className="sticky left-0 z-10 bg-card px-3 py-3 font-medium border-r border-b border-border shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
+                    <div
+                      className="truncate max-w-[12rem]"
+                      title={c.companyName}
+                    >
+                      {c.companyName}
                     </div>
-                  </TableHead>
-                ))}
-                <TableHead
-                  scope="col"
-                  className="px-3 py-2 text-center font-medium border-b border-border/60 min-w-[4rem] sticky right-0 z-30 bg-card shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]"
-                >
-                  Geral
-                </TableHead>
-              </TableRow>
-            </thead>
-            <TableBody>
-              {data.map((c) => {
-                const dimMap = new Map(
-                  c.dimensions.map((d) => [d.code, d])
-                );
-                return (
-                  <TableRow
-                    key={c.companyId}
-                    className="border-b border-border/60 hover:bg-accent/30 transition-colors cursor-pointer"
-                    onClick={() => go("empresa", { companyId: c.companyId })}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        go("empresa", { companyId: c.companyId });
-                      }
-                    }}
-                  >
-                    <TableCell className="sticky left-0 z-10 bg-card px-3 py-2 font-medium border-r border-b border-border/60 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
-                      <div
-                        className="truncate max-w-[12rem]"
-                        title={c.companyName}
+                    <div className="text-xs text-muted-foreground font-normal font-mono-numeric">
+                      {formatCnpj(c.cnpj)}
+                    </div>
+                  </TableCell>
+                  {COPSOQ_DIMENSIONS.map((d) => {
+                    const dr = dimMap.get(d.code);
+                    const score = dr?.weightedAvgRiskScore ?? 0;
+                    const bg = riskScoreBg(score);
+                    const fg = riskScoreFg(score);
+                    const level =
+                      dr?.riskLevel ?? ("LOW" as RiskLevel);
+                    const ariaLabel = `${c.companyName} — ${d.code} ${d.namePtBr}: risco ${score.toFixed(0)}, nível ${RISK_LEVEL_LABELS[level]}`;
+                    const tooltipText = `${d.namePtBr} — ${c.companyName}: ${score.toFixed(0)} (${RISK_LEVEL_LABELS[level]})`;
+                    return (
+                      <TableCell
+                        key={d.code}
+                        className="p-0 text-center align-middle border-r border-border"
+                        style={{ background: bg, color: fg }}
                       >
-                        {c.companyName}
-                      </div>
-                      <div className="text-xs text-muted-foreground font-normal font-mono-numeric">
-                        {formatCnpj(c.cnpj)}
-                      </div>
-                    </TableCell>
-                    {COPSOQ_DIMENSIONS.map((d) => {
-                      const dr = dimMap.get(d.code);
-                      const score = dr?.weightedAvgRiskScore ?? 0;
-                      const bg = riskScoreBg(score);
-                      const fg = riskScoreFg(score);
-                      const level =
-                        dr?.riskLevel ?? ("LOW" as RiskLevel);
-                      const ariaLabel = `${c.companyName} — ${d.code} ${d.namePtBr}: risco ${score.toFixed(0)}, nível ${RISK_LEVEL_LABELS[level]}`;
-                      const tooltipText = `${d.namePtBr} — ${c.companyName}: ${score.toFixed(0)} (${RISK_LEVEL_LABELS[level]})`;
-                      return (
-                        <TableCell
-                          key={d.code}
-                          className="p-0 text-center align-middle border-r border-border/40"
-                          style={{ background: bg, color: fg }}
-                        >
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div
-                                tabIndex={0}
-                                role="gridcell"
-                                aria-label={ariaLabel}
-                                className="flex items-center justify-center px-2 py-2.5 min-w-[3rem] min-h-[2.5rem] cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div
+                              tabIndex={0}
+                              role="gridcell"
+                              aria-label={ariaLabel}
+                              className="flex items-center justify-center px-2 py-2.5 min-w-[3rem] min-h-[2.5rem] cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                            >
+                              <span
+                                className="font-mono-numeric text-sm font-semibold"
+                                aria-hidden="true"
                               >
-                                <span
-                                  className="font-mono-numeric text-sm font-semibold"
-                                  aria-hidden="true"
-                                >
-                                  {score.toFixed(0)}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>{tooltipText}</TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell className="sticky right-0 z-10 bg-card px-3 py-2 text-center border-l border-b border-border/60 shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]">
-                      <div
-                        className={`inline-flex flex-col items-center gap-0.5 px-2 py-1 rounded-md ${riskBg(
-                          c.overallRiskLevel
-                        )}`}
-                        role="gridcell"
-                        aria-label={`${c.companyName} — Geral: ${c.overallRiskScore.toFixed(
-                          0
-                        )}, nível ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`}
-                      >
-                        <span className="font-mono-numeric text-sm font-semibold leading-none">
-                          {c.overallRiskScore.toFixed(0)}
-                        </span>
-                        <span className="text-[9px] uppercase tracking-wide opacity-80 leading-none">
-                          {RISK_LEVEL_LABELS[c.overallRiskLevel]}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </table>
-        </div>
-        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-medium">Escala de risco:</span>
-          <div className="flex flex-col gap-0.5">
-            <div
-              className="h-3 w-40 sm:w-48 rounded-sm border border-border/40"
-              style={{
-                background:
-                  "linear-gradient(to right, hsl(120,65%,45%), hsl(60,65%,45%), hsl(0,65%,45%))",
-              }}
-              aria-hidden="true"
-            />
-            <div className="flex justify-between w-40 sm:w-48 text-[10px] font-mono-numeric">
-              <span>0</span>
-              <span>33</span>
-              <span>66</span>
-              <span>100</span>
-            </div>
+                                {score.toFixed(0)}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>{tooltipText}</TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                    );
+                  })}
+                  <TableCell className="sticky right-0 z-10 bg-card px-3 py-3 text-center border-l border-b border-border shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]">
+                    <div
+                      className={`inline-flex flex-col items-center gap-0.5 px-2 py-1 rounded-md ${riskBg(
+                        c.overallRiskLevel
+                      )}`}
+                      role="gridcell"
+                      aria-label={`${c.companyName} — Geral: ${c.overallRiskScore.toFixed(
+                        0
+                      )}, nível ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`}
+                    >
+                      <span className="font-mono-numeric text-sm font-semibold leading-none">
+                        {c.overallRiskScore.toFixed(0)}
+                      </span>
+                      <span className="text-[9px] uppercase tracking-wide opacity-80 leading-none">
+                        {RISK_LEVEL_LABELS[c.overallRiskLevel]}
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </table>
+      </div>
+
+      {/* Legend with muted sage → ochre → clay ramp */}
+      <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
+        <span className="font-medium">Escala de risco:</span>
+        <div className="flex flex-col gap-0.5">
+          <div
+            className="h-3 w-40 sm:w-48 rounded-sm border border-border"
+            style={{
+              background:
+                "linear-gradient(to right, hsl(120,45%,48%), hsl(45,45%,48%), hsl(10,45%,48%))",
+            }}
+            aria-hidden="true"
+          />
+          <div className="flex justify-between w-40 sm:w-48 text-[10px] font-mono-numeric">
+            <span>0</span>
+            <span>33</span>
+            <span>66</span>
+            <span>100</span>
           </div>
-          <span className="hidden md:inline text-muted-foreground/80">
-            verde: favorável · amarelo: intermediário · vermelho: desfavorável
-          </span>
         </div>
-      </CardContent>
-    </Card>
+        <span className="hidden md:inline text-muted-foreground/80">
+          verde: favorável · amarelo: intermediário · vermelho: desfavorável
+        </span>
+      </div>
+    </section>
   );
 }
 
-// ─── Risk distribution chart (horizontal bars) ──────────────────────────────
+// ─── Risk distribution chart (horizontal bars) — no Card wrapper ────────────
 
 function RiskDistributionChart({ data }: { data: CompanyBreakdown[] }) {
   const sorted = useMemo(
@@ -389,144 +355,144 @@ function RiskDistributionChart({ data }: { data: CompanyBreakdown[] }) {
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-muted-foreground" />
+    <section aria-label="Distribuição de risco geral">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl tracking-tight text-foreground">
           Distribuição de risco geral
-        </CardTitle>
-        <CardDescription>
-          Escore geral (0–100) por empresa, ordenado decrescente. Linhas de
-          referência em 33 (médio) e 66 (alto).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {sorted.length === 0 ? null : (
-          <div className="space-y-2.5">
-            <div className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[16rem_1fr_3rem] items-center gap-2 sm:gap-3">
-              <div />
-              <div className="relative h-3 text-[10px] font-mono-numeric">
-                <span
-                  className="absolute -translate-x-1/2 text-risk-medium font-semibold"
-                  style={{ left: "33%" }}
-                >
-                  33
-                </span>
-                <span
-                  className="absolute -translate-x-1/2 text-risk-high font-semibold"
-                  style={{ left: "66%" }}
-                >
-                  66
-                </span>
-              </div>
-              <div />
+        </h2>
+        <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Escore geral (0–100) por empresa, ordenado decrescente. Linhas de
+        referência em 33 (médio) e 66 (alto).
+      </p>
+
+      {sorted.length === 0 ? null : (
+        <div className="space-y-2.5">
+          <div className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[16rem_1fr_3rem] items-center gap-2 sm:gap-3">
+            <div />
+            <div className="relative h-3 text-[10px] font-mono-numeric">
+              <span
+                className="absolute -translate-x-1/2 text-risk-medium font-semibold"
+                style={{ left: "33%" }}
+              >
+                33
+              </span>
+              <span
+                className="absolute -translate-x-1/2 text-risk-high font-semibold"
+                style={{ left: "66%" }}
+              >
+                66
+              </span>
             </div>
-            {sorted.map((c) => {
-              const bg =
-                c.overallRiskLevel === "HIGH"
-                  ? "var(--risk-high)"
-                  : c.overallRiskLevel === "MEDIUM"
-                  ? "var(--risk-medium)"
-                  : "var(--risk-low)";
-              const width = Math.max(
-                2,
-                Math.min(100, c.overallRiskScore)
-              );
-              const ariaLabel = `${c.companyName}: risco geral ${c.overallRiskScore.toFixed(
-                0
-              )} de 100, classificação ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`;
-              return (
+            <div />
+          </div>
+          {sorted.map((c) => {
+            const bg =
+              c.overallRiskLevel === "HIGH"
+                ? "var(--risk-high)"
+                : c.overallRiskLevel === "MEDIUM"
+                ? "var(--risk-medium)"
+                : "var(--risk-low)";
+            const width = Math.max(
+              2,
+              Math.min(100, c.overallRiskScore)
+            );
+            const ariaLabel = `${c.companyName}: risco geral ${c.overallRiskScore.toFixed(
+              0
+            )} de 100, classificação ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`;
+            return (
+              <div
+                key={c.companyId}
+                className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[16rem_1fr_3rem] items-center gap-2 sm:gap-3"
+              >
                 <div
-                  key={c.companyId}
-                  className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[16rem_1fr_3rem] items-center gap-2 sm:gap-3"
+                  className="text-sm flex items-center gap-1.5 min-w-0"
+                  title={c.companyName}
+                >
+                  <Building2
+                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <span className="text-foreground truncate min-w-0">
+                    {c.companyName}
+                  </span>
+                </div>
+                <div
+                  className="relative h-7 rounded-md bg-[var(--surface)] overflow-hidden"
+                  role="img"
+                  aria-label={ariaLabel}
                 >
                   <div
-                    className="text-sm flex items-center gap-1.5 min-w-0"
-                    title={c.companyName}
-                  >
-                    <Building2
-                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                    <span className="text-foreground truncate min-w-0">
-                      {c.companyName}
-                    </span>
-                  </div>
+                    className="absolute inset-y-0 z-10"
+                    style={{
+                      left: "33%",
+                      borderLeft: "2px dashed var(--risk-medium)",
+                      opacity: 0.7,
+                    }}
+                    aria-hidden="true"
+                  />
                   <div
-                    className="relative h-7 rounded-md bg-muted overflow-hidden"
-                    role="img"
-                    aria-label={ariaLabel}
-                  >
-                    <div
-                      className="absolute inset-y-0 z-10"
-                      style={{
-                        left: "33%",
-                        borderLeft: "2px dashed var(--risk-medium)",
-                        opacity: 0.7,
-                      }}
-                      aria-hidden="true"
-                    />
-                    <div
-                      className="absolute inset-y-0 z-10"
-                      style={{
-                        left: "66%",
-                        borderLeft: "2px dashed var(--risk-high)",
-                        opacity: 0.7,
-                      }}
-                      aria-hidden="true"
-                    />
-                    <div
-                      className="h-full transition-all duration-500 ease-out"
-                      style={{ width: `${width}%`, backgroundColor: bg }}
-                    />
-                  </div>
-                  <div className="text-right font-mono-numeric text-sm font-semibold">
-                    {c.overallRiskScore.toFixed(0)}
-                  </div>
+                    className="absolute inset-y-0 z-10"
+                    style={{
+                      left: "66%",
+                      borderLeft: "2px dashed var(--risk-high)",
+                      opacity: 0.7,
+                    }}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="h-full transition-all duration-500 ease-out"
+                    style={{ width: `${width}%`, backgroundColor: bg }}
+                  />
                 </div>
-              );
-            })}
-          </div>
-        )}
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-sm"
-              style={{ backgroundColor: "var(--risk-low)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.LOW}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-sm"
-              style={{ backgroundColor: "var(--risk-medium)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.MEDIUM}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-sm"
-              style={{ backgroundColor: "var(--risk-high)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.HIGH}
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span
-              className="inline-block w-px h-3 bg-foreground/40"
-              aria-hidden="true"
-            />
-            <span>refs. 33 / 66</span>
-          </div>
+                <div className="text-right font-mono-numeric text-sm font-semibold">
+                  {c.overallRiskScore.toFixed(0)}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-sm"
+            style={{ backgroundColor: "var(--risk-low)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.LOW}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-sm"
+            style={{ backgroundColor: "var(--risk-medium)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.MEDIUM}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-sm"
+            style={{ backgroundColor: "var(--risk-high)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.HIGH}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <span
+            className="inline-block w-px h-3 bg-foreground/40"
+            aria-hidden="true"
+          />
+          <span>refs. 33 / 66</span>
+        </div>
+      </div>
+    </section>
   );
 }
 
-// ─── Company detail card ────────────────────────────────────────────────────
+// ─── Company detail row (replaces Card) ─────────────────────────────────────
 
 function topRiskDimensions(c: CompanyBreakdown, n: number) {
   return [...c.dimensions]
@@ -534,86 +500,121 @@ function topRiskDimensions(c: CompanyBreakdown, n: number) {
     .slice(0, n);
 }
 
-function CompanyCard({ c }: { c: CompanyBreakdown }) {
+function CompanyRow({ c }: { c: CompanyBreakdown }) {
   const go = useView((s) => s.go);
   const top3 = topRiskDimensions(c, 3);
   const lastStatusLabel = c.lastAssessmentStatus
     ? ASSESSMENT_STATUS_LABELS[c.lastAssessmentStatus] ?? c.lastAssessmentStatus
     : "Sem avaliação";
 
+  const overallColor =
+    c.overallRiskLevel === "HIGH"
+      ? "var(--risk-high)"
+      : c.overallRiskLevel === "MEDIUM"
+      ? "var(--risk-medium)"
+      : "var(--risk-low)";
+
   return (
-    <Card className="card-hover flex flex-col">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="text-base truncate" title={c.companyName}>
-              {c.companyName}
-            </CardTitle>
-            <CardDescription className="font-mono-numeric">
+    <div
+      className="surface-hover py-5 -mx-2 px-2 rounded-sm cursor-pointer transition-colors"
+      onClick={() => go("empresa", { companyId: c.companyId })}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          go("empresa", { companyId: c.companyId });
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`Acessar detalhe de ${c.companyName}. Risco geral ${c.overallRiskScore.toFixed(0)} — ${RISK_LEVEL_LABELS[c.overallRiskLevel]}.`}
+    >
+      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+        {/* Left: identity + status badge */}
+        <div className="flex items-start gap-3 min-w-0 lg:w-[20rem] lg:shrink-0">
+          <span
+            className="mt-1.5 h-2 w-2 rounded-full shrink-0"
+            style={{ backgroundColor: overallColor }}
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3
+                className="font-display font-medium text-base text-foreground leading-tight truncate"
+                title={c.companyName}
+              >
+                {c.companyName}
+              </h3>
+            </div>
+            <div className="font-mono-numeric text-xs text-muted-foreground mt-1">
               {formatCnpj(c.cnpj)}
-            </CardDescription>
+            </div>
+            {(c.city || c.state) && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                <span className="truncate">
+                  {[c.city, c.state].filter(Boolean).join(" — ")}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border mt-3 pt-2">
+              <span className="truncate">{lastStatusLabel}</span>
+              <span className="font-mono-numeric shrink-0 ml-2">
+                {fmtShortDate(c.lastAssessmentCompletedAt)}
+              </span>
+            </div>
           </div>
-          <Badge
-            className={`${riskBg(c.overallRiskLevel)} border-0 shrink-0`}
+          {/* Overall risk badge */}
+          <div
+            className={`inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-md shrink-0 ${riskBg(
+              c.overallRiskLevel
+            )}`}
             aria-label={`Risco geral: ${RISK_LEVEL_LABELS[c.overallRiskLevel]} (${c.overallRiskScore.toFixed(
               0
             )})`}
           >
-            <span className="font-mono-numeric font-semibold">
+            <span className="font-mono-numeric text-base font-semibold leading-none">
               {c.overallRiskScore.toFixed(0)}
             </span>
-            <span className="ml-1 text-[10px] uppercase tracking-wide opacity-90">
+            <span className="text-[9px] uppercase tracking-wide opacity-90 leading-none">
               {RISK_LEVEL_LABELS[c.overallRiskLevel]}
             </span>
-          </Badge>
-        </div>
-        {(c.city || c.state) && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
-            <span className="truncate">
-              {[c.city, c.state].filter(Boolean).join(" — ")}
-            </span>
           </div>
-        )}
-      </CardHeader>
-      <CardContent className="pb-3 flex-1">
-        <div className="grid grid-cols-3 gap-2 text-center mb-3">
-          <div className="rounded-md bg-muted/40 px-2 py-1.5">
+        </div>
+
+        {/* Middle: counts */}
+        <div className="grid grid-cols-3 gap-3 lg:gap-6 lg:flex-1 lg:max-w-md">
+          <div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
               Avaliações
             </div>
-            <div className="font-mono-numeric text-base font-semibold">
+            <div className="font-mono-numeric text-lg font-semibold text-foreground mt-0.5">
               {c.assessmentsCount}
             </div>
           </div>
-          <div className="rounded-md bg-muted/40 px-2 py-1.5">
+          <div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
               GHEs elegíveis
             </div>
-            <div className="font-mono-numeric text-base font-semibold">
+            <div className="font-mono-numeric text-lg font-semibold text-foreground mt-0.5">
               {c.eligibleGhes}
             </div>
           </div>
-          <div className="rounded-md bg-muted/40 px-2 py-1.5">
+          <div>
             <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
               Respondentes
             </div>
-            <div className="font-mono-numeric text-base font-semibold">
+            <div className="font-mono-numeric text-lg font-semibold text-foreground mt-0.5">
               {c.totalRespondents}
             </div>
           </div>
         </div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground border-y border-border/60 py-2 mb-3">
-          <span className="truncate">{lastStatusLabel}</span>
-          <span className="font-mono-numeric shrink-0 ml-2">
-            {fmtShortDate(c.lastAssessmentCompletedAt)}
-          </span>
-        </div>
-        <div>
+
+        {/* Right: top risk dimensions + action */}
+        <div className="lg:flex-1 lg:min-w-0">
           <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">
             Dimensões de maior risco
           </div>
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             {top3.map((d) => {
               const dim = getDimension(d.code);
               return (
@@ -624,12 +625,11 @@ function CompanyCard({ c }: { c: CompanyBreakdown }) {
                     0
                   )}, nível ${RISK_LEVEL_LABELS[d.riskLevel]}`}
                 >
-                  <Badge
-                    variant="outline"
-                    className="font-mono-numeric text-[10px] px-1.5 py-0 shrink-0"
+                  <span
+                    className="font-mono-numeric text-[10px] px-1.5 py-0.5 rounded-sm border border-border shrink-0"
                   >
                     {d.code}
-                  </Badge>
+                  </span>
                   <span
                     className="flex-1 truncate text-foreground"
                     title={dim.namePtBr}
@@ -647,19 +647,23 @@ function CompanyCard({ c }: { c: CompanyBreakdown }) {
               );
             })}
           </ul>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[var(--brand)] hover:bg-[var(--surface)] hover:text-[var(--brand)]"
+              onClick={(e) => {
+                e.stopPropagation();
+                go("empresa", { companyId: c.companyId });
+              }}
+            >
+              Acessar
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
-      </CardContent>
-      <CardFooter className="pt-0">
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => go("empresa", { companyId: c.companyId })}
-        >
-          Acessar
-          <ChevronRight className="h-4 w-4" aria-hidden="true" />
-        </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -673,39 +677,35 @@ function CompanyDetailCards({ data }: { data: CompanyBreakdown[] }) {
   );
 
   return (
-    <section aria-label="Detalhe por empresa">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-foreground">
+    <section aria-label="Detalhe por empresa" className="border-b border-border pb-4">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl tracking-tight text-foreground">
           Detalhe por empresa
         </h2>
         <span className="text-xs text-muted-foreground">
           Ordenado por risco geral decrescente
         </span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="divide-y divide-border border-t border-border">
         {sorted.map((c) => (
-          <CompanyCard key={c.companyId} c={c} />
+          <CompanyRow key={c.companyId} c={c} />
         ))}
       </div>
     </section>
   );
 }
 
-// ─── Loading / empty / error ────────────────────────────────────────────────
+// ─── Loading / empty / error (no Card wrappers) ─────────────────────────────
 
 function LoadingState() {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-xl" />
-        ))}
-      </div>
-      <Skeleton className="h-96 w-full rounded-xl" />
-      <Skeleton className="h-72 w-full rounded-xl" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="space-y-8">
+      <Skeleton className="h-20 w-full rounded-lg" />
+      <Skeleton className="h-96 w-full rounded-md" />
+      <Skeleton className="h-72 w-full rounded-md" />
+      <div className="space-y-2">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-72 w-full rounded-xl" />
+          <Skeleton key={i} className="h-32 w-full rounded-md" />
         ))}
       </div>
     </div>
@@ -715,53 +715,51 @@ function LoadingState() {
 function EmptyState() {
   const go = useView((s) => s.go);
   return (
-    <Card>
-      <CardContent className="flex flex-col items-center justify-center text-center py-16 gap-4">
-        <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-          <Building2 className="h-7 w-7 text-muted-foreground" />
-        </div>
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold">Nenhuma empresa cadastrada</h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Adicione seu primeiro cliente para visualizar a análise
-            consolidada.
-          </p>
-        </div>
-        <Button onClick={() => go("empresas")}>
-          <Building2 className="h-4 w-4" aria-hidden="true" />
-          Cadastrar empresa
-        </Button>
-      </CardContent>
-    </Card>
+    <section className="border border-dashed border-border rounded-lg py-16 flex flex-col items-center justify-center text-center gap-4">
+      <div className="h-14 w-14 rounded-full bg-[var(--surface)] flex items-center justify-center">
+        <Building2 className="h-7 w-7 text-muted-foreground" />
+      </div>
+      <div className="space-y-1">
+        <h3 className="font-display text-base tracking-tight text-foreground">
+          Nenhuma empresa cadastrada
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Adicione seu primeiro cliente para visualizar a análise
+          consolidada.
+        </p>
+      </div>
+      <Button onClick={() => go("empresas")}>
+        <Building2 className="h-4 w-4" aria-hidden="true" />
+        Cadastrar empresa
+      </Button>
+    </section>
   );
 }
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
-    <Card>
-      <CardContent className="flex flex-col items-center justify-center text-center py-16 gap-4">
-        <div className="h-14 w-14 rounded-full risk-high-bg flex items-center justify-center">
-          <ShieldAlert className="h-7 w-7 text-risk-high" />
-        </div>
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold">
-            Não foi possível carregar a análise consolidada
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-md">
-            Tente novamente em instantes. Se o erro persistir, verifique sua
-            conexão.
-          </p>
-        </div>
-        <Button variant="outline" onClick={onRetry}>
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          Tentar novamente
-        </Button>
-      </CardContent>
-    </Card>
+    <section className="border border-dashed border-border rounded-lg py-16 flex flex-col items-center justify-center text-center gap-4">
+      <div className="h-14 w-14 rounded-full risk-high-bg flex items-center justify-center">
+        <ShieldAlert className="h-7 w-7 text-risk-high" />
+      </div>
+      <div className="space-y-1">
+        <h3 className="font-display text-base tracking-tight text-foreground">
+          Não foi possível carregar a análise consolidada
+        </h3>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Tente novamente em instantes. Se o erro persistir, verifique sua
+          conexão.
+        </p>
+      </div>
+      <Button variant="outline" onClick={onRetry}>
+        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+        Tentar novamente
+      </Button>
+    </section>
   );
 }
 
-// ─── Header ─────────────────────────────────────────────────────────────────
+// ─── Header (serif + border-b, no gradient) ─────────────────────────────────
 
 interface HeaderProps {
   onRefresh: () => void;
@@ -770,13 +768,12 @@ interface HeaderProps {
 
 function Header({ onRefresh, refreshing }: HeaderProps) {
   return (
-    <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+    <header className="border-b border-border pb-6 mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <BarChart3 className="h-6 w-6 text-brand" aria-hidden="true" />
+        <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
           Análise Consolidada
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1.5">
           Comparação de risco psicossocial entre todos os clientes
         </p>
       </div>
@@ -834,7 +831,7 @@ export function ConsolidadoView() {
       <TooltipProvider delayDuration={200}>
         <Header onRefresh={() => load(true)} refreshing={refreshing} />
 
-        <div className="mt-6 space-y-6">
+        <div className="space-y-10">
           {loading ? (
             <LoadingState />
           ) : error ? (

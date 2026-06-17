@@ -32,11 +32,11 @@ const NR_STATUS_CONFIG: Record<
   },
   collecting: {
     label: "Coletando",
-    className: "bg-brand-light text-white border-transparent",
+    className: "bg-[var(--sidebar-accent)] text-[var(--brand)] border-transparent",
   },
   processing: {
     label: "Processando",
-    className: "bg-brand-light text-white border-transparent",
+    className: "bg-[var(--sidebar-accent)] text-[var(--brand)] border-transparent",
   },
   completed: {
     label: "Concluída",
@@ -52,12 +52,6 @@ const NR_STATUS_CONFIG: Record<
   },
 };
 
-/**
- * Shared NR-1 status badge used by the painel and empresa detail views.
- * Color semantics align with the design tokens defined in globals.css
- * (brand-light = blue/collecting, risk-low = green/completed,
- * risk-medium = yellow/review-recommended, muted = neutral).
- */
 export function NrStatusBadge({ status, className }: NrStatusBadgeProps) {
   const config = NR_STATUS_CONFIG[status] ?? NR_STATUS_CONFIG.no_assessment;
   return (

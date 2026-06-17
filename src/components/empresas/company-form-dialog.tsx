@@ -176,7 +176,7 @@ export function CompanyFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto scroll-area">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="font-display text-xl">
             {editing ? "Editar empresa" : "Nova empresa"}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -186,15 +186,15 @@ export function CompanyFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-6">
           {/* Identificação */}
           <fieldset className="space-y-4" disabled={submitting}>
-            <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            <legend className="font-display text-sm font-medium text-foreground">
               Identificação
             </legend>
             <div className="space-y-1.5">
               <Label htmlFor="emp-name">
-                Nome <span className="text-destructive">*</span>
+                Nome <span className="text-[var(--risk-high)]">*</span>
               </Label>
               <Input
                 id="emp-name"
@@ -207,7 +207,7 @@ export function CompanyFormDialog({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="emp-cnpj">
-                  CNPJ <span className="text-destructive">*</span>
+                  CNPJ <span className="text-[var(--risk-high)]">*</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -221,15 +221,15 @@ export function CompanyFormDialog({
                     aria-describedby="emp-cnpj-feedback"
                     className={`font-mono-numeric pr-9 ${
                       showCnpjError || cnpjError
-                        ? "border-destructive focus-visible:ring-destructive/30"
+                        ? "border-[var(--risk-high)] focus-visible:ring-[var(--risk-high)]/30"
                         : cnpjValid
-                        ? "border-risk-low focus-visible:ring-risk-low/30"
+                        ? "border-[var(--risk-low)] focus-visible:ring-[var(--risk-low)]/30"
                         : ""
                     }`}
                   />
                   {cnpjValid && (
                     <Check
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-risk-low"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--risk-low)]"
                       aria-hidden
                     />
                   )}
@@ -237,7 +237,7 @@ export function CompanyFormDialog({
                 {(showCnpjError || cnpjError) && (
                   <p
                     id="emp-cnpj-feedback"
-                    className="text-xs text-destructive flex items-center gap-1"
+                    className="text-xs text-[var(--risk-high)] flex items-center gap-1"
                   >
                     <X className="h-3 w-3" />
                     {cnpjError ?? "CNPJ inválido"}
@@ -307,7 +307,7 @@ export function CompanyFormDialog({
 
           {/* Contato */}
           <fieldset className="space-y-4" disabled={submitting}>
-            <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            <legend className="font-display text-sm font-medium text-foreground">
               Contato
             </legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

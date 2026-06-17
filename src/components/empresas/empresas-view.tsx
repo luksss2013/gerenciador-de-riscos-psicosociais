@@ -11,7 +11,6 @@ import {
   ClipboardList,
   Loader2,
   MapPin,
-  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -24,18 +23,9 @@ import { api, ApiError } from "@/lib/api";
 import { useView } from "@/lib/store";
 import type { CompanySummary } from "@/lib/types";
 import { formatCnpj, sanitizeCnpj } from "@/lib/cnpj";
-import { NrStatusBadge, type NrStatus } from "@/components/shell/nr-status-badge";
 import { CompanyFormDialog } from "@/components/empresas/company-form-dialog";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,8 +35,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 const TWO_YEARS_MS = 1000 * 60 * 60 * 24 * 365 * 2;
 const PAGE_SIZE = 20;
 
-/** Derive the NR-1 status badge from a company's lastAssessment summary. */
-function deriveStatus(c: CompanySummary): NrStatus {
+type RowStatus =
+  | "no_assessment"
+  | "collecting"
+  | "processing"
+  | "completed"
+  | "review_recommended"
+  | "draft"
+  | "archived";
+
+/** Status dot color (matched to NrStatusBadge tokens from R-1). */
+const STATUS_DOT_CLASS: Record<RowStatus, string> = {
+  no_assessment: "bg-[var(--muted-foreground)]",
+  draft: "bg-[var(--muted-foreground)]",
+  collecting: "bg-[var(--brand)]",
+  processing: "bg-[var(--brand-light)]",
+  completed: "bg-[var(--risk-low)]",
+  review_recommended: "bg-[var(--risk-medium)]",
+  archived: "bg-[var(--muted-foreground)]",
+};
+
+/** Derive the NR-1 status from a company's lastAssessment summary. */
+function deriveStatus(c: CompanySummary): RowStatus {
   const { lastAssessmentStatus, lastAssessmentCompletedAt } = c.summary;
   if (!lastAssessmentStatus) return "no_assessment";
   if (lastAssessmentStatus === "collecting") return "collecting";
@@ -62,6 +72,16 @@ function deriveStatus(c: CompanySummary): NrStatus {
   }
   return "no_assessment";
 }
+
+const STATUS_LABEL: Record<RowStatus, string> = {
+  no_assessment: "Sem avaliação",
+  draft: "Rascunho",
+  collecting: "Coletando",
+  processing: "Processando",
+  completed: "Concluída",
+  review_recommended: "Revisão recomendada",
+  archived: "Arquivada",
+};
 
 // ─── View ────────────────────────────────────────────────────────────────────
 
@@ -163,13 +183,13 @@ export function EmpresasView() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
-      {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      {/* Page header */}
+      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-border pb-6 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight">
             Empresas
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1.5">
             Gerencie seus clientes e seus ciclos de avaliação NR-1.
           </p>
         </div>
@@ -180,7 +200,7 @@ export function EmpresasView() {
       </header>
 
       {/* Search bar */}
-      <div className="mb-5 flex flex-col sm:flex-row gap-2 sm:items-center">
+      <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:items-center">
         <div className="relative flex-1">
           <Label htmlFor="empresas-search" className="sr-only">
             Buscar empresa por nome ou CNPJ
@@ -196,7 +216,7 @@ export function EmpresasView() {
             placeholder="Buscar por nome ou CNPJ…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9"
+            className="pl-9 bg-[var(--surface)] border-border"
             aria-label="Buscar empresa por nome ou CNPJ"
           />
           {searchInput && (
@@ -225,21 +245,22 @@ export function EmpresasView() {
 
       {/* Error */}
       {!loading && error && (
-        <Card className="border-destructive/30">
-          <CardContent className="py-10 flex flex-col items-center text-center gap-3">
-            <div className="h-11 w-11 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <p className="font-medium">Falha ao carregar empresas</p>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-            </div>
-            <Button variant="outline" onClick={() => void load()}>
-              <RefreshCw className="h-4 w-4" />
-              Tentar novamente
-            </Button>
-          </CardContent>
-        </Card>
+        <section
+          role="alert"
+          className="border border-dashed border-border rounded-lg py-12 flex flex-col items-center text-center gap-3"
+        >
+          <div className="h-11 w-11 rounded-full risk-high-bg flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-display text-lg">Falha ao carregar empresas</p>
+            <p className="text-sm text-muted-foreground mt-1">{error}</p>
+          </div>
+          <Button variant="outline" onClick={() => void load()}>
+            <RefreshCw className="h-4 w-4" />
+            Tentar novamente
+          </Button>
+        </section>
       )}
 
       {/* Loaded */}
@@ -253,10 +274,10 @@ export function EmpresasView() {
             <>
               <section
                 aria-label="Lista de empresas"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                className="border-t border-border"
               >
                 {pageItems.map((c) => (
-                  <CompanyCard
+                  <CompanyRow
                     key={c.id}
                     company={c}
                     onOpen={() => go("empresa", { companyId: c.id })}
@@ -271,8 +292,12 @@ export function EmpresasView() {
                   aria-label="Paginação de empresas"
                 >
                   <p className="text-sm text-muted-foreground">
-                    {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtered.length)}{" "}
-                    de {filtered.length}
+                    <span className="font-mono-numeric">{pageStart + 1}</span>
+                    {"–"}
+                    <span className="font-mono-numeric">
+                      {Math.min(pageStart + PAGE_SIZE, filtered.length)}
+                    </span>{" "}
+                    de <span className="font-mono-numeric">{filtered.length}</span>
                   </p>
                   <div className="flex items-center gap-1">
                     <Button
@@ -318,9 +343,9 @@ export function EmpresasView() {
   );
 }
 
-// ─── Company card ────────────────────────────────────────────────────────────
+// ─── Company row ─────────────────────────────────────────────────────────────
 
-function CompanyCard({
+function CompanyRow({
   company,
   onOpen,
   onEdit,
@@ -334,61 +359,83 @@ function CompanyCard({
     company.city || company.state
       ? [company.city, company.state].filter(Boolean).join(" · ")
       : null;
+  const deptCount = company.summary.departmentsCount;
+  const asmtCount = company.summary.assessmentsCount;
 
   return (
-    <Card className="card-hover h-full flex flex-col">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base leading-tight line-clamp-2">
-            {company.name}
-          </CardTitle>
-          <NrStatusBadge status={status} />
+    <div className="surface-hover border-b border-border py-4 px-1 group">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6">
+        {/* Identity */}
+        <div className="min-w-0 flex-1 flex items-start gap-3">
+          <span
+            className={`mt-1.5 h-2.5 w-2.5 rounded-full shrink-0 ${STATUS_DOT_CLASS[status]}`}
+            aria-label={`Status: ${STATUS_LABEL[status]}`}
+            title={STATUS_LABEL[status]}
+          />
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={onOpen}
+                className="font-display font-medium text-lg leading-tight text-foreground text-left hover:text-[var(--brand-light)] transition-colors truncate"
+                aria-label={`Acessar empresa ${company.name}`}
+              >
+                {company.name}
+              </button>
+              <span className="font-mono-numeric text-sm text-muted-foreground">
+                {formatCnpj(company.cnpj)}
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              {location && (
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{location}</span>
+                </span>
+              )}
+              {company.cnaePrimary && (
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  <ClipboardList className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate font-mono-numeric">
+                    CNAE {company.cnaePrimary}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <CardDescription className="font-mono-numeric">
-          {formatCnpj(company.cnpj)}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-1.5 text-sm text-muted-foreground flex-1">
-        {location && (
-          <div className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{location}</span>
-          </div>
-        )}
-        {company.cnaePrimary && (
-          <div className="flex items-center gap-1.5">
-            <ClipboardList className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">CNAE: {company.cnaePrimary}</span>
-          </div>
-        )}
-      </CardContent>
-      <CardFooter className="flex items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5" />
-          <span>
-            {company.summary.departmentsCount} GHE
-            {company.summary.departmentsCount !== 1 ? "s" : ""} ·{" "}
-            {company.summary.assessmentsCount} aval.
-            {company.summary.assessmentsCount !== 1 ? "ões" : "ão"}
+
+        {/* Counts */}
+        <div className="flex items-center gap-5 text-sm text-muted-foreground shrink-0 lg:pr-2">
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5" />
+            <span className="font-mono-numeric">{deptCount}</span>
+            <span>{deptCount !== 1 ? "GHEs" : "GHE"}</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ClipboardList className="h-3.5 w-3.5" />
+            <span className="font-mono-numeric">{asmtCount}</span>
+            <span>{asmtCount !== 1 ? "avaliações" : "avaliação"}</span>
           </span>
         </div>
-        <div className="flex items-center gap-1">
+
+        {/* Actions */}
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             size="sm"
             variant="ghost"
             onClick={onEdit}
             aria-label={`Editar empresa ${company.name}`}
           >
-            <Pencil className="h-3.5 w-3.5" />
-            <span className="sr-only">Editar</span>
+            Editar
           </Button>
-          <Button size="sm" variant="outline" onClick={onOpen}>
+          <Button size="sm" variant="ghost" onClick={onOpen} className="text-[var(--brand)] hover:text-[var(--brand-light)]">
             Acessar
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -396,46 +443,40 @@ function CompanyCard({
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <Card className="border-dashed">
-      <CardContent className="py-16 flex flex-col items-center text-center gap-4">
-        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-          <Building2 className="h-8 w-8 text-primary" />
-        </div>
-        <div className="max-w-md">
-          <h2 className="text-lg font-semibold">
-            Nenhuma empresa cadastrada
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Adicione seu primeiro cliente.
-          </p>
-        </div>
-        <Button onClick={onAdd}>
-          <Plus className="h-4 w-4" />
-          Adicionar empresa
-        </Button>
-      </CardContent>
-    </Card>
+    <section className="border border-dashed border-border rounded-lg py-16 flex flex-col items-center text-center gap-4">
+      <div className="h-16 w-16 rounded-full bg-[var(--surface)] flex items-center justify-center">
+        <Building2 className="h-8 w-8 text-[var(--brand)]" />
+      </div>
+      <div className="max-w-md">
+        <h2 className="font-display text-xl">Nenhuma empresa cadastrada</h2>
+        <p className="text-sm text-muted-foreground mt-1.5">
+          Adicione seu primeiro cliente para iniciar ciclos de avaliação NR-1.
+        </p>
+      </div>
+      <Button onClick={onAdd}>
+        <Plus className="h-4 w-4" />
+        Adicionar empresa
+      </Button>
+    </section>
   );
 }
 
 function NoResults({ onClear }: { onClear: () => void }) {
   return (
-    <Card className="border-dashed">
-      <CardContent className="py-12 flex flex-col items-center text-center gap-3">
-        <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center">
-          <Search className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <div>
-          <p className="font-medium">Nenhuma empresa encontrada</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Ajuste os termos da busca ou cadastre uma nova empresa.
-          </p>
-        </div>
-        <Button variant="outline" onClick={onClear}>
-          Limpar busca
-        </Button>
-      </CardContent>
-    </Card>
+    <section className="border border-dashed border-border rounded-lg py-12 flex flex-col items-center text-center gap-3">
+      <div className="h-11 w-11 rounded-full bg-[var(--surface)] flex items-center justify-center">
+        <Search className="h-5 w-5 text-muted-foreground" />
+      </div>
+      <div>
+        <p className="font-display text-lg">Nenhuma empresa encontrada</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Ajuste os termos da busca ou cadastre uma nova empresa.
+        </p>
+      </div>
+      <Button variant="outline" onClick={onClear}>
+        Limpar busca
+      </Button>
+    </section>
   );
 }
 
@@ -443,9 +484,9 @@ function NoResults({ onClear }: { onClear: () => void }) {
 
 function EmpresasSkeleton() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="border-t border-border">
       {Array.from({ length: 6 }).map((_, i) => (
-        <Skeleton key={i} className="h-44 w-full rounded-xl" />
+        <Skeleton key={i} className="h-20 w-full rounded-none border-b border-border/40" />
       ))}
     </div>
   );

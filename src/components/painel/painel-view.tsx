@@ -36,14 +36,6 @@ import type {
 import { formatCnpj } from "@/lib/cnpj";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -154,7 +146,7 @@ function firstName(full: string | null | undefined): string {
   return parts[0];
 }
 
-// ─── Status accent color (for CompanyCard top border) ───────────────────────
+// ─── Status accent color (for CompanyRow status dot) ────────────────────────
 
 function statusAccentClass(status: NrStatus): string {
   switch (status) {
@@ -235,7 +227,7 @@ export function PainelView() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
-      {/* Hero header */}
+      {/* Page header */}
       <HeroHeader
         professionalName={professional?.name ?? null}
         onAddCompany={() => go("empresas")}
@@ -246,62 +238,66 @@ export function PainelView() {
 
       {/* Error */}
       {!loading && error && (
-        <Card className="border-destructive/30">
-          <CardContent className="py-10 flex flex-col items-center text-center gap-3">
-            <div className="h-11 w-11 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <p className="font-medium">Falha ao carregar o painel</p>
-              <p className="text-sm text-muted-foreground mt-1">{error}</p>
-            </div>
-            <Button variant="outline" onClick={() => void load()}>
-              <RefreshCw className="h-4 w-4" />
-              Tentar novamente
-            </Button>
-          </CardContent>
-        </Card>
+        <section
+          aria-label="Erro ao carregar painel"
+          className="border-b border-border py-10 flex flex-col items-center text-center gap-3"
+        >
+          <div className="h-11 w-11 rounded-full bg-destructive/10 flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+          </div>
+          <div>
+            <p className="font-medium">Falha ao carregar o painel</p>
+            <p className="text-sm text-muted-foreground mt-1">{error}</p>
+          </div>
+          <Button variant="outline" onClick={() => void load()}>
+            <RefreshCw className="h-4 w-4" />
+            Tentar novamente
+          </Button>
+        </section>
       )}
 
       {/* Loaded */}
       {!loading && !error && companies && (
         <>
-          {/* Alerts banner (still useful — kept above the KPI row) */}
+          {/* Alerts banner — refined: border-b dividers + small status dot, no warning card chrome */}
           {alerts.length > 0 && (
-            <section className="mb-6" aria-label="Alertas de conformidade">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            <section className="mb-8" aria-label="Alertas de conformidade">
+              <h2 className="font-display text-sm tracking-tight text-muted-foreground mb-3">
                 Alertas
               </h2>
               <ScrollArea className="w-full">
-                <div className="flex gap-3 pb-2">
-                  {alerts.map((a) => {
+                <div className="flex gap-0 pb-1">
+                  {alerts.map((a, idx) => {
                     const Icon = a.icon;
                     return (
                       <button
                         key={`${a.kind}-${a.companyId}`}
                         onClick={() => go("empresa", { companyId: a.companyId })}
-                        className={`shrink-0 w-72 text-left rounded-lg border p-3 transition-colors hover:bg-accent/50 ${
-                          a.tone === "warning"
-                            ? "border-warning/40 bg-warning/10"
-                            : "border-border bg-muted/40"
-                        }`}
+                        className={`shrink-0 w-72 text-left px-4 py-3 transition-colors hover:bg-[var(--surface)] ${
+                          idx === 0 ? "pl-0" : ""
+                        } ${idx < alerts.length - 1 ? "border-r border-border" : ""}`}
                       >
                         <div className="flex items-start gap-2.5">
-                          <Icon
-                            className={`h-4 w-4 mt-0.5 shrink-0 ${
+                          <span
+                            className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${
                               a.tone === "warning"
-                                ? "text-warning"
-                                : "text-muted-foreground"
+                                ? "bg-[var(--risk-medium)]"
+                                : "bg-[var(--muted-foreground)]"
                             }`}
+                            aria-hidden="true"
                           />
                           <div className="min-w-0">
-                            <div className="text-sm font-medium truncate">
+                            <div className="text-sm font-medium truncate text-foreground">
                               {a.companyName}
                             </div>
                             <div className="text-xs text-muted-foreground leading-snug mt-0.5">
                               {a.message}
                             </div>
                           </div>
+                          <Icon
+                            className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/70"
+                            aria-hidden="true"
+                          />
                         </div>
                       </button>
                     );
@@ -315,8 +311,8 @@ export function PainelView() {
           {totalCompanies === 0 ? (
             <EmptyState onAdd={() => go("empresas")} />
           ) : (
-            <div className="space-y-6">
-              {/* KPI summary row */}
+            <div className="space-y-10">
+              {/* Stat strip */}
               <KpiRow dashboard={dashboard} />
 
               {/* Compliance overview */}
@@ -325,41 +321,40 @@ export function PainelView() {
                 totalCompanies={totalCompanies}
               />
 
-              {/* Two-column section */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Companies grid — 2/3 width on desktop */}
-                <section
-                  className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4"
-                  aria-label="Empresas"
-                >
+              {/* Companies list — 2/3 width on desktop */}
+              <section aria-label="Empresas" className="lg:col-span-2">
+                <div className="flex items-baseline justify-between mb-4">
+                  <h2 className="font-display text-xl tracking-tight text-foreground">
+                    Empresas
+                  </h2>
+                  <span className="text-xs text-muted-foreground">
+                    {totalCompanies} {totalCompanies === 1 ? "cliente" : "clientes"}
+                  </span>
+                </div>
+                <div className="divide-y divide-border border-b border-border">
                   {companies.map((c) => (
-                    <CompanyCard
+                    <CompanyRow
                       key={c.id}
                       company={c}
                       onOpen={() => go("empresa", { companyId: c.id })}
                     />
                   ))}
-                </section>
+                </div>
+              </section>
 
-                {/* Recent assessments feed — 1/3 width on desktop */}
-                <aside
-                  aria-label="Avaliações recentes"
-                  className="lg:col-span-1"
-                >
-                  <RecentAssessmentsFeed
-                    items={dashboard?.recentAssessments ?? []}
-                    onPick={(a) =>
-                      go("avaliacao", {
-                        assessmentId: a.id,
-                        companyId: a.companyId,
-                      })
-                    }
-                  />
-                </aside>
-              </div>
+              {/* Recent assessments feed */}
+              <RecentAssessmentsFeed
+                items={dashboard?.recentAssessments ?? []}
+                onPick={(a) =>
+                  go("avaliacao", {
+                    assessmentId: a.id,
+                    companyId: a.companyId,
+                  })
+                }
+              />
 
               {/* Heatmap + Trend row */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <DimensionHeatmapMini
                   heatmap={dashboard?.dimensionHeatmap ?? []}
                 />
@@ -373,7 +368,7 @@ export function PainelView() {
   );
 }
 
-// ─── Hero header ────────────────────────────────────────────────────────────
+// ─── Page header (clean, on warm paper — no gradient hero) ──────────────────
 
 function HeroHeader({
   professionalName,
@@ -387,83 +382,28 @@ function HeroHeader({
     : "Painel do profissional SST";
   return (
     <header
-      className="mb-6 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-8 rounded-none sm:rounded-xl bg-gradient-to-r from-[var(--brand)] to-[var(--brand-light)] text-white"
+      className="border-b border-border pb-6 mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
       aria-label="Cabeçalho do painel"
     >
-      <div className="max-w-7xl mx-auto w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Painel de Conformidade NR-1
-          </h1>
-          <p className="text-sm text-white/80 mt-1">{greeting}</p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={onAddCompany}
-          className="shrink-0 bg-white text-foreground border-white hover:bg-white/90 hover:text-foreground"
-        >
-          <Plus className="h-4 w-4" />
-          Nova Empresa
-        </Button>
+      <div>
+        <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
+          Painel de Conformidade NR-1
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1.5">{greeting}</p>
       </div>
+      <Button
+        variant="outline"
+        onClick={onAddCompany}
+        className="shrink-0 border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--surface)] hover:text-[var(--brand)]"
+      >
+        <Plus className="h-4 w-4" />
+        Nova Empresa
+      </Button>
     </header>
   );
 }
 
-// ─── KPI row ────────────────────────────────────────────────────────────────
-
-interface KpiCardProps {
-  label: string;
-  value: number;
-  icon: React.ElementType;
-  iconTone: "brand" | "warning" | "risk" | "muted";
-  secondary?: string;
-  ariaLabel: string;
-}
-
-const KPI_ICON_TONE_CLASS: Record<KpiCardProps["iconTone"], string> = {
-  brand: "bg-brand-light/15 text-brand-light",
-  warning: "bg-warning/15 text-warning",
-  risk: "bg-risk-high/15 text-risk-high",
-  muted: "bg-muted text-muted-foreground",
-};
-
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  iconTone,
-  secondary,
-  ariaLabel,
-}: KpiCardProps) {
-  return (
-    <Card className="card-hover" role="group" aria-label={ariaLabel}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-3xl font-bold font-mono-numeric leading-none">
-              {value}
-            </div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground mt-2">
-              {label}
-            </div>
-            {secondary && (
-              <div className="text-xs text-muted-foreground mt-1">
-                {secondary}
-              </div>
-            )}
-          </div>
-          <div
-            className={`h-9 w-9 rounded-md flex items-center justify-center shrink-0 ${KPI_ICON_TONE_CLASS[iconTone]}`}
-            aria-hidden="true"
-          >
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// ─── Stat strip (replaces 4-card KPI grid) ──────────────────────────────────
 
 function KpiRow({ dashboard }: { dashboard: ProfessionalDashboard | null }) {
   const k = dashboard?.kpis;
@@ -474,49 +414,74 @@ function KpiRow({ dashboard }: { dashboard: ProfessionalDashboard | null }) {
   const totalCompanies = k?.totalCompanies ?? 0;
   const totalRespondents = k?.totalRespondents ?? 0;
 
+  const stats: {
+    value: number;
+    label: string;
+    secondary?: string;
+    ariaLabel: string;
+  }[] = [
+    {
+      value: totalCompanies,
+      label: "Empresas",
+      ariaLabel: `Empresas: ${totalCompanies}`,
+    },
+    {
+      value: active,
+      label: "Avaliações ativas",
+      secondary: `${completed} concluída${completed === 1 ? "" : "s"}`,
+      ariaLabel: `Avaliações ativas: ${active}. ${completed} concluídas.`,
+    },
+    {
+      value: atRisk,
+      label: "GHEs em risco",
+      secondary: `${mediumRisk} intermediário${mediumRisk === 1 ? "" : "s"}`,
+      ariaLabel: `GHEs em risco alto: ${atRisk}. ${mediumRisk} em risco intermediário.`,
+    },
+    {
+      value: totalRespondents,
+      label: "Total respondentes",
+      ariaLabel: `Total de respondentes: ${totalRespondents}`,
+    },
+  ];
+
   return (
-    <section aria-label="Indicadores principais" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <KpiCard
-        label="Empresas"
-        value={totalCompanies}
-        icon={Building2}
-        iconTone="brand"
-        ariaLabel={`Empresas: ${totalCompanies}`}
-      />
-      <KpiCard
-        label="Avaliações ativas"
-        value={active}
-        icon={Activity}
-        iconTone="brand"
-        secondary={`${completed} concluída${completed === 1 ? "" : "s"}`}
-        ariaLabel={`Avaliações ativas: ${active}. ${completed} concluídas.`}
-      />
-      <KpiCard
-        label="GHEs em risco"
-        value={atRisk}
-        icon={ShieldAlert}
-        iconTone={atRisk > 0 ? "risk" : "muted"}
-        secondary={`${mediumRisk} intermediário${mediumRisk === 1 ? "" : "s"}`}
-        ariaLabel={`GHEs em risco alto: ${atRisk}. ${mediumRisk} em risco intermediário.`}
-      />
-      <KpiCard
-        label="Total respondentes"
-        value={totalRespondents}
-        icon={Users}
-        iconTone="brand"
-        ariaLabel={`Total de respondentes: ${totalRespondents}`}
-      />
+    <section
+      aria-label="Indicadores principais"
+      className="bg-[var(--surface)] rounded-lg p-5"
+    >
+      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
+        {stats.map((s, i) => (
+          <div
+            key={i}
+            className={`px-4 sm:px-6 py-1 ${i === 0 ? "pl-0" : ""}`}
+            role="group"
+            aria-label={s.ariaLabel}
+          >
+            <div className="font-mono-numeric text-2xl leading-none text-foreground">
+              {s.value}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              {s.label}
+            </div>
+            {s.secondary && (
+              <div className="text-[11px] text-muted-foreground/80 mt-1 font-mono-numeric">
+                {s.secondary}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
 
-// ─── Compliance overview ────────────────────────────────────────────────────
+// ─── Compliance overview (section, no Card wrapper) ─────────────────────────
 
 interface ComplianceBucket {
   key: "compliant" | "inProgress" | "pendingReview" | "noAssessment";
   label: string;
   value: number;
-  colorClass: string; // tailwind bg-* utility for the bar segment
+  colorVar: string; // CSS variable for the bar segment
 }
 
 function ComplianceOverview({
@@ -535,25 +500,25 @@ function ComplianceOverview({
       key: "compliant",
       label: "Em conformidade",
       value: compliance.compliant,
-      colorClass: "bg-risk-low",
+      colorVar: "var(--risk-low)",
     },
     {
       key: "inProgress",
       label: "Em andamento",
       value: compliance.inProgress,
-      colorClass: "bg-brand-light",
+      colorVar: "var(--brand-light)",
     },
     {
       key: "pendingReview",
       label: "Revisão pendente",
       value: compliance.pendingReview,
-      colorClass: "bg-warning",
+      colorVar: "var(--risk-medium)",
     },
     {
       key: "noAssessment",
       label: "Sem avaliação",
       value: compliance.noAssessment,
-      colorClass: "bg-muted-foreground/40",
+      colorVar: "var(--muted-foreground)",
     },
   ];
 
@@ -561,63 +526,66 @@ function ComplianceOverview({
   const nonZero = buckets.filter((b) => b.value > 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Conformidade NR-1</CardTitle>
-        </div>
-        <CardDescription>
-          Distribuição do estado de conformidade das {totalCompanies} empresa
-          {totalCompanies === 1 ? "" : "s"}.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Stacked bar */}
-        <div
-          className="h-3 w-full rounded-full overflow-hidden flex bg-muted"
-          role="img"
-          aria-label={`Conformidade: ${compliance.compliant} em conformidade, ${compliance.inProgress} em andamento, ${compliance.pendingReview} em revisão pendente, ${compliance.noAssessment} sem avaliação.`}
-        >
-          {total > 0 ? (
-            nonZero.map((b) => (
-              <div
-                key={b.key}
-                className={b.colorClass}
-                style={{
-                  width: `${(b.value / total) * 100}%`,
-                }}
-                title={`${b.label}: ${b.value}`}
-              />
-            ))
-          ) : (
-            <div className="w-full bg-muted" />
-          )}
-        </div>
+    <section aria-label="Conformidade NR-1">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl tracking-tight text-foreground">
+          Conformidade NR-1
+        </h2>
+        <span className="text-xs text-muted-foreground">
+          {totalCompanies} {totalCompanies === 1 ? "empresa" : "empresas"}
+        </span>
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Distribuição do estado de conformidade dos clientes sob gestão.
+      </p>
 
-        {/* Legend */}
-        <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          {buckets.map((b) => (
-            <li key={b.key} className="flex items-center gap-2">
-              <span
-                className={`h-2.5 w-2.5 rounded-sm ${b.colorClass}`}
-                aria-hidden="true"
-              />
-              <div className="min-w-0">
-                <div className="text-muted-foreground truncate">{b.label}</div>
-                <div className="font-medium font-mono-numeric">{b.value}</div>
+      {/* Stacked bar */}
+      <div
+        className="h-2.5 w-full rounded-full overflow-hidden flex bg-[var(--surface)]"
+        role="img"
+        aria-label={`Conformidade: ${compliance.compliant} em conformidade, ${compliance.inProgress} em andamento, ${compliance.pendingReview} em revisão pendente, ${compliance.noAssessment} sem avaliação.`}
+      >
+        {total > 0 ? (
+          nonZero.map((b) => (
+            <div
+              key={b.key}
+              style={{
+                width: `${(b.value / total) * 100}%`,
+                backgroundColor: b.colorVar,
+              }}
+              title={`${b.label}: ${b.value}`}
+            />
+          ))
+        ) : (
+          <div className="w-full bg-[var(--surface)]" />
+        )}
+      </div>
+
+      {/* Legend */}
+      <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mt-5">
+        {buckets.map((b) => (
+          <li key={b.key} className="flex items-center gap-2">
+            <span
+              className="h-2.5 w-2.5 rounded-sm shrink-0"
+              style={{ backgroundColor: b.colorVar }}
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <div className="text-muted-foreground truncate">{b.label}</div>
+              <div className="font-medium font-mono-numeric text-foreground">
+                {b.value}
               </div>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
-// ─── Company card ───────────────────────────────────────────────────────────
+// ─── Company list-row (replaces Card pattern) ───────────────────────────────
 
-function CompanyCard({
+function CompanyRow({
   company,
   onOpen,
 }: {
@@ -636,71 +604,83 @@ function CompanyCard({
   const isCollecting = company.summary.lastAssessmentStatus === "collecting";
 
   return (
-    <Card className="card-hover h-full overflow-hidden">
-      {/* Status accent top border */}
-      <div
-        className="h-0.5 w-full"
-        style={{ backgroundColor: accent }}
-        aria-hidden="true"
-      />
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base leading-tight line-clamp-2">
-            {company.name}
-          </CardTitle>
-          <NrStatusBadge status={status} />
-        </div>
-        <CardDescription className="font-mono-numeric">
-          {formatCnpj(company.cnpj)}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm text-muted-foreground">
-        {location && (
-          <div className="flex items-center gap-1.5">
-            <MapPin className="h-3.5 w-3.5" />
-            <span>{location}</span>
-          </div>
-        )}
-        {company.cnaePrimary && (
-          <div className="flex items-center gap-1.5">
-            <ClipboardList className="h-3.5 w-3.5" />
-            <span>CNAE: {company.cnaePrimary}</span>
-          </div>
-        )}
-        {isCollecting && (
-          <div className="pt-1">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-muted-foreground">Coleta em andamento</span>
-              <span className="text-muted-foreground font-mono-numeric">—</span>
+    <div className="surface-hover py-4 -mx-2 px-2 rounded-sm transition-colors">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        {/* Status dot + name/CNPJ */}
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <span
+            className="mt-1.5 h-2 w-2 rounded-full shrink-0"
+            style={{ backgroundColor: accent }}
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-display font-medium text-base text-foreground leading-tight line-clamp-1">
+                {company.name}
+              </h3>
+              <NrStatusBadge status={status} />
             </div>
-            <Progress
-              value={0}
-              className="h-1.5"
-              aria-label="Avaliação em coleta"
-            />
+            <div className="font-mono-numeric text-xs text-muted-foreground mt-1">
+              {formatCnpj(company.cnpj)}
+              {location && (
+                <span className="mx-2" aria-hidden="true">·</span>
+              )}
+              {location && (
+                <span className="inline-flex items-center gap-1 align-middle">
+                  <MapPin className="h-3 w-3" aria-hidden="true" />
+                  {location}
+                </span>
+              )}
+              {company.cnaePrimary && (
+                <>
+                  <span className="mx-2" aria-hidden="true">·</span>
+                  <span className="inline-flex items-center gap-1 align-middle">
+                    <ClipboardList className="h-3 w-3" aria-hidden="true" />
+                    CNAE {company.cnaePrimary}
+                  </span>
+                </>
+              )}
+            </div>
+            {isCollecting && (
+              <div className="mt-2 max-w-xs">
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="text-muted-foreground">Coleta em andamento</span>
+                  <span className="text-muted-foreground font-mono-numeric">—</span>
+                </div>
+                <Progress
+                  value={0}
+                  className="h-1"
+                  aria-label="Avaliação em coleta"
+                />
+              </div>
+            )}
           </div>
-        )}
-      </CardContent>
-      <CardFooter className="flex items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5" />
-          <span>
+        </div>
+
+        {/* Counts + action */}
+        <div className="flex items-center justify-between gap-4 sm:shrink-0 pl-5 sm:pl-0">
+          <div className="text-xs text-muted-foreground font-mono-numeric">
             {company.summary.departmentsCount} GHE
             {company.summary.departmentsCount !== 1 ? "s" : ""} ·{" "}
             {company.summary.assessmentsCount} aval.
             {company.summary.assessmentsCount !== 1 ? "ões" : "ão"}
-          </span>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onOpen}
+            className="text-[var(--brand)] hover:bg-[var(--surface)] hover:text-[var(--brand)]"
+          >
+            Acessar
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
         </div>
-        <Button size="sm" variant="outline" onClick={onOpen}>
-          Acessar
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
 
-// ─── Recent assessments feed ────────────────────────────────────────────────
+// ─── Recent assessments feed (list with border-b dividers, no Card) ─────────
 
 type RecentAssessmentItem = ProfessionalDashboard["recentAssessments"][number];
 
@@ -720,6 +700,21 @@ function assessmentStatusIcon(status: AssessmentStatus): React.ElementType {
   }
 }
 
+function statusDotColor(status: AssessmentStatus): string {
+  switch (status) {
+    case "collecting":
+    case "processing":
+      return "var(--brand-light)";
+    case "completed":
+      return "var(--risk-low)";
+    case "archived":
+      return "var(--muted-foreground)";
+    case "draft":
+    default:
+      return "var(--muted-foreground)";
+  }
+}
+
 function RecentAssessmentsFeed({
   items,
   onPick,
@@ -729,78 +724,82 @@ function RecentAssessmentsFeed({
 }) {
   const top = items.slice(0, 5);
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Avaliações recentes</CardTitle>
+    <section aria-label="Avaliações recentes">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl tracking-tight text-foreground">
+          Avaliações recentes
+        </h2>
+        <span className="text-xs text-muted-foreground">Últimos ciclos atualizados</span>
+      </div>
+
+      {top.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted-foreground border-b border-border">
+          Nenhuma avaliação registrada.
         </div>
-        <CardDescription>Últimos ciclos atualizados.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-0 flex-1 min-h-0">
-        {top.length === 0 ? (
-          <div className="px-6 py-10 text-center text-sm text-muted-foreground">
-            Nenhuma avaliação registrada.
-          </div>
-        ) : (
-          <ScrollArea className="max-h-96 px-6 scroll-area">
-            <ol className="space-y-1 py-2">
-              {top.map((a) => {
-                const Icon = assessmentStatusIcon(a.status);
-                const statusLabel =
-                  ASSESSMENT_STATUS_LABELS[a.status] ?? a.status;
-                return (
-                  <li key={a.id}>
-                    <button
-                      onClick={() => onPick(a)}
-                      className="w-full text-left flex gap-3 py-2.5 px-2 -mx-2 rounded-md hover:bg-accent/60 transition-colors"
-                    >
-                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <Icon className="h-3.5 w-3.5 text-foreground/70" />
+      ) : (
+        <ScrollArea className="max-h-96 scroll-area border-b border-border">
+          <ol>
+            {top.map((a) => {
+              const Icon = assessmentStatusIcon(a.status);
+              const statusLabel =
+                ASSESSMENT_STATUS_LABELS[a.status] ?? a.status;
+              return (
+                <li key={a.id} className="border-b border-border last:border-b-0">
+                  <button
+                    onClick={() => onPick(a)}
+                    className="w-full text-left flex gap-3 py-3 px-1 -mx-1 rounded-sm transition-colors hover:bg-[var(--surface)]"
+                  >
+                    <span
+                      className="mt-1.5 h-1.5 w-1.5 rounded-full shrink-0"
+                      style={{ backgroundColor: statusDotColor(a.status) }}
+                      aria-hidden="true"
+                    />
+                    <Icon
+                      className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/70"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm leading-snug">
+                        <span className="font-medium truncate block text-foreground">
+                          {a.companyName}
+                        </span>
+                        <span className="text-muted-foreground truncate block">
+                          {a.title}
+                        </span>
                       </div>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <div className="text-sm leading-snug">
-                          <span className="font-medium truncate block">
-                            {a.companyName}
-                          </span>
-                          <span className="text-muted-foreground truncate block">
-                            {a.title}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                            {statusLabel}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            · {relativeTime(a.updatedAt)}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {statusLabel}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          · {relativeTime(a.updatedAt)}
+                        </span>
                       </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </ScrollArea>
-        )}
-      </CardContent>
-    </Card>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </ScrollArea>
+      )}
+    </section>
   );
 }
 
-// ─── Dimension heatmap mini ────────────────────────────────────────────────
+// ─── Dimension heatmap mini (section, no Card wrapper) ──────────────────────
 
 type HeatmapItem = ProfessionalDashboard["dimensionHeatmap"][number];
 
-function riskBarClass(level: RiskLevel): string {
+function riskBarVar(level: RiskLevel): string {
   switch (level) {
     case "HIGH":
-      return "bg-risk-high";
+      return "var(--risk-high)";
     case "MEDIUM":
-      return "bg-risk-medium";
+      return "var(--risk-medium)";
     case "LOW":
     default:
-      return "bg-risk-low";
+      return "var(--risk-low)";
   }
 }
 
@@ -811,99 +810,97 @@ function DimensionHeatmapMini({ heatmap }: { heatmap: HeatmapItem[] }) {
   const allZero = heatmap.every((d) => d.weightedAvgRiskScore === 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">
-            Risco médio por dimensão
-          </CardTitle>
+    <section aria-label="Risco médio por dimensão" className="border-b border-border pb-8">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl tracking-tight text-foreground">
+          Risco médio por dimensão
+        </h2>
+        <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Todos os ciclos concluídos — COPSOQ II-BR (D1–D11).
+      </p>
+
+      {allZero ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          Sem dados de dimensão ainda.
         </div>
-        <CardDescription>
-          Todos os ciclos concluídos — COPSOQ II-BR (D1–D11).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {allZero ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            Sem dados de dimension ainda.
+      ) : (
+        <TooltipProvider delayDuration={150}>
+          <div
+            className="flex items-end justify-between gap-1.5 h-32"
+            role="img"
+            aria-label="Risco médio por dimensão COPSOQ. Veja a tabela sr-only abaixo para os valores completos."
+          >
+            {heatmap.map((d) => {
+              const heightPct = Math.max(
+                4,
+                Math.min(100, Math.round(d.weightedAvgRiskScore)),
+              );
+              return (
+                <Tooltip key={d.code}>
+                  <TooltipTrigger asChild>
+                    <div className="flex-1 flex flex-col items-center gap-1.5 group cursor-default">
+                      <div className="w-full h-full flex items-end">
+                        <div
+                          className="w-full rounded-t-sm transition-opacity group-hover:opacity-80"
+                          style={{
+                            height: `${heightPct}%`,
+                            backgroundColor: riskBarVar(d.riskLevel),
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-mono-numeric">
+                        {d.code}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    <div className="font-medium">{d.code} · {d.name}</div>
+                    <div className="text-muted-foreground">
+                      Escore: {Math.round(d.weightedAvgRiskScore)}/100 ·{" "}
+                      {d.riskLevel === "HIGH"
+                        ? "Desfavorável"
+                        : d.riskLevel === "MEDIUM"
+                          ? "Intermediário"
+                          : "Favorável"}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
           </div>
-        ) : (
-          <TooltipProvider delayDuration={150}>
-            <div
-              className="flex items-end justify-between gap-1.5 h-32"
-              role="img"
-              aria-label="Risco médio por dimensão COPSOQ. Veja a tabela sr-only abaixo para os valores completos."
-            >
-              {heatmap.map((d) => {
-                const heightPct = Math.max(
-                  4,
-                  Math.min(100, Math.round(d.weightedAvgRiskScore)),
-                );
-                return (
-                  <Tooltip key={d.code}>
-                    <TooltipTrigger asChild>
-                      <div className="flex-1 flex flex-col items-center gap-1.5 group cursor-default">
-                        <div className="w-full h-full flex items-end">
-                          <div
-                            className={`w-full rounded-t-sm transition-all ${riskBarClass(
-                              d.riskLevel,
-                            )} group-hover:opacity-80`}
-                            style={{ height: `${heightPct}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-muted-foreground font-mono-numeric">
-                          {d.code}
-                        </span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      <div className="font-medium">{d.code} · {d.name}</div>
-                      <div className="text-muted-foreground">
-                        Escore: {Math.round(d.weightedAvgRiskScore)}/100 ·{" "}
-                        {d.riskLevel === "HIGH"
-                          ? "Desfavorável"
-                          : d.riskLevel === "MEDIUM"
-                            ? "Intermediário"
-                            : "Favorável"}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
-            {/* sr-only data table for screen readers */}
-            <table className="sr-only">
-              <caption>
-                Risco médio por dimensão (todos os ciclos concluídos)
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">Código</th>
-                  <th scope="col">Dimensão</th>
-                  <th scope="col">Escore (0-100)</th>
-                  <th scope="col">Nível</th>
+          {/* sr-only data table for screen readers */}
+          <table className="sr-only">
+            <caption>
+              Risco médio por dimensão (todos os ciclos concluídos)
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Código</th>
+                <th scope="col">Dimensão</th>
+                <th scope="col">Escore (0-100)</th>
+                <th scope="col">Nível</th>
+              </tr>
+            </thead>
+            <tbody>
+              {heatmap.map((d) => (
+                <tr key={d.code}>
+                  <td>{d.code}</td>
+                  <td>{d.name}</td>
+                  <td>{Math.round(d.weightedAvgRiskScore)}</td>
+                  <td>{d.riskLevel}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {heatmap.map((d) => (
-                  <tr key={d.code}>
-                    <td>{d.code}</td>
-                    <td>{d.name}</td>
-                    <td>{Math.round(d.weightedAvgRiskScore)}</td>
-                    <td>{d.riskLevel}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TooltipProvider>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </tbody>
+          </table>
+        </TooltipProvider>
+      )}
+    </section>
   );
 }
 
-// ─── Trend mini-chart (pure SVG) ────────────────────────────────────────────
+// ─── Trend mini-chart (section, no Card wrapper; recolored to chart palette) ─
 
 type TrendPoint = ProfessionalDashboard["trend"][number];
 
@@ -945,113 +942,114 @@ function TrendMiniChart({ trend }: { trend: TrendPoint[] }) {
       : "";
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Avaliações por mês</CardTitle>
+    <section aria-label="Avaliações por mês" className="border-b border-border pb-8">
+      <div className="flex items-baseline justify-between mb-4">
+        <h2 className="font-display text-xl tracking-tight text-foreground">
+          Avaliações por mês
+        </h2>
+        <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">
+        Últimos 6 meses.
+      </p>
+
+      {allZero ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          Nenhuma avaliação nos últimos 6 meses.
         </div>
-        <CardDescription>Últimos 6 meses.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {allZero ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            Nenhuma avaliação nos últimos 6 meses.
-          </div>
-        ) : (
-          <>
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              className="w-full h-auto"
-              role="img"
-              aria-label={`Avaliações por mês: ${trend
-                .map((p) => `${p.label}: ${p.count}`)
-                .join(", ")}.`}
-            >
-              {/* Y baseline */}
-              <line
-                x1={PAD_X}
-                y1={PAD_Y_TOP + innerH}
-                x2={PAD_X + innerW}
-                y2={PAD_Y_TOP + innerH}
-                stroke="var(--border)"
-                strokeWidth={1}
-              />
-              {/* Area fill */}
-              <path
-                d={areaPath}
-                fill="var(--brand-light)"
-                fillOpacity={0.15}
-                stroke="none"
-              />
-              {/* Line */}
-              <path
-                d={linePath}
-                fill="none"
-                stroke="var(--brand-light)"
-                strokeWidth={2}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-              {/* Points + X labels */}
-              {points.map((p, i) => (
-                <g key={i}>
-                  <circle
-                    cx={p.x}
-                    cy={p.y}
-                    r={3}
-                    fill="var(--brand)"
-                    stroke="var(--background)"
-                    strokeWidth={1.5}
-                  />
+      ) : (
+        <>
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="w-full h-auto"
+            role="img"
+            aria-label={`Avaliações por mês: ${trend
+              .map((p) => `${p.label}: ${p.count}`)
+              .join(", ")}.`}
+          >
+            {/* Y baseline */}
+            <line
+              x1={PAD_X}
+              y1={PAD_Y_TOP + innerH}
+              x2={PAD_X + innerW}
+              y2={PAD_Y_TOP + innerH}
+              stroke="var(--border)"
+              strokeWidth={1}
+            />
+            {/* Area fill */}
+            <path
+              d={areaPath}
+              fill="var(--chart-2)"
+              fillOpacity={0.15}
+              stroke="none"
+            />
+            {/* Line */}
+            <path
+              d={linePath}
+              fill="none"
+              stroke="var(--chart-1)"
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            {/* Points + X labels */}
+            {points.map((p, i) => (
+              <g key={i}>
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={3}
+                  fill="var(--brand)"
+                  stroke="var(--background)"
+                  strokeWidth={1.5}
+                />
+                <text
+                  x={p.x}
+                  y={H - 10}
+                  textAnchor="middle"
+                  fontSize={9}
+                  fill="var(--muted-foreground)"
+                  fontFamily="var(--font-geist-mono, monospace)"
+                >
+                  {p.label.split(" ")[0]}
+                </text>
+                {p.count > 0 && (
                   <text
                     x={p.x}
-                    y={H - 10}
+                    y={p.y - 8}
                     textAnchor="middle"
                     fontSize={9}
-                    fill="var(--muted-foreground)"
+                    fontWeight={600}
+                    fill="var(--foreground)"
                     fontFamily="var(--font-geist-mono, monospace)"
                   >
-                    {p.label.split(" ")[0]}
+                    {p.count}
                   </text>
-                  {p.count > 0 && (
-                    <text
-                      x={p.x}
-                      y={p.y - 8}
-                      textAnchor="middle"
-                      fontSize={9}
-                      fontWeight={600}
-                      fill="var(--foreground)"
-                      fontFamily="var(--font-geist-mono, monospace)"
-                    >
-                      {p.count}
-                    </text>
-                  )}
-                </g>
-              ))}
-            </svg>
-            {/* sr-only data table */}
-            <table className="sr-only">
-              <caption>Avaliações por mês (últimos 6 meses)</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Mês</th>
-                  <th scope="col">Avaliações</th>
+                )}
+              </g>
+            ))}
+          </svg>
+          {/* sr-only data table */}
+          <table className="sr-only">
+            <caption>Avaliações por mês (últimos 6 meses)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Mês</th>
+                <th scope="col">Avaliações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trend.map((p) => (
+                <tr key={p.month}>
+                  <td>{p.label}</td>
+                  <td>{p.count}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {trend.map((p) => (
-                  <tr key={p.month}>
-                    <td>{p.label}</td>
-                    <td>{p.count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -1059,24 +1057,24 @@ function TrendMiniChart({ trend }: { trend: TrendPoint[] }) {
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <Card className="border-dashed">
-      <CardContent className="py-16 flex flex-col items-center text-center gap-4">
-        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-          <Building2 className="h-8 w-8 text-primary" />
-        </div>
-        <div className="max-w-md">
-          <h2 className="text-lg font-semibold">Nenhuma empresa cadastrada</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Adicione seu primeiro cliente para começar a gerenciar riscos
-            psicossociais conforme a NR-1.
-          </p>
-        </div>
-        <Button onClick={onAdd}>
-          <Plus className="h-4 w-4" />
-          Adicionar empresa
-        </Button>
-      </CardContent>
-    </Card>
+    <section className="border border-dashed border-border rounded-lg py-16 flex flex-col items-center text-center gap-4">
+      <div className="h-16 w-16 rounded-full bg-[var(--surface)] flex items-center justify-center">
+        <Building2 className="h-8 w-8 text-[var(--brand)]" />
+      </div>
+      <div className="max-w-md">
+        <h2 className="font-display text-lg tracking-tight text-foreground">
+          Nenhuma empresa cadastrada
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Adicione seu primeiro cliente para começar a gerenciar riscos
+          psicossociais conforme a NR-1.
+        </p>
+      </div>
+      <Button onClick={onAdd}>
+        <Plus className="h-4 w-4" />
+        Adicionar empresa
+      </Button>
+    </section>
   );
 }
 
@@ -1084,34 +1082,27 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 
 function PainelSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Alerts skeleton */}
       <div className="flex gap-3 overflow-hidden">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-16 w-72 shrink-0" />
+          <Skeleton key={i} className="h-14 w-72 shrink-0 rounded-md" />
         ))}
       </div>
-      {/* KPI row skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-28 w-full rounded-xl" />
-        ))}
-      </div>
+      {/* Stat strip skeleton */}
+      <Skeleton className="h-20 w-full rounded-lg" />
       {/* Compliance skeleton */}
-      <Skeleton className="h-32 w-full rounded-xl" />
-      {/* Two-column skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 w-full rounded-xl" />
-          ))}
-        </div>
-        <Skeleton className="h-96 lg:col-span-1 rounded-xl" />
+      <Skeleton className="h-28 w-full rounded-md" />
+      {/* Companies list skeleton */}
+      <div className="space-y-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full rounded-md" />
+        ))}
       </div>
       {/* Heatmap + trend skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Skeleton className="h-56 w-full rounded-xl" />
-        <Skeleton className="h-56 w-full rounded-xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Skeleton className="h-56 w-full rounded-md" />
+        <Skeleton className="h-56 w-full rounded-md" />
       </div>
     </div>
   );

@@ -208,20 +208,20 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0">
-        <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-          <ShieldCheck className="h-5 w-5 text-primary-foreground" />
+        <div className="h-8 w-8 rounded-md bg-[var(--brand)] flex items-center justify-center">
+          <ShieldCheck className="h-4 w-4 text-[var(--accent-foreground)]" />
         </div>
         <div className="leading-tight">
-          <div className="font-semibold text-sm">NR-1 Copsoq</div>
-          <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Riscos Psicossociais
+          <div className="font-display font-semibold text-[15px] text-foreground">NR-1 Copsoq</div>
+          <div className="text-[11px] text-muted-foreground">
+            Riscos psicossociais
           </div>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4" aria-label="Navegação principal">
-        <ul className="space-y-1">
+        <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = view === item.view;
@@ -232,10 +232,10 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
                     go(item.view);
                     onNavigate?.();
                   }}
-                  className={`w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors border-l-2 ${
                     active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                      ? "border-[var(--brand)] bg-sidebar-accent text-[var(--brand)]"
+                      : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                   }`}
                   aria-current={active ? "page" : undefined}
                 >
@@ -255,7 +255,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
             <DropdownMenuTrigger asChild>
               <button className="flex-1 flex items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent/60 transition-colors text-left">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  <AvatarFallback className="bg-[var(--sidebar-accent)] text-[var(--brand)] text-xs">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
@@ -346,10 +346,10 @@ function MobileTopbar() {
       </Sheet>
 
       <div className="flex items-center gap-2">
-        <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-          <ShieldCheck className="h-4 w-4 text-primary-foreground" />
+        <div className="h-7 w-7 rounded-md bg-[var(--brand)] flex items-center justify-center">
+          <ShieldCheck className="h-4 w-4 text-[var(--accent-foreground)]" />
         </div>
-        <span className="font-semibold text-sm">{currentLabel}</span>
+        <span className="font-display font-semibold text-sm text-foreground">{currentLabel}</span>
       </div>
     </header>
   );
@@ -360,15 +360,15 @@ function MobileTopbar() {
 function AppFooter() {
   return (
     <footer
-      className="mt-auto bg-primary text-primary-foreground"
+      className="mt-auto bg-[var(--surface)] text-muted-foreground border-t border-border"
       role="contentinfo"
     >
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          <span className="font-medium">NR-1 Copsoq</span>
-          <span className="opacity-60">·</span>
-          <span className="opacity-80">
+          <ShieldCheck className="h-3.5 w-3.5 text-[var(--brand)]" />
+          <span className="font-medium text-foreground">NR-1 Copsoq</span>
+          <span className="opacity-50">·</span>
+          <span>
             COPSOQ II-BR (CC BY-NC-ND 4.0) · Conforme NR-1 / Portaria MTE 1.419/2024
           </span>
         </div>
@@ -388,9 +388,9 @@ export function AppShell() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex flex-1">
-        {/* Desktop sidebar (fixed width 240px) */}
+        {/* Desktop sidebar (224px) */}
         <aside
-          className="hidden lg:block w-60 shrink-0 border-r border-sidebar-border sticky top-0 h-screen"
+          className="hidden lg:block w-56 shrink-0 border-r border-sidebar-border sticky top-0 h-screen"
           aria-label="Barra lateral"
         >
           <SidebarContent />

@@ -44,17 +44,8 @@ import type {
 } from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -66,11 +57,11 @@ import {
 import {
   Table,
   TableBody,
-  TableCell,
   TableCaption,
   TableHead,
   TableHeader,
   TableRow,
+  TableCell,
 } from "@/components/ui/table";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
@@ -98,8 +89,8 @@ interface ProfileFormState {
 export function ConfiguracoesView() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-4xl mx-auto w-full">
-      <header className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+      <header className="border-b border-border pb-6 mb-2">
+        <h1 className="font-display text-2xl sm:text-3xl tracking-tight">
           Configurações
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -107,14 +98,37 @@ export function ConfiguracoesView() {
         </p>
       </header>
 
-      <div className="space-y-6">
+      <div>
         <ProfileSection />
-        <AccountSection />
         <SecuritySection />
         <SessionSection />
-        <AboutSection />
         <AuditLogSection />
+        <AboutSection />
       </div>
+    </div>
+  );
+}
+
+// ─── Section heading helper ─────────────────────────────────────────────────
+
+function SectionHeading({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+        <span className="text-xs uppercase tracking-[0.14em]">{title}</span>
+      </div>
+      {description ? (
+        <p className="text-sm text-muted-foreground">{description}</p>
+      ) : null}
     </div>
   );
 }
@@ -170,112 +184,85 @@ function ProfileSection() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Perfil profissional</CardTitle>
-        </div>
-        <CardDescription>
-          Informações exibidas nos relatórios oficiais de conformidade NR-1.
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={onSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="cfg-name">Nome completo</Label>
-            <Input
-              id="cfg-name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              disabled={saving}
-              required
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="cfg-profession">Categoria profissional</Label>
-              <Select
-                value={form.professionType}
-                onValueChange={(v) =>
-                  setForm({ ...form, professionType: v as ProfessionType })
-                }
-                disabled={saving}
-              >
-                <SelectTrigger id="cfg-profession" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROFESSION_TYPES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {PROFESSION_TYPE_LABELS[p]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cfg-credential">Registro (CRP / CREA / CRM)</Label>
-              <Input
-                id="cfg-credential"
-                placeholder="CRP 06/123456"
-                value={form.credentialNumber}
-                onChange={(e) =>
-                  setForm({ ...form, credentialNumber: e.target.value })
-                }
-                disabled={saving}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cfg-phone">Telefone</Label>
-            <Input
-              id="cfg-phone"
-              type="tel"
-              placeholder="(11) 99999-9999"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              disabled={saving}
-            />
-          </div>
-        </CardContent>
-        <CardFooter className="justify-end">
-          <Button type="submit" disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Salvando…
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Salvar alterações
-              </>
-            )}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
-  );
-}
+    <section
+      aria-labelledby="cfg-profile-title"
+      className="border-b border-border py-8"
+    >
+      <SectionHeading
+        icon={User}
+        title="Perfil profissional"
+        description="Informações exibidas nos relatórios oficiais de conformidade NR-1."
+      />
+      <h2
+        id="cfg-profile-title"
+        className="font-display text-xl mt-3 mb-6"
+      >
+        Perfil profissional
+      </h2>
 
-// ─── Conta ──────────────────────────────────────────────────────────────────
-
-function AccountSection() {
-  const { professional } = useAuth();
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Conta</CardTitle>
-        </div>
-        <CardDescription>
-          Credenciais de acesso à plataforma.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-5">
         <div className="space-y-1.5">
+          <Label htmlFor="cfg-name">Nome completo</Label>
+          <Input
+            id="cfg-name"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            disabled={saving}
+            required
+            className="bg-[var(--card)]"
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="cfg-profession">Categoria profissional</Label>
+            <Select
+              value={form.professionType}
+              onValueChange={(v) =>
+                setForm({ ...form, professionType: v as ProfessionType })
+              }
+              disabled={saving}
+            >
+              <SelectTrigger id="cfg-profession" className="w-full bg-[var(--card)]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROFESSION_TYPES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {PROFESSION_TYPE_LABELS[p]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cfg-credential">Registro (CRP / CREA / CRM)</Label>
+            <Input
+              id="cfg-credential"
+              placeholder="CRP 06/123456"
+              value={form.credentialNumber}
+              onChange={(e) =>
+                setForm({ ...form, credentialNumber: e.target.value })
+              }
+              disabled={saving}
+              className="bg-[var(--card)]"
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="cfg-phone">Telefone</Label>
+          <Input
+            id="cfg-phone"
+            type="tel"
+            placeholder="(11) 99999-9999"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            disabled={saving}
+            className="bg-[var(--card)]"
+          />
+        </div>
+
+        {/* Conta — e-mail (read-only identifier) */}
+        <div className="space-y-1.5 pt-4 border-t border-border">
           <Label htmlFor="cfg-email">E-mail</Label>
           <Input
             id="cfg-email"
@@ -283,15 +270,16 @@ function AccountSection() {
             value={professional?.email ?? ""}
             readOnly
             disabled
-            className="bg-muted/40 font-mono-numeric"
+            className="bg-[var(--surface)] font-mono-numeric text-muted-foreground"
             aria-readonly
           />
           <p className="text-xs text-muted-foreground">
             O e-mail é o identificador da conta e não pode ser alterado.
           </p>
         </div>
-        <Separator />
-        <div className="flex items-center justify-between gap-3">
+
+        {/* Conta — senha (placeholder for upcoming) */}
+        <div className="flex items-center justify-between gap-3 pt-4 border-t border-border">
           <div className="flex items-start gap-2.5">
             <KeyRound className="h-4 w-4 text-muted-foreground mt-0.5" />
             <div>
@@ -304,7 +292,12 @@ function AccountSection() {
           <Tooltip>
             <TooltipTrigger asChild>
               <span tabIndex={0} className="inline-flex">
-                <Button variant="outline" size="sm" disabled>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="border-border text-muted-foreground"
+                >
                   <Lock className="h-3.5 w-3.5" />
                   Alterar senha
                 </Button>
@@ -313,8 +306,28 @@ function AccountSection() {
             <TooltipContent>Em breve</TooltipContent>
           </Tooltip>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="flex justify-end pt-2">
+          <Button
+            type="submit"
+            disabled={saving}
+            className="bg-[var(--brand)] text-[var(--accent-foreground)] hover:bg-[var(--brand-light)]"
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Salvando…
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Salvar alterações
+              </>
+            )}
+          </Button>
+        </div>
+      </form>
+    </section>
   );
 }
 
@@ -353,38 +366,46 @@ function SecuritySection() {
   ];
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Segurança & LGPD</CardTitle>
-        </div>
-        <CardDescription>
-          Como a plataforma protege dados do profissional e do trabalhador.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <section
+      aria-labelledby="cfg-security-title"
+      className="border-b border-border py-8"
+    >
+      <SectionHeading
+        icon={ShieldCheck}
+        title="Segurança & LGPD"
+        description="Como a plataforma protege dados do profissional e do trabalhador."
+      />
+      <h2
+        id="cfg-security-title"
+        className="font-display text-xl mt-3 mb-6"
+      >
+        Segurança & LGPD
+      </h2>
+
+      <ul className="divide-y divide-border border-t border-b border-border">
         {items.map((it) => {
           const Icon = it.icon;
           return (
-            <div
+            <li
               key={it.title}
-              className="rounded-lg border border-border bg-muted/30 p-4 flex gap-3"
+              className="py-4 flex gap-3"
             >
-              <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                <Icon className="h-4 w-4 text-primary" />
+              <div className="h-8 w-8 rounded-md bg-[var(--sidebar-accent)] flex items-center justify-center shrink-0">
+                <Icon className="h-4 w-4 text-[var(--brand)]" />
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-medium">{it.title}</div>
+                <div className="text-sm font-medium text-foreground">
+                  {it.title}
+                </div>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                   {it.description}
                 </p>
               </div>
-            </div>
+            </li>
           );
         })}
-      </CardContent>
-    </Card>
+      </ul>
+    </section>
   );
 }
 
@@ -474,83 +495,89 @@ function SessionSection() {
   const showBulkButton = data.length >= 2;
 
   return (
-    <Card id="sessoes">
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <MonitorSmartphone className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Sessões ativas</CardTitle>
-            </div>
-            <CardDescription className="mt-1">
-              Gerencie os dispositivos conectados à sua conta. Você pode
-              encerrar sessões individuais ou todas as outras.
-            </CardDescription>
-          </div>
-          {showBulkButton && (
-            <AlertDialog open={bulkOpen} onOpenChange={setBulkOpen}>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-                  disabled={revokingOthers || othersCount === 0}
-                  aria-label="Encerrar todas as outras sessões"
-                >
-                  <ShieldOff className="h-3.5 w-3.5" />
-                  <span className="ml-1.5 hidden sm:inline">
-                    Encerrar todas as outras
-                  </span>
-                  <span className="ml-1.5 sm:hidden">Encerrar outras</span>
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    Encerrar todas as outras sessões?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tem certeza? Todas as outras sessões serão encerradas
-                    imediatamente. Esta ação não pode ser desfeita. A sessão
-                    atual será mantida.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={revokingOthers}>
-                    Cancelar
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={(e) => {
-                      e.preventDefault();
-                      void onRevokeOthers();
-                    }}
-                    disabled={revokingOthers}
-                    className="bg-destructive text-white hover:bg-destructive/90"
-                  >
-                    {revokingOthers ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Encerrando…
-                      </>
-                    ) : (
-                      <>
-                        <ShieldOff className="h-4 w-4" />
-                        Encerrar {othersCount} sessão
-                        {othersCount === 1 ? "" : "ões"}
-                      </>
-                    )}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+    <section
+      id="sessoes"
+      aria-labelledby="cfg-sessions-title"
+      className="border-b border-border py-8"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <SectionHeading
+            icon={MonitorSmartphone}
+            title="Sessões ativas"
+            description="Gerencie os dispositivos conectados à sua conta. Você pode encerrar sessões individuais ou todas as outras."
+          />
+          <h2
+            id="cfg-sessions-title"
+            className="font-display text-xl mt-3"
+          >
+            Sessões ativas
+          </h2>
         </div>
-      </CardHeader>
-      <CardContent>
+        {showBulkButton && (
+          <AlertDialog open={bulkOpen} onOpenChange={setBulkOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 border-[var(--risk-high)]/50 text-[var(--risk-high)] hover:bg-[var(--risk-high)]/10 hover:text-[var(--risk-high)]"
+                disabled={revokingOthers || othersCount === 0}
+                aria-label="Encerrar todas as outras sessões"
+              >
+                <ShieldOff className="h-3.5 w-3.5" />
+                <span className="ml-1.5 hidden sm:inline">
+                  Encerrar todas as outras
+                </span>
+                <span className="ml-1.5 sm:hidden">Encerrar outras</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-display">
+                  Encerrar todas as outras sessões?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza? Todas as outras sessões serão encerradas
+                  imediatamente. Esta ação não pode ser desfeita. A sessão
+                  atual será mantida.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={revokingOthers}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void onRevokeOthers();
+                  }}
+                  disabled={revokingOthers}
+                  className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+                >
+                  {revokingOthers ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Encerrando…
+                    </>
+                  ) : (
+                    <>
+                      <ShieldOff className="h-4 w-4" />
+                      Encerrar {othersCount} sessão
+                      {othersCount === 1 ? "" : "ões"}
+                    </>
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+
+      <div className="mt-6">
         {error ? (
           <div className="py-10 flex flex-col items-center text-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
-              <ShieldOff className="h-4 w-4 text-destructive" />
+            <div className="h-10 w-10 rounded-full bg-[var(--risk-high)]/10 flex items-center justify-center">
+              <ShieldOff className="h-4 w-4 text-[var(--risk-high)]" />
             </div>
             <p className="text-sm text-muted-foreground">{error}</p>
             <Button variant="outline" size="sm" onClick={() => void load()}>
@@ -566,11 +593,11 @@ function SessionSection() {
           </div>
         ) : (
           <ul
-            className="space-y-2 max-h-96 overflow-y-auto scroll-area"
+            className="border-t border-border max-h-96 overflow-y-auto scroll-area"
             aria-label="Lista de sessões ativas"
           >
             {data.map((s) => (
-              <SessionCard
+              <SessionRowItem
                 key={s.id}
                 session={s}
                 revoking={revokingId === s.id}
@@ -579,12 +606,12 @@ function SessionSection() {
             ))}
           </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
-function SessionCard({
+function SessionRowItem({
   session,
   revoking,
   onRevoke,
@@ -596,23 +623,20 @@ function SessionCard({
   const created = safeDate(session.createdAt);
   const expires = safeDate(session.expiresAt);
   return (
-    <li className="rounded-lg border border-border bg-muted/20 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-      <div className="flex-1 min-w-0 space-y-1">
+    <li className="border-b border-border py-4 px-1 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono-numeric text-sm font-medium">
+          <span className="font-mono-numeric text-sm font-medium text-foreground">
             {session.tokenPreview}
           </span>
           {session.isCurrent ? (
-            <Badge
-              className="bg-brand-light text-white border-transparent"
-              aria-label="Sessão atual"
-            >
+            <Badge className="bg-[var(--sidebar-accent)] text-[var(--brand)] border-transparent hover:bg-[var(--sidebar-accent)]">
               Sessão atual
             </Badge>
           ) : (
             <Badge
               variant="outline"
-              className="text-muted-foreground font-normal"
+              className="bg-muted text-muted-foreground font-normal border-border"
             >
               Outra sessão
             </Badge>
@@ -638,7 +662,7 @@ function SessionCard({
             <TooltipTrigger asChild>
               <span tabIndex={0} className="inline-flex">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   disabled
                   aria-label="Não é possível encerrar a sessão atual — use Sair"
@@ -655,11 +679,12 @@ function SessionCard({
           </Tooltip>
         ) : (
           <Button
-            variant="destructive"
+            variant="ghost"
             size="sm"
             disabled={revoking}
             onClick={onRevoke}
             aria-label={`Encerrar sessão ${session.tokenPreview}`}
+            className="text-[var(--risk-high)] hover:bg-[var(--risk-high)]/10 hover:text-[var(--risk-high)]"
           >
             {revoking ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -676,11 +701,11 @@ function SessionCard({
 
 function SessionListSkeleton() {
   return (
-    <ul className="space-y-2" aria-hidden="true">
+    <ul className="border-t border-border" aria-hidden="true">
       {Array.from({ length: 3 }).map((_, i) => (
         <li
           key={i}
-          className="rounded-lg border border-border bg-muted/20 p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+          className="border-b border-border py-4 px-1 flex flex-col sm:flex-row sm:items-center gap-3"
         >
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
@@ -694,75 +719,6 @@ function SessionListSkeleton() {
         </li>
       ))}
     </ul>
-  );
-}
-
-// ─── Sobre ──────────────────────────────────────────────────────────────────
-
-function AboutSection() {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Sobre a plataforma</CardTitle>
-        </div>
-        <CardDescription>
-          Versão, embasamento normativo e licença do instrumento.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground">Versão</span>
-          <span className="font-mono-numeric font-medium">{APP_VERSION}</span>
-        </div>
-        <Separator />
-        <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Embasamento normativo
-          </div>
-          <ul className="space-y-1.5 text-sm">
-            <li>
-              <span className="font-medium">NR-1</span> — Disposições gerais e
-              gerenciamento de riscos ocupacionais.
-            </li>
-            <li>
-              <span className="font-medium">Portaria MTE 1.419/2024</span> —
-              Anexo III: Riscos Psicossociais.
-            </li>
-            <li>
-              <span className="font-medium">Portaria MTE 765/2025</span> —
-              Atualizações do FRPRT.
-            </li>
-          </ul>
-        </div>
-        <Separator />
-        <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Instrumento
-          </div>
-          <p className="text-sm leading-relaxed">
-            COPSOQ II-BR — versão brasileira do Copenhagen Psychosocial
-            Questionnaire II. Adaptado e validado por{" "}
-            <span className="font-medium">
-              Gonçalves et al. (2021)
-            </span>
-            .
-          </p>
-        </div>
-        <Separator />
-        <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            Licença
-          </div>
-          <p className="text-sm">
-            O instrumento COPSOQ II-BR é distribuído sob licença{" "}
-            <span className="font-medium">CC BY-NC-ND 4.0</span> (Atribuição ·
-            Não comercial · Sem derivados).
-          </p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -933,277 +889,376 @@ function AuditLogSection() {
   }, [actionFilter, resourceFilter]);
 
   return (
-    <Card id="auditoria">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Registro de Auditoria</CardTitle>
+    <section
+      id="auditoria"
+      aria-labelledby="cfg-audit-title"
+      className="border-b border-border py-8"
+    >
+      <SectionHeading
+        icon={History}
+        title="Registro de Auditoria"
+        description="Trilha de ações realizadas na sua conta."
+      />
+      <h2
+        id="cfg-audit-title"
+        className="font-display text-xl mt-3 mb-6"
+      >
+        Registro de Auditoria
+      </h2>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-end gap-3 mb-5">
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="audit-filter-resource"
+            className="text-xs text-muted-foreground"
+          >
+            Recurso
+          </Label>
+          <Select
+            value={resourceFilter || "__all__"}
+            onValueChange={(v) => {
+              setResourceFilter(v === "__all__" ? "" : v);
+              setPage(1);
+            }}
+            disabled={loading}
+          >
+            <SelectTrigger
+              id="audit-filter-resource"
+              className="w-44 bg-[var(--card)]"
+              aria-label="Filtrar por tipo de recurso"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todos</SelectItem>
+              {RESOURCE_TYPE_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <CardDescription>
-          Trilha de ações realizadas na sua conta.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Filter row */}
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="audit-filter-resource"
-              className="text-xs text-muted-foreground"
-            >
-              Recurso
-            </Label>
-            <Select
-              value={resourceFilter || "__all__"}
-              onValueChange={(v) => {
-                setResourceFilter(v === "__all__" ? "" : v);
-                setPage(1);
-              }}
-              disabled={loading}
-            >
-              <SelectTrigger
-                id="audit-filter-resource"
-                className="w-44"
-                aria-label="Filtrar por tipo de recurso"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {RESOURCE_TYPE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
-          <div className="space-y-1.5">
-            <Label
-              htmlFor="audit-filter-action"
-              className="text-xs text-muted-foreground"
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="audit-filter-action"
+            className="text-xs text-muted-foreground"
+          >
+            Ação
+          </Label>
+          <Select
+            value={actionFilter || "__all__"}
+            onValueChange={(v) => {
+              setActionFilter(v === "__all__" ? "" : v);
+              setPage(1);
+            }}
+            disabled={loading}
+          >
+            <SelectTrigger
+              id="audit-filter-action"
+              className="w-52 bg-[var(--card)]"
+              aria-label="Filtrar por tipo de ação"
             >
-              Ação
-            </Label>
-            <Select
-              value={actionFilter || "__all__"}
-              onValueChange={(v) => {
-                setActionFilter(v === "__all__" ? "" : v);
-                setPage(1);
-              }}
-              disabled={loading}
-            >
-              <SelectTrigger
-                id="audit-filter-action"
-                className="w-52"
-                aria-label="Filtrar por tipo de ação"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todas</SelectItem>
-                {ACTION_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Todas</SelectItem>
+              {ACTION_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-          {hasFilters && (
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearFilters}
+            disabled={loading}
+            className="h-9 text-muted-foreground hover:text-foreground"
+            aria-label="Limpar filtros"
+          >
+            Limpar
+          </Button>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void onExportCSV()}
+            disabled={exporting || loading}
+            className="h-9 border-border"
+            aria-label="Exportar registro de auditoria em CSV"
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            <span className="ml-1.5">Exportar CSV</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label="Atualizar registro de auditoria"
+            className="h-9 w-9 text-muted-foreground hover:text-foreground"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Table or states */}
+      {error ? (
+        <div className="py-10 flex flex-col items-center text-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-[var(--risk-high)]/10 flex items-center justify-center">
+            <Lock className="h-4 w-4 text-[var(--risk-high)]" />
+          </div>
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" size="sm" onClick={() => void load()}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            Tentar novamente
+          </Button>
+        </div>
+      ) : loading ? (
+        <AuditLogSkeleton />
+      ) : data.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">
+          Nenhuma ação registrada.
+        </div>
+      ) : (
+        <div className="max-h-96 overflow-y-auto scroll-area border-t border-border">
+          <Table>
+            <TableCaption className="sr-only">
+              Registro de auditoria — {meta?.total ?? data.length} entrada(s)
+              {hasFilters ? " com filtros aplicados" : ""}. Página{" "}
+              {meta?.page ?? page} de {meta?.pages ?? 1}.
+            </TableCaption>
+            <TableHeader className="sticky top-0 bg-[var(--surface)] z-10">
+              <TableRow className="border-b border-border hover:bg-transparent">
+                <TableHead className="w-40 text-xs uppercase tracking-[0.1em] text-muted-foreground font-medium py-3">
+                  Data/Hora
+                </TableHead>
+                <TableHead className="w-56 text-xs uppercase tracking-[0.1em] text-muted-foreground font-medium py-3">
+                  Ação
+                </TableHead>
+                <TableHead className="w-36 text-xs uppercase tracking-[0.1em] text-muted-foreground font-medium py-3">
+                  Recurso
+                </TableHead>
+                <TableHead className="text-xs uppercase tracking-[0.1em] text-muted-foreground font-medium py-3">
+                  Detalhes
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((entry) => {
+                const Icon = actionIcon(entry.action);
+                const details = summarizeMetadata(entry.metadata);
+                const fullDetails =
+                  entry.metadata != null
+                    ? JSON.stringify(entry.metadata, null, 2)
+                    : null;
+                return (
+                  <TableRow
+                    key={entry.id}
+                    className="border-b border-border"
+                  >
+                    <TableCell className="font-mono-numeric text-xs text-muted-foreground py-3">
+                      {formatDateTime(entry.createdAt)}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="h-6 w-6 rounded-md bg-[var(--surface)] flex items-center justify-center shrink-0"
+                          aria-hidden="true"
+                        >
+                          <Icon className="h-3.5 w-3.5 text-[var(--brand)]" />
+                        </span>
+                        <span className="text-sm text-foreground truncate">
+                          {actionLabel(entry.action)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge
+                        variant="outline"
+                        className="font-normal text-xs border-border bg-[var(--surface)] text-muted-foreground"
+                      >
+                        {resourceTypeLabel(entry.resourceType)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground py-3">
+                      {fullDetails ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help truncate block max-w-xs">
+                              {details}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            className="max-w-sm whitespace-pre-wrap font-mono-numeric text-xs"
+                          >
+                            {fullDetails}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span>{details}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!error && !loading && data.length > 0 && meta && (
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground pt-5">
+          <span>
+            Página {meta.page} de {meta.pages} · {meta.total} registro
+            {meta.total === 1 ? "" : "s"}
+          </span>
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              onClick={onClearFilters}
-              disabled={loading}
-              className="h-9"
-              aria-label="Limpar filtros"
+              onClick={onPrevPage}
+              disabled={meta.page <= 1}
+              className="h-8 text-muted-foreground hover:text-foreground"
+              aria-label="Página anterior"
             >
-              Limpar
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Anterior
             </Button>
-          )}
-
-          <div className="ml-auto flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => void onExportCSV()}
-              disabled={exporting || loading}
-              className="h-9"
-              aria-label="Exportar registro de auditoria em CSV"
+              onClick={onNextPage}
+              disabled={meta.page >= meta.pages}
+              className="h-8 text-muted-foreground hover:text-foreground"
+              aria-label="Próxima página"
             >
-              {exporting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              <span className="ml-1.5">Exportar CSV</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => void load()}
-              disabled={loading}
-              aria-label="Atualizar registro de auditoria"
-              className="h-9 w-9"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
+              Próxima
+              <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
-
-        {/* Table or states */}
-        {error ? (
-          <div className="py-10 flex flex-col items-center text-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
-              <Lock className="h-4 w-4 text-destructive" />
-            </div>
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <Button variant="outline" size="sm" onClick={() => void load()}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              Tentar novamente
-            </Button>
-          </div>
-        ) : loading ? (
-          <AuditLogSkeleton />
-        ) : data.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">
-            Nenhuma ação registrada.
-          </div>
-        ) : (
-          <div className="max-h-96 overflow-y-auto scroll-area rounded-md border border-border">
-            <Table>
-              <TableCaption className="sr-only">
-                Registro de auditoria — {meta?.total ?? data.length} entrada(s)
-                {hasFilters ? " com filtros aplicados" : ""}. Página{" "}
-                {meta?.page ?? page} de {meta?.pages ?? 1}.
-              </TableCaption>
-              <TableHeader className="sticky top-0 bg-card z-10">
-                <TableRow>
-                  <TableHead className="w-40">Data/Hora</TableHead>
-                  <TableHead className="w-56">Ação</TableHead>
-                  <TableHead className="w-36">Recurso</TableHead>
-                  <TableHead>Detalhes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((entry) => {
-                  const Icon = actionIcon(entry.action);
-                  const details = summarizeMetadata(entry.metadata);
-                  const fullDetails =
-                    entry.metadata != null
-                      ? JSON.stringify(entry.metadata, null, 2)
-                      : null;
-                  return (
-                    <TableRow key={entry.id}>
-                      <TableCell className="font-mono-numeric text-xs text-muted-foreground">
-                        {formatDateTime(entry.createdAt)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="h-6 w-6 rounded-md bg-muted flex items-center justify-center shrink-0"
-                            aria-hidden="true"
-                          >
-                            <Icon className="h-3.5 w-3.5 text-foreground/70" />
-                          </span>
-                          <span className="text-sm truncate">
-                            {actionLabel(entry.action)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className="font-normal text-xs"
-                        >
-                          {resourceTypeLabel(entry.resourceType)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {fullDetails ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="cursor-help truncate block max-w-xs">
-                                {details}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side="top"
-                              className="max-w-sm whitespace-pre-wrap font-mono-numeric text-xs"
-                            >
-                              {fullDetails}
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span>{details}</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {!error && !loading && data.length > 0 && meta && (
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>
-              Página {meta.page} de {meta.pages} · {meta.total} registro
-              {meta.total === 1 ? "" : "s"}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onPrevPage}
-                disabled={meta.page <= 1}
-                className="h-8"
-                aria-label="Página anterior"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-                Anterior
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onNextPage}
-                disabled={meta.page >= meta.pages}
-                className="h-8"
-                aria-label="Próxima página"
-              >
-                Próxima
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </section>
   );
 }
 
 function AuditLogSkeleton() {
   return (
-    <div className="rounded-md border border-border">
-      <div className="space-y-2 p-3">
+    <div className="border-t border-border">
+      <div className="space-y-1">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <div className="h-4 w-32 bg-muted rounded" />
-            <div className="h-4 w-40 bg-muted rounded" />
-            <div className="h-4 w-24 bg-muted rounded" />
-            <div className="h-4 flex-1 bg-muted rounded" />
+          <div
+            key={i}
+            className="flex items-center gap-3 border-b border-border py-3"
+          >
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 flex-1" />
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Sobre ──────────────────────────────────────────────────────────────────
+
+function AboutSection() {
+  return (
+    <section
+      aria-labelledby="cfg-about-title"
+      className="py-8"
+    >
+      <SectionHeading
+        icon={BookOpen}
+        title="Sobre a plataforma"
+        description="Versão, embasamento normativo e licença do instrumento."
+      />
+      <h2
+        id="cfg-about-title"
+        className="font-display text-xl mt-3 mb-6"
+      >
+        Sobre a plataforma
+      </h2>
+
+      <dl className="divide-y divide-border border-t border-b border-border">
+        <div className="flex items-center justify-between gap-3 py-4">
+          <dt className="text-sm text-muted-foreground">Versão</dt>
+          <dd className="font-mono-numeric font-medium text-sm text-foreground">
+            {APP_VERSION}
+          </dd>
+        </div>
+        <div className="py-4 space-y-2">
+          <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Embasamento normativo
+          </dt>
+          <dd>
+            <ul className="space-y-1.5 text-sm text-foreground">
+              <li>
+                <span className="font-medium">NR-1</span> — Disposições gerais e
+                gerenciamento de riscos ocupacionais.
+              </li>
+              <li>
+                <span className="font-medium">Portaria MTE 1.419/2024</span> —
+                Anexo III: Riscos Psicossociais.
+              </li>
+              <li>
+                <span className="font-medium">Portaria MTE 765/2025</span> —
+                Atualizações do FRPRT.
+              </li>
+            </ul>
+          </dd>
+        </div>
+        <div className="py-4 space-y-2">
+          <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Instrumento
+          </dt>
+          <dd>
+            <p className="text-sm leading-relaxed text-foreground">
+              COPSOQ II-BR — versão brasileira do Copenhagen Psychosocial
+              Questionnaire II. Adaptado e validado por{" "}
+              <span className="font-medium">
+                Gonçalves et al. (2021)
+              </span>
+              .
+            </p>
+          </dd>
+        </div>
+        <div className="py-4 space-y-2">
+          <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            Licença
+          </dt>
+          <dd>
+            <p className="text-sm text-foreground">
+              O instrumento COPSOQ II-BR é distribuído sob licença{" "}
+              <span className="font-medium">CC BY-NC-ND 4.0</span> (Atribuição ·
+              Não comercial · Sem derivados).
+            </p>
+          </dd>
+        </div>
+      </dl>
+    </section>
   );
 }

@@ -281,12 +281,12 @@ export function WorkerPortal({ token }: { token: string }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      {/* Top brand strip */}
-      <header className="border-b border-border bg-surface-card">
+      {/* Top brand strip — minimal, no card chrome */}
+      <header className="border-b border-border">
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <span
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--brand)] text-[var(--accent-foreground)]"
               aria-hidden="true"
             >
               <ShieldCheck className="h-4 w-4" />
@@ -299,7 +299,7 @@ export function WorkerPortal({ token }: { token: string }) {
             type="button"
             onClick={closeWorker}
             aria-label="Sair da pesquisa"
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Sair</span>
@@ -307,7 +307,7 @@ export function WorkerPortal({ token }: { token: string }) {
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main content — centered on warm paper */}
       <main className="flex-1 flex flex-col w-full" aria-live="polite">
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-8 sm:py-12 flex-1 flex flex-col">
           {bootLoading ? (
@@ -338,8 +338,8 @@ export function WorkerPortal({ token }: { token: string }) {
         </div>
       </main>
 
-      {/* Sticky discreet footer */}
-      <footer className="mt-auto border-t border-border bg-surface">
+      {/* Discreet footer */}
+      <footer className="mt-auto border-t border-border">
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-3 flex items-center justify-center gap-2">
           <Lock
             className="h-3.5 w-3.5 text-muted-foreground shrink-0"
@@ -364,7 +364,7 @@ function WorkerLoader({ label }: { label: string }) {
       aria-live="polite"
     >
       <Loader2
-        className="h-8 w-8 animate-spin text-primary"
+        className="h-7 w-7 animate-spin text-[var(--brand)]"
         aria-hidden="true"
       />
       <p className="text-sm text-muted-foreground">{label}</p>
@@ -379,26 +379,25 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
       aria-labelledby="welcome-title"
     >
       <div className="space-y-5">
-        <span className="inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground w-fit">
-          <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+        <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
           Questionário COPSOQ II-BR · 40 questões
-        </span>
+        </p>
         <h1
           id="welcome-title"
-          className="text-2xl sm:text-3xl font-semibold leading-tight text-foreground tracking-tight"
+          className="font-display text-3xl sm:text-4xl leading-tight text-foreground"
         >
           Pesquisa sobre Condições de Trabalho
         </h1>
-        <div className="space-y-4 text-sm sm:text-base text-muted-foreground leading-relaxed">
+        <div className="space-y-4 text-sm sm:text-base text-muted-foreground leading-relaxed max-w-2xl">
           <p>
             Esta pesquisa tem como objetivo conhecer as condições de trabalho
             no seu setor. Sua opinião é fundamental para identificar fatores
             que afetam a saúde e o bem-estar dos trabalhadores.
           </p>
-          <ul className="space-y-2.5">
-            <li className="flex gap-2.5">
+          <ul className="space-y-3">
+            <li className="flex gap-3">
               <span
-                className="mt-1.5 inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+                className="mt-2 inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand)]"
                 aria-hidden="true"
               />
               <span>
@@ -408,9 +407,9 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
                 — você pode interromper a qualquer momento.
               </span>
             </li>
-            <li className="flex gap-2.5">
+            <li className="flex gap-3">
               <span
-                className="mt-1.5 inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+                className="mt-2 inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand)]"
                 aria-hidden="true"
               />
               <span>
@@ -421,9 +420,9 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
                 você.
               </span>
             </li>
-            <li className="flex gap-2.5">
+            <li className="flex gap-3">
               <span
-                className="mt-1.5 inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+                className="mt-2 inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand)]"
                 aria-hidden="true"
               />
               <span>
@@ -441,7 +440,7 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
           type="button"
           onClick={onStart}
           size="lg"
-          className="w-full sm:w-auto min-h-12 px-8 text-base"
+          className="w-full sm:w-auto min-h-12 px-8 text-base bg-[var(--brand)] text-[var(--accent-foreground)] hover:bg-[var(--brand-light)]"
         >
           Começar
         </Button>
@@ -476,7 +475,7 @@ function WorkerQuestionItem({
       className="flex-1 flex flex-col gap-6 sm:gap-8"
       aria-labelledby="question-title"
     >
-      {/* Progress */}
+      {/* Progress — pine */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-mono-numeric" aria-hidden="true">
@@ -488,6 +487,7 @@ function WorkerQuestionItem({
         </div>
         <Progress
           value={progressPct}
+          className="[&>div]:bg-[var(--brand)]"
           aria-label={`Progresso da pesquisa: questão ${currentIndex} de ${totalItems}`}
         />
         <span className="sr-only" aria-live="polite">
@@ -499,7 +499,7 @@ function WorkerQuestionItem({
       <div className="space-y-6">
         <h2
           id="question-title"
-          className="text-xl sm:text-2xl font-medium leading-snug text-foreground"
+          className="font-display text-2xl sm:text-3xl leading-snug text-foreground"
         >
           {item.textPtBr}
         </h2>
@@ -508,13 +508,13 @@ function WorkerQuestionItem({
           <p
             role="status"
             aria-live="polite"
-            className="text-sm rounded-md bg-muted border border-border px-3 py-2 text-foreground"
+            className="text-sm border border-[var(--risk-medium)]/40 bg-[var(--surface)] px-3 py-2 text-foreground rounded-md"
           >
             {infoMsg}
           </p>
         ) : null}
 
-        {/* Likert options — stacked, full-width, min-h 56px */}
+        {/* Likert options — refined radio tiles */}
         <div
           role="group"
           aria-label="Opções de resposta"
@@ -531,20 +531,20 @@ function WorkerQuestionItem({
                 aria-pressed={isSelected}
                 aria-label={`Opção ${opt.value} de 5: ${opt.label}`}
                 className={cn(
-                  "group relative flex items-center gap-3 w-full min-h-14 px-4 sm:px-5 rounded-lg border text-left transition-all",
+                  "group relative flex items-center gap-3 w-full min-h-14 px-4 sm:px-5 rounded-lg border text-left transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   "disabled:cursor-not-allowed",
                   isSelected
-                    ? "border-primary bg-primary/5 ring-2 ring-primary/30"
-                    : "border-border bg-surface-card hover:border-primary/50 hover:bg-muted/50"
+                    ? "bg-[var(--sidebar-accent)] border-[var(--brand)]"
+                    : "border-border bg-[var(--card)] hover:bg-[var(--surface)]"
                 )}
               >
                 <span
                   className={cn(
                     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold font-mono-numeric transition-colors",
                     isSelected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-muted text-muted-foreground group-hover:border-primary/40 group-hover:text-foreground"
+                      ? "border-[var(--brand)] bg-[var(--brand)] text-[var(--accent-foreground)]"
+                      : "border-border bg-[var(--surface)] text-muted-foreground group-hover:border-[var(--brand-light)] group-hover:text-foreground"
                   )}
                   aria-hidden="true"
                 >
@@ -579,7 +579,7 @@ function WorkerThanks() {
       aria-labelledby="thanks-title"
     >
       <span
-        className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary"
+        className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[var(--sidebar-accent)] text-[var(--brand)]"
         aria-hidden="true"
       >
         <ShieldCheck className="h-7 w-7" />
@@ -587,7 +587,7 @@ function WorkerThanks() {
       <div className="space-y-3 max-w-md">
         <h1
           id="thanks-title"
-          className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight"
+          className="font-display text-3xl sm:text-4xl text-foreground"
         >
           Obrigado pela sua participação
         </h1>
@@ -614,20 +614,25 @@ function WorkerError({
       aria-live="assertive"
     >
       <span
-        className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive"
+        className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-[var(--risk-high)]/10 text-[var(--risk-high)]"
         aria-hidden="true"
       >
         <AlertTriangle className="h-7 w-7" />
       </span>
       <div className="space-y-2 max-w-md">
-        <h1 className="text-xl sm:text-2xl font-semibold text-foreground">
+        <h1 className="font-display text-2xl sm:text-3xl text-foreground">
           Não é possível continuar
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
           {message}
         </p>
       </div>
-      <Button type="button" variant="outline" onClick={onClose}>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onClose}
+        className="border-[var(--brand)] text-[var(--brand)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--brand)]"
+      >
         Voltar ao início
       </Button>
     </section>

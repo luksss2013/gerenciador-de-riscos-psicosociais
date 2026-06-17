@@ -1,0 +1,1436 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { useEffect, useMemo, useState } from "react";
+     5→import {
+     6→  AlertCircle,
+     7→  ArrowRight,
+     8→  Check,
+     9→  ChevronDown,
+    10→  ChevronLeft,
+    11→  Info,
+    12→  ListPlus,
+    13→  Loader2,
+    14→  Pencil,
+    15→  Plus,
+    16→  RefreshCw,
+    17→  ShieldAlert,
+    18→  Trash2,
+    19→} from "lucide-react";
+    20→import { toast } from "sonner";
+    21→
+    22→import { api, ApiError } from "@/lib/api";
+    23→import { useView } from "@/lib/store";
+    24→import type {
+    25→  Assessment,
+    26→  DimensionCode,
+    27→  RiskInventoryItem,
+    28→  RiskLevel,
+    29→} from "@/lib/types";
+    30→import {
+    31→  COPSOQ_DIMENSIONS,
+    32→  MTE_FACTORS,
+    33→  getDimension,
+    34→} from "@/lib/copsoq-data";
+    35→import { classifyInventoryRisk } from "@/lib/scoring";
+    36→import { RISK_LEVEL_LABELS } from "@/lib/errors";
+    37→
+    38→import { Button } from "@/components/ui/button";
+    39→import {
+    40→  Card,
+    41→  CardContent,
+    42→  CardDescription,
+    43→  CardHeader,
+    44→  CardTitle,
+    45→} from "@/components/ui/card";
+    46→import { Badge } from "@/components/ui/badge";
+    47→import { Skeleton } from "@/components/ui/skeleton";
+    48→import {
+    49→  Table,
+    50→  TableBody,
+    51→  TableCell,
+    52→  TableHead,
+    53→  TableHeader,
+    54→  TableRow,
+    55→} from "@/components/ui/table";
+    56→import {
+    57→  Dialog,
+    58→  DialogContent,
+    59→  DialogDescription,
+    60→  DialogFooter,
+    61→  DialogHeader,
+    62→  DialogTitle,
+    63→} from "@/components/ui/dialog";
+    64→import {
+    65→  AlertDialog,
+    66→  AlertDialogAction,
+    67→  AlertDialogCancel,
+    68→  AlertDialogContent,
+    69→  AlertDialogDescription,
+    70→  AlertDialogFooter,
+    71→  AlertDialogHeader,
+    72→  AlertDialogTitle,
+    73→  AlertDialogTrigger,
+    74→} from "@/components/ui/alert-dialog";
+    75→import {
+    76→  Select,
+    77→  SelectContent,
+    78→  SelectItem,
+    79→  SelectTrigger,
+    80→  SelectValue,
+    81→} from "@/components/ui/select";
+    82→import { Textarea } from "@/components/ui/textarea";
+    83→import { Label } from "@/components/ui/label";
+    84→import {
+    85→  Tooltip,
+    86→  TooltipContent,
+    87→  TooltipProvider,
+    88→  TooltipTrigger,
+    89→} from "@/components/ui/tooltip";
+    90→import {
+    91→  Collapsible,
+    92→  CollapsibleContent,
+    93→  CollapsibleTrigger,
+    94→} from "@/components/ui/collapsible";
+    95→
+    96→// ─── Helpers ────────────────────────────────────────────────────────────────
+    97→
+    98→type EditableField =
+    99→  | "hazardDescription"
+   100→  | "possibleHarms"
+   101→  | "probability"
+   102→  | "severity"
+   103→  | "existingControls"
+   104→  | "proposedMeasures";
+   105→
+   106→interface CellEdit {
+   107→  itemId: string;
+   108→  field: EditableField;
+   109→}
+   110→
+   111→const PROB_OPTIONS: { value: number; label: string }[] = [
+   112→  { value: 1, label: "1 — Improvável" },
+   113→  { value: 2, label: "2 — Possível" },
+   114→  { value: 3, label: "3 — Provável" },
+   115→];
+   116→
+   117→const SEV_OPTIONS: { value: number; label: string }[] = [
+   118→  { value: 1, label: "1 — Leve" },
+   119→  { value: 2, label: "2 — Moderado" },
+   120→  { value: 3, label: "3 — Grave" },
+   121→];
+   122→
+   123→function mteFactorInfo(code: string | null) {
+   124→  if (!code) return null;
+   125→  return MTE_FACTORS.find((f) => f.code === code) ?? null;
+   126→}
+   127→
+   128→function riskLevelClass(level: RiskLevel): string {
+   129→  switch (level) {
+   130→    case "LOW":
+   131→      return "risk-low-bg";
+   132→    case "MEDIUM":
+   133→      return "risk-medium-bg";
+   134→    case "HIGH":
+   135→    default:
+   136→      return "risk-high-bg";
+   137→  }
+   138→}
+   139→
+   140→// ─── RiskLevelCell ──────────────────────────────────────────────────────────
+   141→
+   142→function RiskLevelCell({
+   143→  probability,
+   144→  severity,
+   145→}: {
+   146→  probability: number;
+   147→  severity: number;
+   148→}) {
+   149→  const { level, score } = classifyInventoryRisk(probability, severity);
+   150→  const label = RISK_LEVEL_LABELS[level] ?? level;
+   151→  return (
+   152→    <span
+   153→      className={`inline-flex items-center justify-center min-w-[2.75rem] px-2 py-0.5 rounded text-[11px] font-semibold font-mono-numeric ${riskLevelClass(level)}`}
+   154→      aria-label={`Nível de risco: ${label}, pontuação ${score}`}
+   155→      title={`${label} · P${probability} × S${severity} = ${score}`}
+   156→    >
+   157→      {label}
+   158→    </span>
+   159→  );
+   160→}
+   161→
+   162→// ─── EditableTextCell ───────────────────────────────────────────────────────
+   163→
+   164→interface EditableTextCellProps {
+   165→  item: RiskInventoryItem;
+   166→  field: EditableField;
+   167→  value: string | null;
+   168→  placeholder: string;
+   169→  ariaLabel: string;
+   170→  onPatch: (itemId: string, body: Record<string, unknown>, field: EditableField) => Promise<void>;
+   171→  savingCell: CellEdit | null;
+   172→  savedCell: CellEdit | null;
+   173→  editingCell: CellEdit | null;
+   174→  setEditingCell: (c: CellEdit | null) => void;
+   175→  draft: string;
+   176→  setDraft: (s: string) => void;
+   177→}
+   178→
+   179→function EditableTextCell({
+   180→  item,
+   181→  field,
+   182→  value,
+   183→  placeholder,
+   184→  ariaLabel,
+   185→  onPatch,
+   186→  savingCell,
+   187→  savedCell,
+   188→  editingCell,
+   189→  setEditingCell,
+   190→  draft,
+   191→  setDraft,
+   192→}: EditableTextCellProps) {
+   193→  const isEditing = editingCell?.itemId === item.id && editingCell.field === field;
+   194→  const isSaving = savingCell?.itemId === item.id && savingCell.field === field;
+   195→  const isSaved = savedCell?.itemId === item.id && savedCell.field === field;
+   196→
+   197→  if (isEditing) {
+   198→    return (
+   199→      <Textarea
+   200→        autoFocus
+   201→        value={draft}
+   202→        onChange={(e) => setDraft(e.target.value)}
+   203→        onBlur={() => {
+   204→          const trimmed = draft.trim();
+   205→          setEditingCell(null);
+   206→          if (trimmed === (value ?? "")) return;
+   207→          void onPatch(item.id, { [field]: trimmed }, field);
+   208→        }}
+   209→        onKeyDown={(e) => {
+   210→          if (e.key === "Escape") {
+   211→            setEditingCell(null);
+   212→          }
+   213→          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+   214→            (e.target as HTMLTextAreaElement).blur();
+   215→          }
+   216→        }}
+   217→        className="min-h-[60px] resize-y text-xs leading-relaxed"
+   218→        aria-label={ariaLabel}
+   219→      />
+   220→    );
+   221→  }
+   222→
+   223→  return (
+   224→    <button
+   225→      type="button"
+   226→      onClick={() => {
+   227→        setEditingCell({ itemId: item.id, field });
+   228→        setDraft(value ?? "");
+   229→      }}
+   230→      className="group w-full text-left text-xs rounded-sm px-2 py-1.5 -mx-2 -my-1 hover:bg-accent/60 transition-colors min-h-[36px] flex items-start gap-1.5"
+   231→      aria-label={ariaLabel}
+   232→    >
+   233→      {value && value.trim().length > 0 ? (
+   234→        <span className="whitespace-pre-wrap break-words flex-1 leading-relaxed">
+   235→          {value}
+   236→        </span>
+   237→      ) : (
+   238→        <span className="text-muted-foreground italic flex-1">{placeholder}</span>
+   239→      )}
+   240→      <span className="flex items-center shrink-0 mt-0.5">
+   241→        {isSaving ? (
+   242→          <Loader2
+   243→            className="h-3 w-3 animate-spin text-muted-foreground"
+   244→            aria-label="Salvando"
+   245→          />
+   246→        ) : isSaved ? (
+   247→          <Check
+   248→            className="h-3 w-3 text-risk-low"
+   249→            aria-label="Salvo"
+   250→          />
+   251→        ) : (
+   252→          <Pencil
+   253→            className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+   254→            aria-hidden="true"
+   255→          />
+   256→        )}
+   257→      </span>
+   258→    </button>
+   259→  );
+   260→}
+   261→
+   262→// ─── EditableSelectCell ─────────────────────────────────────────────────────
+   263→
+   264→interface EditableSelectCellProps {
+   265→  item: RiskInventoryItem;
+   266→  field: "probability" | "severity";
+   267→  value: number;
+   268→  options: { value: number; label: string }[];
+   269→  ariaLabel: string;
+   270→  onPatch: (itemId: string, body: Record<string, unknown>, field: EditableField) => Promise<void>;
+   271→  savingCell: CellEdit | null;
+   272→  savedCell: CellEdit | null;
+   273→  editingCell: CellEdit | null;
+   274→  setEditingCell: (c: CellEdit | null) => void;
+   275→}
+   276→
+   277→function EditableSelectCell({
+   278→  item,
+   279→  field,
+   280→  value,
+   281→  options,
+   282→  ariaLabel,
+   283→  onPatch,
+   284→  savingCell,
+   285→  savedCell,
+   286→  editingCell,
+   287→  setEditingCell,
+   288→}: EditableSelectCellProps) {
+   289→  const isEditing = editingCell?.itemId === item.id && editingCell.field === field;
+   290→  const isSaving = savingCell?.itemId === item.id && savingCell.field === field;
+   291→  const isSaved = savedCell?.itemId === item.id && savedCell.field === field;
+   292→  const currentLabel = options.find((o) => o.value === value)?.label ?? String(value);
+   293→
+   294→  if (isEditing) {
+   295→    return (
+   296→      <Select
+   297→        defaultOpen
+   298→        value={String(value)}
+   299→        onValueChange={(v) => {
+   300→          const n = Number(v);
+   301→          setEditingCell(null);
+   302→          if (n === value) return;
+   303→          void onPatch(item.id, { [field]: n }, field);
+   304→        }}
+   305→        onOpenChange={(open) => {
+   306→          if (!open) setEditingCell(null);
+   307→        }}
+   308→      >
+   309→        <SelectTrigger size="sm" className="w-full min-w-[7rem] h-8" aria-label={ariaLabel}>
+   310→          <SelectValue />
+   311→        </SelectTrigger>
+   312→        <SelectContent>
+   313→          {options.map((o) => (
+   314→            <SelectItem key={o.value} value={String(o.value)}>
+   315→              {o.label}
+   316→            </SelectItem>
+   317→          ))}
+   318→        </SelectContent>
+   319→      </Select>
+   320→    );
+   321→  }
+   322→
+   323→  return (
+   324→    <button
+   325→      type="button"
+   326→      onClick={() => setEditingCell({ itemId: item.id, field })}
+   327→      className="group w-full inline-flex items-center justify-between gap-1 text-xs rounded-sm px-2 py-1 -mx-2 -my-1 hover:bg-accent/60 transition-colors min-h-[28px]"
+   328→      aria-label={ariaLabel}
+   329→    >
+   330→      <span className="font-mono-numeric font-medium">{currentLabel}</span>
+   331→      {isSaving ? (
+   332→        <Loader2
+   333→          className="h-3 w-3 animate-spin text-muted-foreground"
+   334→          aria-label="Salvando"
+   335→        />
+   336→      ) : isSaved ? (
+   337→        <Check
+   338→          className="h-3 w-3 text-risk-low"
+   339→          aria-label="Salvo"
+   340→        />
+   341→      ) : (
+   342→        <Pencil
+   343→          className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+   344→          aria-hidden="true"
+   345→        />
+   346→      )}
+   347→    </button>
+   348→  );
+   349→}
+   350→
+   351→// ─── InventoryTable ─────────────────────────────────────────────────────────
+   352→
+   353→interface InventoryTableProps {
+   354→  items: RiskInventoryItem[];
+   355→  onPatch: (itemId: string, body: Record<string, unknown>, field: EditableField) => Promise<void>;
+   356→  onDelete: (itemId: string) => Promise<void>;
+   357→  onCreateAction: (item: RiskInventoryItem) => void;
+   358→  savingCell: CellEdit | null;
+   359→  savedCell: CellEdit | null;
+   360→}
+   361→
+   362→function InventoryTable({
+   363→  items,
+   364→  onPatch,
+   365→  onDelete,
+   366→  onCreateAction,
+   367→  savingCell,
+   368→  savedCell,
+   369→}: InventoryTableProps) {
+   370→  const [editingCell, setEditingCell] = useState<CellEdit | null>(null);
+   371→  const [draft, setDraft] = useState<string>("");
+   372→
+   373→  const sorted = useMemo(() => {
+   374→    return [...items].sort((a, b) => {
+   375→      const an = (a.departmentName ?? "").toLowerCase();
+   376→      const bn = (b.departmentName ?? "").toLowerCase();
+   377→      if (an < bn) return -1;
+   378→      if (an > bn) return 1;
+   379→      const ad = a.dimensionCode ?? "ZZZ";
+   380→      const bd = b.dimensionCode ?? "ZZZ";
+   381→      return ad.localeCompare(bd);
+   382→    });
+   383→  }, [items]);
+   384→
+   385→  return (
+   386→    <Card>
+   387→      <CardHeader className="pb-3">
+   388→        <CardTitle className="flex items-center gap-2 text-base">
+   389→          <ListPlus className="h-4 w-4" />
+   390→          Itens do inventário
+   391→        </CardTitle>
+   392→        <CardDescription>
+   393→          {items.length} item(ns) no inventário. Clique em uma célula para
+   394→          editar. Alterações são salvas automaticamente.
+   395→        </CardDescription>
+   396→      </CardHeader>
+   397→      <CardContent className="p-0">
+   398→        <div className="overflow-x-auto scroll-area">
+   399→          <Table className="min-w-[1280px]">
+   400→            <caption className="sr-only">
+   401→              Inventário de riscos psicossociais. Colunas: tipo (automático ou
+   402→              manual), GHE, fator FRPRT MTE, dimensão COPSOQ, perigo
+   403→              identificado, possíveis danos, probabilidade, severidade, nível de
+   404→              risco calculado, controles existentes, medidas propostas, ações.
+   405→            </caption>
+   406→            <TableHeader>
+   407→              <TableRow>
+   408→                <TableHead className="w-[80px]">Tipo</TableHead>
+   409→                <TableHead className="w-[140px]">GHE</TableHead>
+   410→                <TableHead className="w-[200px]">Fator FRPRT MTE</TableHead>
+   411→                <TableHead className="w-[200px]">Dimensão</TableHead>
+   412→                <TableHead className="w-[220px]">Perigo Identificado</TableHead>
+   413→                <TableHead className="w-[220px]">Possíveis Danos</TableHead>
+   414→                <TableHead className="w-[150px]">Probabilidade</TableHead>
+   415→                <TableHead className="w-[150px]">Severidade</TableHead>
+   416→                <TableHead className="w-[110px]">Nível</TableHead>
+   417→                <TableHead className="w-[220px]">Controles Existentes</TableHead>
+   418→                <TableHead className="w-[260px]">Medidas Propostas</TableHead>
+   419→                <TableHead className="w-[80px] text-right">Ações</TableHead>
+   420→              </TableRow>
+   421→            </TableHeader>
+   422→            <TableBody>
+   423→              {sorted.map((item) => {
+   424→                const mte = mteFactorInfo(item.mteFactorCode);
+   425→                const dim = item.dimensionCode
+   426→                  ? (() => {
+   427→                      try {
+   428→                        return getDimension(item.dimensionCode as DimensionCode);
+   429→                      } catch {
+   430→                        return null;
+   431→                      }
+   432→                    })()
+   433→                  : null;
+   434→                return (
+   435→                  <TableRow key={item.id} className="align-top">
+   436→                    <TableCell className="align-top">
+   437→                      {item.isManual ? (
+   438→                        <Badge className="bg-brand-light/10 text-brand-light border-transparent">
+   439→                          Manual
+   440→                        </Badge>
+   441→                      ) : (
+   442→                        <Badge variant="outline" className="text-muted-foreground">
+   443→                          Auto
+   444→                        </Badge>
+   445→                      )}
+   446→                    </TableCell>
+   447→                    <TableCell className="align-top font-medium">
+   448→                      <div
+   449→                        className="truncate max-w-[140px]"
+   450→                        title={item.departmentName ?? "—"}
+   451→                      >
+   452→                        {item.departmentName ?? "—"}
+   453→                      </div>
+   454→                    </TableCell>
+   455→                    <TableCell className="align-top">
+   456→                      {mte ? (
+   457→                        <Badge
+   458→                          variant="outline"
+   459→                          className="font-mono-numeric gap-1 max-w-[200px]"
+   460→                        >
+   461→                          <span className="font-semibold">{mte.code}</span>
+   462→                          <span className="text-muted-foreground font-sans">·</span>
+   463→                          <span className="font-sans font-normal truncate">
+   464→                            {mte.name}
+   465→                          </span>
+   466→                        </Badge>
+   467→                      ) : (
+   468→                        <span className="text-muted-foreground text-xs">—</span>
+   469→                      )}
+   470→                    </TableCell>
+   471→                    <TableCell className="align-top">
+   472→                      {dim ? (
+   473→                        <Badge
+   474→                          variant="outline"
+   475→                          className="font-mono-numeric gap-1 max-w-[200px]"
+   476→                        >
+   477→                          <span className="font-semibold">{dim.code}</span>
+   478→                          <span className="text-muted-foreground font-sans">·</span>
+   479→                          <span className="font-sans font-normal truncate">
+   480→                            {dim.namePtBr}
+   481→                          </span>
+   482→                        </Badge>
+   483→                      ) : (
+   484→                        <span className="text-muted-foreground text-xs">—</span>
+   485→                      )}
+   486→                    </TableCell>
+   487→                    <TableCell className="align-top">
+   488→                      <EditableTextCell
+   489→                        item={item}
+   490→                        field="hazardDescription"
+   491→                        value={item.hazardDescription}
+   492→                        placeholder="Clique para descrever o perigo…"
+   493→                        ariaLabel="Editar perigo identificado"
+   494→                        onPatch={onPatch}
+   495→                        savingCell={savingCell}
+   496→                        savedCell={savedCell}
+   497→                        editingCell={editingCell}
+   498→                        setEditingCell={setEditingCell}
+   499→                        draft={draft}
+   500→                        setDraft={setDraft}
+   501→                      />
+   502→                    </TableCell>
+   503→                    <TableCell className="align-top">
+   504→                      <EditableTextCell
+   505→                        item={item}
+   506→                        field="possibleHarms"
+   507→                        value={item.possibleHarms}
+   508→                        placeholder="Clique para descrever os danos…"
+   509→                        ariaLabel="Editar possíveis danos"
+   510→                        onPatch={onPatch}
+   511→                        savingCell={savingCell}
+   512→                        savedCell={savedCell}
+   513→                        editingCell={editingCell}
+   514→                        setEditingCell={setEditingCell}
+   515→                        draft={draft}
+   516→                        setDraft={setDraft}
+   517→                      />
+   518→                    </TableCell>
+   519→                    <TableCell className="align-top">
+   520→                      <EditableSelectCell
+   521→                        item={item}
+   522→                        field="probability"
+   523→                        value={item.probability}
+   524→                        options={PROB_OPTIONS}
+   525→                        ariaLabel={`Editar probabilidade do item ${item.id}`}
+   526→                        onPatch={onPatch}
+   527→                        savingCell={savingCell}
+   528→                        savedCell={savedCell}
+   529→                        editingCell={editingCell}
+   530→                        setEditingCell={setEditingCell}
+   531→                      />
+   532→                    </TableCell>
+   533→                    <TableCell className="align-top">
+   534→                      <EditableSelectCell
+   535→                        item={item}
+   536→                        field="severity"
+   537→                        value={item.severity}
+   538→                        options={SEV_OPTIONS}
+   539→                        ariaLabel={`Editar severidade do item ${item.id}`}
+   540→                        onPatch={onPatch}
+   541→                        savingCell={savingCell}
+   542→                        savedCell={savedCell}
+   543→                        editingCell={editingCell}
+   544→                        setEditingCell={setEditingCell}
+   545→                      />
+   546→                    </TableCell>
+   547→                    <TableCell className="align-top">
+   548→                      <RiskLevelCell
+   549→                        probability={item.probability}
+   550→                        severity={item.severity}
+   551→                      />
+   552→                    </TableCell>
+   553→                    <TableCell className="align-top">
+   554→                      <EditableTextCell
+   555→                        item={item}
+   556→                        field="existingControls"
+   557→                        value={item.existingControls}
+   558→                        placeholder="Clique para descrever controles…"
+   559→                        ariaLabel="Editar controles existentes"
+   560→                        onPatch={onPatch}
+   561→                        savingCell={savingCell}
+   562→                        savedCell={savedCell}
+   563→                        editingCell={editingCell}
+   564→                        setEditingCell={setEditingCell}
+   565→                        draft={draft}
+   566→                        setDraft={setDraft}
+   567→                      />
+   568→                    </TableCell>
+   569→                    <TableCell className="align-top">
+   570→                      <div className="flex flex-col gap-1.5">
+   571→                        <EditableTextCell
+   572→                          item={item}
+   573→                          field="proposedMeasures"
+   574→                          value={item.proposedMeasures}
+   575→                          placeholder="Clique para propor medidas…"
+   576→                          ariaLabel="Editar medidas propostas"
+   577→                          onPatch={onPatch}
+   578→                          savingCell={savingCell}
+   579→                          savedCell={savedCell}
+   580→                          editingCell={editingCell}
+   581→                          setEditingCell={setEditingCell}
+   582→                          draft={draft}
+   583→                          setDraft={setDraft}
+   584→                        />
+   585→                        {item.proposedMeasures &&
+   586→                        item.proposedMeasures.trim().length > 0 ? (
+   587→                          <button
+   588→                            type="button"
+   589→                            onClick={() => onCreateAction(item)}
+   590→                            className="inline-flex items-center gap-1 text-xs text-brand-light hover:underline self-start font-medium"
+   591→                            aria-label={`Criar ação a partir das medidas propostas do item ${item.id}`}
+   592→                          >
+   593→                            <ArrowRight className="h-3 w-3" />
+   594→                            Criar Ação
+   595→                          </button>
+   596→                        ) : null}
+   597→                      </div>
+   598→                    </TableCell>
+   599→                    <TableCell className="align-top text-right">
+   600→                      {item.isManual ? (
+   601→                        <AlertDialog>
+   602→                          <AlertDialogTrigger asChild>
+   603→                            <Button
+   604→                              variant="ghost"
+   605→                              size="icon"
+   606→                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+   607→                              aria-label="Excluir item manual do inventário"
+   608→                            >
+   609→                              <Trash2 className="h-4 w-4" />
+   610→                            </Button>
+   611→                          </AlertDialogTrigger>
+   612→                          <AlertDialogContent>
+   613→                            <AlertDialogHeader>
+   614→                              <AlertDialogTitle>
+   615→                                Excluir item do inventário?
+   616→                              </AlertDialogTitle>
+   617→                              <AlertDialogDescription>
+   618→                                Esta ação remove o risco manual do inventário
+   619→                                e não pode ser desfeita.
+   620→                              </AlertDialogDescription>
+   621→                            </AlertDialogHeader>
+   622→                            <AlertDialogFooter>
+   623→                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+   624→                              <AlertDialogAction
+   625→                                onClick={() => {
+   626→                                  void onDelete(item.id);
+   627→                                }}
+   628→                                className="bg-destructive text-white hover:bg-destructive/90"
+   629→                              >
+   630→                                Excluir
+   631→                              </AlertDialogAction>
+   632→                            </AlertDialogFooter>
+   633→                          </AlertDialogContent>
+   634→                        </AlertDialog>
+   635→                      ) : (
+   636→                        <Tooltip>
+   637→                          <TooltipTrigger asChild>
+   638→                            <span tabIndex={0} className="inline-flex">
+   639→                              <Button
+   640→                                variant="ghost"
+   641→                                size="icon"
+   642→                                className="h-8 w-8 text-muted-foreground/40 cursor-not-allowed"
+   643→                                disabled
+   644→                                aria-label="Itens automáticos não podem ser excluídos"
+   645→                              >
+   646→                                <Trash2 className="h-4 w-4" />
+   647→                              </Button>
+   648→                            </span>
+   649→                          </TooltipTrigger>
+   650→                          <TooltipContent>
+   651→                            Itens automáticos não podem ser excluídos
+   652→                          </TooltipContent>
+   653→                        </Tooltip>
+   654→                      )}
+   655→                    </TableCell>
+   656→                  </TableRow>
+   657→                );
+   658→              })}
+   659→            </TableBody>
+   660→          </Table>
+   661→        </div>
+   662→      </CardContent>
+   663→    </Card>
+   664→  );
+   665→}
+   666→
+   667→// ─── ManualRiskForm ─────────────────────────────────────────────────────────
+   668→
+   669→interface ManualRiskFormProps {
+   670→  open: boolean;
+   671→  onOpenChange: (open: boolean) => void;
+   672→  assessment: Assessment | null;
+   673→  prefillMteFactor?: string;
+   674→  onSubmit: (body: Record<string, unknown>) => Promise<void>;
+   675→}
+   676→
+   677→function ManualRiskForm({
+   678→  open,
+   679→  onOpenChange,
+   680→  assessment,
+   681→  prefillMteFactor,
+   682→  onSubmit,
+   683→}: ManualRiskFormProps) {
+   684→  return (
+   685→    <Dialog open={open} onOpenChange={onOpenChange}>
+   686→      <DialogContent className="sm:max-w-[640px] max-h-[90vh] overflow-y-auto">
+   687→        <DialogHeader>
+   688→          <DialogTitle className="flex items-center gap-2">
+   689→            <Plus className="h-4 w-4" />
+   690→            Adicionar Risco Manual
+   691→          </DialogTitle>
+   692→          <DialogDescription>
+   693→            Inclua um fator de risco psicossocial identificado por observação
+   694→            direta ou apontamento do GHE, não coberto automaticamente pela
+   695→            pesquisa COPSOQ II-BR.
+   696→          </DialogDescription>
+   697→        </DialogHeader>
+   698→        {open ? (
+   699→          <ManualRiskFormContents
+   700→            key={prefillMteFactor ?? "none"}
+   701→            assessment={assessment}
+   702→            prefillMteFactor={prefillMteFactor}
+   703→            onSubmit={onSubmit}
+   704→            onCancel={() => onOpenChange(false)}
+   705→          />
+   706→        ) : null}
+   707→      </DialogContent>
+   708→    </Dialog>
+   709→  );
+   710→}
+   711→
+   712→interface ManualRiskFormContentsProps {
+   713→  assessment: Assessment | null;
+   714→  prefillMteFactor?: string;
+   715→  onSubmit: (body: Record<string, unknown>) => Promise<void>;
+   716→  onCancel: () => void;
+   717→}
+   718→
+   719→function ManualRiskFormContents({
+   720→  assessment,
+   721→  prefillMteFactor,
+   722→  onSubmit,
+   723→  onCancel,
+   724→}: ManualRiskFormContentsProps) {
+   725→  const departments = assessment?.departments ?? [];
+   726→
+   727→  const [assessmentDepartmentId, setAssessmentDepartmentId] = useState<string>("");
+   728→  const [mteFactorCode, setMteFactorCode] = useState<string>(prefillMteFactor ?? "");
+   729→  const [dimensionCode, setDimensionCode] = useState<string>("");
+   730→  const [hazardDescription, setHazardDescription] = useState("");
+   731→  const [possibleHarms, setPossibleHarms] = useState("");
+   732→  const [probability, setProbability] = useState<string>("2");
+   733→  const [severity, setSeverity] = useState<string>("2");
+   734→  const [existingControls, setExistingControls] = useState("");
+   735→  const [proposedMeasures, setProposedMeasures] = useState("");
+   736→  const [submitting, setSubmitting] = useState(false);
+   737→  const [errors, setErrors] = useState<Record<string, string>>({});
+   738→
+   739→  const handleSubmit = async (e: React.FormEvent) => {
+   740→    e.preventDefault();
+   741→    const errs: Record<string, string> = {};
+   742→    if (!mteFactorCode) errs.mteFactorCode = "Selecione um fator FRPRT MTE.";
+   743→    if (hazardDescription.trim().length < 3)
+   744→      errs.hazardDescription = "Mínimo de 3 caracteres.";
+   745→    if (possibleHarms.trim().length < 3)
+   746→      errs.possibleHarms = "Mínimo de 3 caracteres.";
+   747→    if (!probability) errs.probability = "Selecione a probabilidade.";
+   748→    if (!severity) errs.severity = "Selecione a severidade.";
+   749→    if (Object.keys(errs).length > 0) {
+   750→      setErrors(errs);
+   751→      return;
+   752→    }
+   753→    setSubmitting(true);
+   754→    setErrors({});
+   755→    try {
+   756→      const body: Record<string, unknown> = {
+   757→        mteFactorCode,
+   758→        hazardDescription: hazardDescription.trim(),
+   759→        possibleHarms: possibleHarms.trim(),
+   760→        probability: Number(probability),
+   761→        severity: Number(severity),
+   762→      };
+   763→      if (assessmentDepartmentId)
+   764→        body.assessmentDepartmentId = assessmentDepartmentId;
+   765→      if (dimensionCode) body.dimensionCode = dimensionCode;
+   766→      if (existingControls.trim())
+   767→        body.existingControls = existingControls.trim();
+   768→      if (proposedMeasures.trim())
+   769→        body.proposedMeasures = proposedMeasures.trim();
+   770→      await onSubmit(body);
+   771→    } catch (e) {
+   772→      let msg = "Erro ao adicionar risco manual.";
+   773→      if (e instanceof ApiError) {
+   774→        if (e.code === "VALIDATION_ERROR") {
+   775→          msg = e.message || "Dados inválidos. Verifique os campos.";
+   776→        } else if (e.code === "ASSESSMENT_NOT_COMPLETED") {
+   777→          msg = "A avaliação precisa estar concluída para incluir itens no inventário.";
+   778→        } else if (e.code === "ASSESSMENT_DEPT_NOT_FOUND") {
+   779→          msg = "GHE selecionado não pertence a esta avaliação.";
+   780→        } else {
+   781→          msg = e.message;
+   782→        }
+   783→      }
+   784→      toast.error(msg);
+   785→      setSubmitting(false);
+   786→    }
+   787→  };
+   788→
+   789→  const probNum = Number(probability) || 2;
+   790→  const sevNum = Number(severity) || 2;
+   791→
+   792→  return (
+   793→    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+   794→      <div className="space-y-1.5">
+   795→        <Label htmlFor="manual-ghe">GHE</Label>
+   796→        <Select
+   797→          value={assessmentDepartmentId}
+   798→          onValueChange={setAssessmentDepartmentId}
+   799→        >
+   800→          <SelectTrigger
+   801→            id="manual-ghe"
+   802→            className="w-full"
+   803→            aria-label="Selecionar GHE"
+   804→          >
+   805→            <SelectValue placeholder="Selecionar GHE (opcional)" />
+   806→          </SelectTrigger>
+   807→          <SelectContent>
+   808→            {departments.map((d) => (
+   809→              <SelectItem key={d.id} value={d.id}>
+   810→                {d.departmentName}
+   811→              </SelectItem>
+   812→            ))}
+   813→          </SelectContent>
+   814→        </Select>
+   815→        <p className="text-[11px] text-muted-foreground">
+   816→          Opcional — vincule este risco a um GHE específico da avaliação.
+   817→        </p>
+   818→      </div>
+   819→
+   820→      <div className="space-y-1.5">
+   821→        <Label htmlFor="manual-mte">
+   822→          Fator FRPRT MTE <span className="text-destructive">*</span>
+   823→        </Label>
+   824→        <Select value={mteFactorCode} onValueChange={setMteFactorCode}>
+   825→          <SelectTrigger
+   826→            id="manual-mte"
+   827→            className="w-full"
+   828→            aria-label="Selecionar fator FRPRT MTE"
+   829→            aria-invalid={!!errors.mteFactorCode}
+   830→          >
+   831→            <SelectValue placeholder="Selecionar fator" />
+   832→          </SelectTrigger>
+   833→          <SelectContent>
+   834→            {MTE_FACTORS.map((f) => (
+   835→              <SelectItem key={f.code} value={f.code}>
+   836→                {f.code} · {f.name}
+   837→              </SelectItem>
+   838→            ))}
+   839→          </SelectContent>
+   840→        </Select>
+   841→        {errors.mteFactorCode ? (
+   842→          <p className="text-xs text-destructive">{errors.mteFactorCode}</p>
+   843→        ) : null}
+   844→      </div>
+   845→
+   846→      <div className="space-y-1.5">
+   847→        <Label htmlFor="manual-dim">Dimensão COPSOQ (opcional)</Label>
+   848→        <Select value={dimensionCode} onValueChange={setDimensionCode}>
+   849→          <SelectTrigger
+   850→            id="manual-dim"
+   851→            className="w-full"
+   852→            aria-label="Selecionar dimensão COPSOQ"
+   853→          >
+   854→            <SelectValue placeholder="Selecionar dimensão" />
+   855→          </SelectTrigger>
+   856→          <SelectContent>
+   857→            {COPSOQ_DIMENSIONS.map((d) => (
+   858→              <SelectItem key={d.code} value={d.code}>
+   859→                {d.code} · {d.namePtBr}
+   860→              </SelectItem>
+   861→            ))}
+   862→          </SelectContent>
+   863→        </Select>
+   864→      </div>
+   865→
+   866→      <div className="space-y-1.5">
+   867→        <Label htmlFor="manual-hazard">
+   868→          Perigo Identificado <span className="text-destructive">*</span>
+   869→        </Label>
+   870→        <Textarea
+   871→          id="manual-hazard"
+   872→          value={hazardDescription}
+   873→          onChange={(e) => setHazardDescription(e.target.value)}
+   874→          placeholder="Descreva o perigo identificado (mínimo 3 caracteres)…"
+   875→          rows={2}
+   876→          aria-invalid={!!errors.hazardDescription}
+   877→        />
+   878→        {errors.hazardDescription ? (
+   879→          <p className="text-xs text-destructive">{errors.hazardDescription}</p>
+   880→        ) : null}
+   881→      </div>
+   882→
+   883→      <div className="space-y-1.5">
+   884→        <Label htmlFor="manual-harms">
+   885→          Possíveis Danos <span className="text-destructive">*</span>
+   886→        </Label>
+   887→        <Textarea
+   888→          id="manual-harms"
+   889→          value={possibleHarms}
+   890→          onChange={(e) => setPossibleHarms(e.target.value)}
+   891→          placeholder="Descreva os possíveis danos (mínimo 3 caracteres)…"
+   892→          rows={2}
+   893→          aria-invalid={!!errors.possibleHarms}
+   894→        />
+   895→        {errors.possibleHarms ? (
+   896→          <p className="text-xs text-destructive">{errors.possibleHarms}</p>
+   897→        ) : null}
+   898→      </div>
+   899→
+   900→      <div className="grid grid-cols-2 gap-3">
+   901→        <div className="space-y-1.5">
+   902→          <Label htmlFor="manual-prob">
+   903→            Probabilidade <span className="text-destructive">*</span>
+   904→          </Label>
+   905→          <Select value={probability} onValueChange={setProbability}>
+   906→            <SelectTrigger
+   907→              id="manual-prob"
+   908→              className="w-full"
+   909→              aria-label="Selecionar probabilidade"
+   910→            >
+   911→              <SelectValue />
+   912→            </SelectTrigger>
+   913→            <SelectContent>
+   914→              {PROB_OPTIONS.map((o) => (
+   915→                <SelectItem key={o.value} value={String(o.value)}>
+   916→                  {o.label}
+   917→                </SelectItem>
+   918→              ))}
+   919→            </SelectContent>
+   920→          </Select>
+   921→        </div>
+   922→        <div className="space-y-1.5">
+   923→          <Label htmlFor="manual-sev">
+   924→            Severidade <span className="text-destructive">*</span>
+   925→          </Label>
+   926→          <Select value={severity} onValueChange={setSeverity}>
+   927→            <SelectTrigger
+   928→              id="manual-sev"
+   929→              className="w-full"
+   930→              aria-label="Selecionar severidade"
+   931→            >
+   932→              <SelectValue />
+   933→            </SelectTrigger>
+   934→            <SelectContent>
+   935→              {SEV_OPTIONS.map((o) => (
+   936→                <SelectItem key={o.value} value={String(o.value)}>
+   937→                  {o.label}
+   938→                </SelectItem>
+   939→              ))}
+   940→            </SelectContent>
+   941→          </Select>
+   942→        </div>
+   943→      </div>
+   944→
+   945→      <div className="rounded-md border border-border bg-muted/30 p-3 text-xs flex items-center gap-2 flex-wrap">
+   946→        <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+   947→        <span className="text-muted-foreground">Nível calculado (P × S):</span>
+   948→        <RiskLevelCell probability={probNum} severity={sevNum} />
+   949→      </div>
+   950→
+   951→      <div className="space-y-1.5">
+   952→        <Label htmlFor="manual-controls">Controles Existentes (opcional)</Label>
+   953→        <Textarea
+   954→          id="manual-controls"
+   955→          value={existingControls}
+   956→          onChange={(e) => setExistingControls(e.target.value)}
+   957→          placeholder="Descreva os controles existentes…"
+   958→          rows={2}
+   959→        />
+   960→      </div>
+   961→
+   962→      <div className="space-y-1.5">
+   963→        <Label htmlFor="manual-measures">Medidas Propostas (opcional)</Label>
+   964→        <Textarea
+   965→          id="manual-measures"
+   966→          value={proposedMeasures}
+   967→          onChange={(e) => setProposedMeasures(e.target.value)}
+   968→          placeholder="Descreva as medidas propostas…"
+   969→          rows={2}
+   970→        />
+   971→      </div>
+   972→
+   973→      <DialogFooter>
+   974→        <Button
+   975→          type="button"
+   976→          variant="outline"
+   977→          onClick={onCancel}
+   978→          disabled={submitting}
+   979→        >
+   980→          Cancelar
+   981→        </Button>
+   982→        <Button type="submit" disabled={submitting}>
+   983→          {submitting ? (
+   984→            <Loader2 className="h-4 w-4 animate-spin" />
+   985→          ) : (
+   986→            <Plus className="h-4 w-4" />
+   987→          )}
+   988→          Adicionar
+   989→        </Button>
+   990→      </DialogFooter>
+   991→    </form>
+   992→  );
+   993→}
+   994→
+   995→// ─── UncoveredFactorsSection ────────────────────────────────────────────────
+   996→
+   997→function UncoveredFactorsSection({
+   998→  onAddFactor,
+   999→}: {
+  1000→  onAddFactor: (mteFactorCode: string) => void;
+  1001→}) {
+  1002→  const uncovered = useMemo(
+  1003→    () => MTE_FACTORS.filter((f) => !f.coveredByCopsoq),
+  1004→    []
+  1005→  );
+  1006→
+  1007→  return (
+  1008→    <Collapsible defaultOpen={false}>
+  1009→      <Card>
+  1010→        <CollapsibleTrigger asChild>
+  1011→          <CardHeader className="group cursor-pointer hover:bg-accent/40 transition-colors">
+  1012→            <div className="flex items-start justify-between gap-3">
+  1013→              <div className="flex items-start gap-2.5 min-w-0">
+  1014→                <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+  1015→                <div className="min-w-0">
+  1016→                  <CardTitle className="text-base">
+  1017→                    Fatores MTE não cobertos pelo COPSOQ II-BR
+  1018→                  </CardTitle>
+  1019→                  <CardDescription className="mt-0.5">
+  1020→                    {uncovered.length} fator(es) FRPRT do MTE não são medidos
+  1021→                    pelo instrumento. Clique em &ldquo;Adicionar&rdquo; para
+  1022→                    incluí-los manualmente no inventário.
+  1023→                  </CardDescription>
+  1024→                </div>
+  1025→              </div>
+  1026→              <ChevronDown
+  1027→                className="h-4 w-4 text-muted-foreground shrink-0 mt-1 transition-transform duration-200 group-data-[state=open]:rotate-180"
+  1028→                aria-hidden="true"
+  1029→              />
+  1030→            </div>
+  1031→          </CardHeader>
+  1032→        </CollapsibleTrigger>
+  1033→        <CollapsibleContent>
+  1034→          <CardContent className="pt-0">
+  1035→            <ul className="divide-y divide-border">
+  1036→              {uncovered.map((f) => (
+  1037→                <li
+  1038→                  key={f.code}
+  1039→                  className="py-3 flex items-start justify-between gap-3"
+  1040→                >
+  1041→                  <div className="min-w-0">
+  1042→                    <div className="flex items-center gap-2 flex-wrap">
+  1043→                      <Badge
+  1044→                        variant="outline"
+  1045→                        className="font-mono-numeric font-semibold"
+  1046→                      >
+  1047→                        {f.code}
+  1048→                      </Badge>
+  1049→                      <span className="font-medium text-sm">{f.name}</span>
+  1050→                      <Badge
+  1051→                        variant="outline"
+  1052→                        className="text-muted-foreground text-[10px] font-normal"
+  1053→                      >
+  1054→                        {f.category}
+  1055→                      </Badge>
+  1056→                    </div>
+  1057→                    <p className="text-xs text-muted-foreground mt-1">
+  1058→                      Não coberto pelo COPSOQ II-BR.
+  1059→                    </p>
+  1060→                  </div>
+  1061→                  <Button
+  1062→                    size="sm"
+  1063→                    variant="outline"
+  1064→                    onClick={() => onAddFactor(f.code)}
+  1065→                    className="shrink-0"
+  1066→                  >
+  1067→                    <Plus className="h-3.5 w-3.5" />
+  1068→                    Adicionar
+  1069→                  </Button>
+  1070→                </li>
+  1071→              ))}
+  1072→            </ul>
+  1073→          </CardContent>
+  1074→        </CollapsibleContent>
+  1075→      </Card>
+  1076→    </Collapsible>
+  1077→  );
+  1078→}
+  1079→
+  1080→// ─── Skeletons ──────────────────────────────────────────────────────────────
+  1081→
+  1082→function InventarioSkeleton() {
+  1083→  return (
+  1084→    <div className="space-y-6" aria-hidden="true">
+  1085→      <div className="flex flex-wrap gap-2">
+  1086→        <Skeleton className="h-6 w-32" />
+  1087→        <Skeleton className="h-6 w-28" />
+  1088→        <Skeleton className="h-6 w-32" />
+  1089→      </div>
+  1090→      <Skeleton className="h-12" />
+  1091→      <Skeleton className="h-96" />
+  1092→      <Skeleton className="h-48" />
+  1093→    </div>
+  1094→  );
+  1095→}
+  1096→
+  1097→// ─── Main component ─────────────────────────────────────────────────────────
+  1098→
+  1099→export function InventarioView() {
+  1100→  const go = useView((s) => s.go);
+  1101→  const assessmentId = useView((s) => s.assessmentId);
+  1102→  const inventoryPrefill = useView((s) => s.inventoryPrefill);
+  1103→  const setInventoryPrefill = useView((s) => s.setInventoryPrefill);
+  1104→  const setActionItemPrefill = useView((s) => s.setActionItemPrefill);
+  1105→
+  1106→  const [autoItems, setAutoItems] = useState<RiskInventoryItem[]>([]);
+  1107→  const [manualItems, setManualItems] = useState<RiskInventoryItem[]>([]);
+  1108→  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  1109→  const [loading, setLoading] = useState(true);
+  1110→  const [error, setError] = useState<string | null>(null);
+  1111→  const [refreshKey, setRefreshKey] = useState(0);
+  1112→
+  1113→  // Lazy initial state so the form auto-opens when arriving from the
+  1114→  // resultados uncovered-factors shortcut (inventoryPrefill.mteFactorCode).
+  1115→  const [manualFormPrefill, setManualFormPrefill] = useState<{
+  1116→    mteFactorCode?: string;
+  1117→  } | null>(() =>
+  1118→    inventoryPrefill?.mteFactorCode
+  1119→      ? { mteFactorCode: inventoryPrefill.mteFactorCode }
+  1120→      : null
+  1121→  );
+  1122→  const [manualFormOpen, setManualFormOpen] = useState<boolean>(
+  1123→    () => !!inventoryPrefill?.mteFactorCode
+  1124→  );
+  1125→
+  1126→  const [savingCell, setSavingCell] = useState<CellEdit | null>(null);
+  1127→  const [savedCell, setSavedCell] = useState<CellEdit | null>(null);
+  1128→
+  1129→  // Fetch inventory + assessment on mount / refresh.
+  1130→  useEffect(() => {
+  1131→    if (!assessmentId) return;
+  1132→    let cancelled = false;
+  1133→    const run = async () => {
+  1134→      setLoading(true);
+  1135→      setError(null);
+  1136→      try {
+  1137→        const [group, a] = await Promise.all([
+  1138→          api.inventory.list(assessmentId),
+  1139→          api.assessments.get(assessmentId),
+  1140→        ]);
+  1141→        if (cancelled) return;
+  1142→        setAutoItems(group.autoItems);
+  1143→        setManualItems(group.manualItems);
+  1144→        setAssessment(a);
+  1145→        setLoading(false);
+  1146→      } catch (e) {
+  1147→        if (cancelled) return;
+  1148→        const msg =
+  1149→          e instanceof ApiError
+  1150→            ? e.message
+  1151→            : "Erro inesperado ao carregar o inventário.";
+  1152→        setError(msg);
+  1153→        setLoading(false);
+  1154→      }
+  1155→    };
+  1156→    void run();
+  1157→    return () => {
+  1158→      cancelled = true;
+  1159→    };
+  1160→  }, [assessmentId, refreshKey]);
+  1161→
+  1162→  // Consume the cross-module prefill: clear it once on mount so it doesn't
+  1163→  // re-trigger after the user closes the auto-opened form. setInventoryPrefill
+  1164→  // is a Zustand store setter (not a React useState setter), so this is safe.
+  1165→  useEffect(() => {
+  1166→    if (!inventoryPrefill?.mteFactorCode) return;
+  1167→    setInventoryPrefill(null);
+  1168→  }, [inventoryPrefill, setInventoryPrefill]);
+  1169→
+  1170→  const refresh = () => setRefreshKey((k) => k + 1);
+  1171→
+  1172→  const allItems = useMemo(
+  1173→    () => [...autoItems, ...manualItems],
+  1174→    [autoItems, manualItems]
+  1175→  );
+  1176→
+  1177→  const highRiskCount = useMemo(
+  1178→    () =>
+  1179→      allItems.filter(
+  1180→        (i) => classifyInventoryRisk(i.probability, i.severity).level === "HIGH"
+  1181→      ).length,
+  1182→    [allItems]
+  1183→  );
+  1184→
+  1185→  const handlePatch = async (
+  1186→    itemId: string,
+  1187→    body: Record<string, unknown>,
+  1188→    field: EditableField
+  1189→  ) => {
+  1190→    setSavingCell({ itemId, field });
+  1191→    setSavedCell(null);
+  1192→    try {
+  1193→      const updated = await api.inventory.update(itemId, body);
+  1194→      setAutoItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
+  1195→      setManualItems((prev) =>
+  1196→        prev.map((i) => (i.id === itemId ? updated : i))
+  1197→      );
+  1198→      setSavingCell(null);
+  1199→      setSavedCell({ itemId, field });
+  1200→      window.setTimeout(() => {
+  1201→        setSavedCell((cur) =>
+  1202→          cur && cur.itemId === itemId && cur.field === field ? null : cur
+  1203→        );
+  1204→      }, 1500);
+  1205→      toast.success("Alteração salva.");
+  1206→    } catch (e) {
+  1207→      setSavingCell(null);
+  1208→      const msg =
+  1209→        e instanceof ApiError ? e.message : "Erro ao salvar alteração.";
+  1210→      toast.error(msg);
+  1211→    }
+  1212→  };
+  1213→
+  1214→  const handleDelete = async (itemId: string) => {
+  1215→    try {
+  1216→      await api.inventory.delete(itemId);
+  1217→      setManualItems((prev) => prev.filter((i) => i.id !== itemId));
+  1218→      toast.success("Item removido do inventário.");
+  1219→    } catch (e) {
+  1220→      if (e instanceof ApiError && e.code === "ITEM_NOT_MANUAL") {
+  1221→        toast.error("Itens automáticos não podem ser excluídos.");
+  1222→        return;
+  1223→      }
+  1224→      const msg =
+  1225→        e instanceof ApiError ? e.message : "Erro ao excluir item.";
+  1226→      toast.error(msg);
+  1227→    }
+  1228→  };
+  1229→
+  1230→  const handleAddManual = async (body: Record<string, unknown>) => {
+  1231→    if (!assessmentId) {
+  1232→      toast.error("Nenhuma avaliação selecionada.");
+  1233→      throw new Error("no assessment");
+  1234→    }
+  1235→    const item = await api.inventory.addManual(assessmentId, body);
+  1236→    setManualItems((prev) => [...prev, item]);
+  1237→    toast.success("Risco manual adicionado ao inventário.");
+  1238→    setManualFormOpen(false);
+  1239→    setManualFormPrefill(null);
+  1240→  };
+  1241→
+  1242→  const handleCreateAction = (item: RiskInventoryItem) => {
+  1243→    setActionItemPrefill({
+  1244→      departmentId: item.departmentId ?? undefined,
+  1245→      dimensionCode: item.dimensionCode ?? undefined,
+  1246→      what: item.proposedMeasures ?? "",
+  1247→    });
+  1248→    if (assessmentId) go("plano", { assessmentId });
+  1249→  };
+  1250→
+  1251→  const openManualForm = (mteFactorCode?: string) => {
+  1252→    setManualFormPrefill(mteFactorCode ? { mteFactorCode } : null);
+  1253→    setManualFormOpen(true);
+  1254→  };
+  1255→
+  1256→  // Empty state: no assessment selected.
+  1257→  if (!assessmentId) {
+  1258→    return (
+  1259→      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+  1260→        <Card>
+  1261→          <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
+  1262→            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+  1263→              <ShieldAlert className="h-6 w-6 text-muted-foreground" />
+  1264→            </div>
+  1265→            <div className="space-y-1">
+  1266→              <h2 className="text-lg font-semibold">
+  1267→                Nenhuma avaliação selecionada
+  1268→              </h2>
+  1269→              <p className="text-sm text-muted-foreground max-w-md">
+  1270→                Acesse uma avaliação concluída para visualizar o inventário de
+  1271→                riscos psicossociais.
+  1272→              </p>
+  1273→            </div>
+  1274→            <Button onClick={() => go("painel")}>
+  1275→              <ChevronLeft className="h-4 w-4" />
+  1276→              Voltar ao painel
+  1277→            </Button>
+  1278→          </CardContent>
+  1279→        </Card>
+  1280→      </div>
+  1281→    );
+  1282→  }
+  1283→
+  1284→  return (
+  1285→    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+  1286→      <TooltipProvider delayDuration={200}>
+  1287→        {/* Header */}
+  1288→        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+  1289→          <div className="flex items-start gap-2 min-w-0">
+  1290→            <Button
+  1291→              variant="ghost"
+  1292→              size="icon"
+  1293→              onClick={() => go("avaliacao", { assessmentId })}
+  1294→              aria-label="Voltar à avaliação"
+  1295→              className="shrink-0 -ml-2"
+  1296→            >
+  1297→              <ChevronLeft className="h-5 w-5" />
+  1298→            </Button>
+  1299→            <div className="min-w-0">
+  1300→              <h1 className="text-2xl font-semibold tracking-tight">
+  1301→                Inventário de Riscos
+  1302→              </h1>
+  1303→              <p className="text-sm text-muted-foreground mt-0.5">
+  1304→                Identificação de perigos e avaliação prioritária (NR-1)
+  1305→              </p>
+  1306→              {assessment ? (
+  1307→                <p
+  1308→                  className="text-xs text-muted-foreground mt-1 truncate"
+  1309→                  title={assessment.title}
+  1310→                >
+  1311→                  {assessment.title}
+  1312→                </p>
+  1313→              ) : null}
+  1314→            </div>
+  1315→          </div>
+  1316→          <div className="flex items-center gap-2 shrink-0">
+  1317→            <Button
+  1318→              variant="outline"
+  1319→              size="sm"
+  1320→              onClick={refresh}
+  1321→              disabled={loading}
+  1322→            >
+  1323→              {loading ? (
+  1324→                <Loader2 className="h-4 w-4 animate-spin" />
+  1325→              ) : (
+  1326→                <RefreshCw className="h-4 w-4" />
+  1327→              )}
+  1328→              <span className="hidden sm:inline">Atualizar</span>
+  1329→            </Button>
+  1330→            <Button size="sm" onClick={() => openManualForm()}>
+  1331→              <Plus className="h-4 w-4" />
+  1332→              Adicionar Risco Manual
+  1333→            </Button>
+  1334→          </div>
+  1335→        </header>
+  1336→
+  1337→        {/* Summary chips */}
+  1338→        <div className="flex flex-wrap items-center gap-2 mb-6">
+  1339→          <Badge variant="outline" className="gap-1.5">
+  1340→            <span className="font-mono-numeric font-semibold">
+  1341→              {autoItems.length}
+  1342→            </span>
+  1343→            <span className="text-muted-foreground">automáticos</span>
+  1344→          </Badge>
+  1345→          <Badge variant="outline" className="gap-1.5">
+  1346→            <span className="font-mono-numeric font-semibold">
+  1347→              {manualItems.length}
+  1348→            </span>
+  1349→            <span className="text-muted-foreground">manuais</span>
+  1350→          </Badge>
+  1351→          <Badge className="risk-high-bg gap-1.5">
+  1352→            <ShieldAlert className="h-3.5 w-3.5" />
+  1353→            <span className="font-mono-numeric font-semibold">
+  1354→              {highRiskCount}
+  1355→            </span>
+  1356→            <span>alto risco</span>
+  1357→          </Badge>
+  1358→        </div>
+  1359→
+  1360→        {/* Main content */}
+  1361→        {error ? (
+  1362→          <Card className="border-destructive/50">
+  1363→            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
+  1364→              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+  1365→                <AlertCircle className="h-6 w-6 text-destructive" />
+  1366→              </div>
+  1367→              <div className="space-y-1">
+  1368→                <h2 className="text-lg font-semibold">
+  1369→                  Não foi possível carregar o inventário
+  1370→                </h2>
+  1371→                <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+  1372→              </div>
+  1373→              <div className="flex flex-wrap gap-2 justify-center">
+  1374→                <Button
+  1375→                  variant="outline"
+  1376→                  onClick={() => go("avaliacao", { assessmentId })}
+  1377→                >
+  1378→                  <ChevronLeft className="h-4 w-4" />
+  1379→                  Voltar à avaliação
+  1380→                </Button>
+  1381→                <Button onClick={refresh}>
+  1382→                  <RefreshCw className="h-4 w-4" />
+  1383→                  Tentar novamente
+  1384→                </Button>
+  1385→              </div>
+  1386→            </CardContent>
+  1387→          </Card>
+  1388→        ) : loading ? (
+  1389→          <InventarioSkeleton />
+  1390→        ) : allItems.length === 0 ? (
+  1391→          <Card>
+  1392→            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
+  1393→              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+  1394→                <ListPlus className="h-6 w-6 text-muted-foreground" />
+  1395→              </div>
+  1396→              <div className="space-y-1">
+  1397→                <h2 className="text-lg font-semibold">Inventário vazio</h2>
+  1398→                <p className="text-sm text-muted-foreground max-w-md">
+  1399→                  Nenhum item automático foi gerado (nenhum GHE elegível
+  1400→                  apresentou dimensão com risco médio ou alto). Adicione riscos
+  1401→                  manualmente ou verifique o resultado da avaliação.
+  1402→                </p>
+  1403→              </div>
+  1404→              <Button onClick={() => openManualForm()}>
+  1405→                <Plus className="h-4 w-4" />
+  1406→                Adicionar Risco Manual
+  1407→              </Button>
+  1408→            </CardContent>
+  1409→          </Card>
+  1410→        ) : (
+  1411→          <div className="space-y-6">
+  1412→            <InventoryTable
+  1413→              items={allItems}
+  1414→              onPatch={handlePatch}
+  1415→              onDelete={handleDelete}
+  1416→              onCreateAction={handleCreateAction}
+  1417→              savingCell={savingCell}
+  1418→              savedCell={savedCell}
+  1419→            />
+  1420→            <UncoveredFactorsSection onAddFactor={openManualForm} />
+  1421→          </div>
+  1422→        )}
+  1423→
+  1424→        {/* Manual risk form dialog */}
+  1425→        <ManualRiskForm
+  1426→          open={manualFormOpen}
+  1427→          onOpenChange={setManualFormOpen}
+  1428→          assessment={assessment}
+  1429→          prefillMteFactor={manualFormPrefill?.mteFactorCode}
+  1430→          onSubmit={handleAddManual}
+  1431→        />
+  1432→      </TooltipProvider>
+  1433→    </div>
+  1434→  );
+  1435→}
+  1436→

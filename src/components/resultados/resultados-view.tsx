@@ -19,7 +19,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   TrendingUp,
-  Users,
 } from "lucide-react";
 
 import { api, ApiError } from "@/lib/api";
@@ -40,13 +39,6 @@ import {
 import { RISK_LEVEL_LABELS } from "@/lib/errors";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -67,13 +59,17 @@ import {
 // ─── Color helpers ──────────────────────────────────────────────────────────
 
 function riskScoreBg(score: number): string {
-  // Interpolate hue 120 (green) → 60 (yellow) → 0 (red) across 0..100.
-  const h = score <= 50 ? 120 - (score / 50) * 60 : 60 - ((score - 50) / 50) * 60;
-  return `hsl(${h}, 65%, 45%)`;
+  // Muted sage → ochre → clay ramp (HSL 120°→45°→10° at ~45% saturation).
+  const h =
+    score <= 50
+      ? 120 - (score / 50) * (120 - 45)
+      : 45 - ((score - 50) / 50) * (45 - 10);
+  return `hsl(${h}, 45%, 48%)`;
 }
 
 function riskScoreFg(score: number): string {
-  return score > 50 ? "#ffffff" : "#1A2535";
+  // Warm-paper on the darker clay end, warm-ink on the sage/ochre end.
+  return score > 55 ? "#FAF8F4" : "#2A2620";
 }
 
 const CHART_PALETTE = [
@@ -113,109 +109,63 @@ function fmtShortDate(iso: string | null): string {
   }
 }
 
-// ─── DashboardKpis ──────────────────────────────────────────────────────────
-
-interface KpiCardProps {
-  label: string;
-  value: string;
-  icon: React.ElementType;
-  accentClass: string;
-  tintClass: string;
-  borderClass: string;
-  description?: string;
-}
-
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  accentClass,
-  tintClass,
-  borderClass,
-  description,
-}: KpiCardProps) {
-  return (
-    <Card
-      className={`card-hover py-4 overflow-hidden relative ${tintClass} ${borderClass}`}
-      role="group"
-      aria-label={`${label}: ${value}${description ? `. ${description}` : ""}`}
-    >
-      <CardContent className="flex items-start gap-3">
-        <div
-          className={`h-10 w-10 shrink-0 rounded-md flex items-center justify-center ${accentClass}`}
-          aria-hidden="true"
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-xs font-medium text-muted-foreground leading-tight">
-            {label}
-          </div>
-          <div className="text-2xl md:text-4xl font-semibold font-mono-numeric mt-1 leading-tight">
-            {value}
-          </div>
-          {description ? (
-            <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
-              {description}
-            </div>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// ─── DashboardKpis (stat strip) ─────────────────────────────────────────────
 
 function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
+  const stats: Array<{ label: string; value: string; hint?: string }> = [
+    {
+      label: "Adesão Global",
+      value: `${kpis.globalAdesao.toFixed(0)}%`,
+      hint: "Participação sobre o esperado",
+    },
+    {
+      label: "GHEs Alto Risco",
+      value: String(kpis.ghesHighRisk),
+      hint: "≥1 dimensão HIGH",
+    },
+    {
+      label: "GHEs Médio Risco",
+      value: String(kpis.ghesMediumRisk),
+      hint: "≥1 dimensão MEDIUM",
+    },
+    {
+      label: "GHEs Inelegíveis",
+      value: String(kpis.ghesIneligible),
+      hint: "< 5 respostas",
+    },
+    {
+      label: "Total Respondentes",
+      value: String(kpis.totalRespondents),
+      hint: "Trabalhadores que responderam",
+    },
+  ];
   return (
     <section
       aria-label="Indicadores-chave"
-      className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5"
+      className="bg-[var(--surface)] rounded-lg p-5"
     >
-      <KpiCard
-        label="Adesão Global"
-        value={`${kpis.globalAdesao.toFixed(0)}%`}
-        icon={Users}
-        accentClass="bg-brand-light/10 text-brand-light"
-        tintClass="bg-gradient-to-br from-brand-light/5 to-transparent"
-        borderClass="border-b-2 border-brand-light"
-        description="Participação sobre o esperado"
-      />
-      <KpiCard
-        label="GHEs Alto Risco"
-        value={String(kpis.ghesHighRisk)}
-        icon={ShieldAlert}
-        accentClass="risk-high-bg"
-        tintClass="bg-gradient-to-br from-risk-high/5 to-transparent"
-        borderClass="border-b-2 border-risk-high"
-        description="≥1 dimensão HIGH"
-      />
-      <KpiCard
-        label="GHEs Médio Risco"
-        value={String(kpis.ghesMediumRisk)}
-        icon={ShieldAlert}
-        accentClass="risk-medium-bg"
-        tintClass="bg-gradient-to-br from-risk-medium/5 to-transparent"
-        borderClass="border-b-2 border-risk-medium"
-        description="≥1 dimensão MEDIUM"
-      />
-      <KpiCard
-        label="GHEs Inelegíveis"
-        value={String(kpis.ghesIneligible)}
-        icon={Lock}
-        accentClass="bg-muted text-muted-foreground"
-        tintClass="bg-gradient-to-br from-muted/30 to-transparent"
-        borderClass="border-b-2 border-muted-foreground/40"
-        description="< 5 respostas"
-      />
-      <KpiCard
-        label="Total Respondentes"
-        value={String(kpis.totalRespondents)}
-        icon={Activity}
-        accentClass="bg-brand/10 text-brand"
-        tintClass="bg-gradient-to-br from-brand/5 to-transparent"
-        borderClass="border-b-2 border-brand"
-        description="Trabalhadores que responderam"
-      />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className="px-3 first:pl-0 last:pr-0"
+            role="group"
+            aria-label={`${s.label}: ${s.value}${s.hint ? `. ${s.hint}` : ""}`}
+          >
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">
+              {s.label}
+            </div>
+            <div className="font-mono-numeric text-2xl md:text-3xl font-semibold mt-1 leading-tight text-foreground">
+              {s.value}
+            </div>
+            {s.hint ? (
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
+                {s.hint}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -274,7 +224,7 @@ function HeatRow({
 }) {
   if (!row.isEligible || !row.dimensions) {
     return (
-      <tr className="bg-muted/40 text-muted-foreground hover:bg-accent/30 transition-colors">
+      <tr className="bg-muted/40 text-muted-foreground hover:bg-[var(--surface)] transition-colors">
         <td className="sticky left-0 z-10 bg-muted/40 px-3 py-2 font-medium border-b border-r border-border/60 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
           <div className="truncate max-w-[10rem]" title={row.deptName}>
             {row.deptName}
@@ -298,7 +248,7 @@ function HeatRow({
 
   const dimMap = new Map(row.dimensions.map((d) => [d.code, d]));
   return (
-    <tr className="border-b border-border/60 hover:bg-accent/30 transition-colors">
+    <tr className="border-b border-border/60 hover:bg-[var(--surface)] transition-colors">
       <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium border-r border-b border-border/60 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
         <div className="truncate max-w-[10rem]" title={row.deptName}>
           {row.deptName}
@@ -334,80 +284,78 @@ function HeatRow({
 
 function HeatMap({ heatmap }: { heatmap: DashboardData["heatmap"] }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <section aria-label="Mapa de calor GHE × Dimensão" className="border-b border-border pb-8">
+      <div className="mb-4">
+        <h2 className="font-display text-xl text-foreground flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-muted-foreground" />
           Mapa de calor — GHE × Dimensão
-        </CardTitle>
-        <CardDescription>
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
           Cores verde → amarelo → vermelho indicam risco crescente (0 a 100).
           GHEs com menos de 5 respostas são exibidas como inelegíveis (RB-03).
           Ícone <AlertTriangle className="inline h-3 w-3" aria-hidden="true" />{" "}
           indica baixa confiabilidade (α &lt; 0,5).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="max-h-[28rem] overflow-auto scroll-area rounded-md border">
-          <table className="w-full text-sm border-collapse" role="grid">
-            <caption className="sr-only">
-              Mapa de calor dos escores de risco por GHE (linha) e dimensão
-              psicossocial D1 a D11 (coluna). GHEs inelegíveis apresentam menos
-              de 5 respostas.
-            </caption>
-            <thead className="sticky top-0 z-20">
-              <tr>
+        </p>
+      </div>
+      <div className="max-h-[28rem] overflow-auto scroll-area rounded-md border border-border">
+        <table className="w-full text-sm border-collapse" role="grid">
+          <caption className="sr-only">
+            Mapa de calor dos escores de risco por GHE (linha) e dimensão
+            psicossocial D1 a D11 (coluna). GHEs inelegíveis apresentam menos
+            de 5 respostas.
+          </caption>
+          <thead className="sticky top-0 z-20">
+            <tr>
+              <th
+                scope="col"
+                className="sticky left-0 z-30 bg-card px-3 py-2 text-left font-medium border-b border-r border-border/60 min-w-[10rem] shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+              >
+                GHE
+              </th>
+              {COPSOQ_DIMENSIONS.map((d) => (
                 <th
+                  key={d.code}
                   scope="col"
-                  className="sticky left-0 z-30 bg-card px-3 py-2 text-left font-medium border-b border-r border-border/60 min-w-[10rem] shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+                  className="px-2 py-2 text-center font-medium border-b border-border/60 min-w-[3.5rem]"
                 >
-                  GHE
+                  <div className="font-mono-numeric text-xs">{d.code}</div>
+                  <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+                    {DIM_SHORT_NAMES[d.code]}
+                  </div>
                 </th>
-                {COPSOQ_DIMENSIONS.map((d) => (
-                  <th
-                    key={d.code}
-                    scope="col"
-                    className="px-2 py-2 text-center font-medium border-b border-border/60 min-w-[3.5rem]"
-                  >
-                    <div className="font-mono-numeric text-xs">{d.code}</div>
-                    <div className="text-[10px] text-muted-foreground font-normal leading-tight">
-                      {DIM_SHORT_NAMES[d.code]}
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {heatmap.map((row) => (
-                <HeatRow key={row.deptId} row={row} />
               ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-medium">Escala de risco:</span>
-          <div className="flex flex-col gap-0.5">
-            <div
-              className="h-3 w-40 sm:w-48 rounded-sm border border-border/40"
-              style={{
-                background:
-                  "linear-gradient(to right, hsl(120,65%,45%), hsl(60,65%,45%), hsl(0,65%,45%))",
-              }}
-              aria-hidden="true"
-            />
-            <div className="flex justify-between w-40 sm:w-48 text-[10px] font-mono-numeric">
-              <span>0</span>
-              <span>33</span>
-              <span>66</span>
-              <span>100</span>
-            </div>
+            </tr>
+          </thead>
+          <tbody>
+            {heatmap.map((row) => (
+              <HeatRow key={row.deptId} row={row} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
+        <span className="font-medium">Escala de risco:</span>
+        <div className="flex flex-col gap-0.5">
+          <div
+            className="h-3 w-40 sm:w-48 rounded-sm border border-border/40"
+            style={{
+              background:
+                "linear-gradient(to right, hsl(120,45%,48%), hsl(45,45%,48%), hsl(10,45%,48%))",
+            }}
+            aria-hidden="true"
+          />
+          <div className="flex justify-between w-40 sm:w-48 text-[10px] font-mono-numeric">
+            <span>0</span>
+            <span>33</span>
+            <span>66</span>
+            <span>100</span>
           </div>
-          <span className="hidden md:inline text-muted-foreground/80">
-            verde: favorável · amarelo: intermediário · vermelho: desfavorável
-          </span>
         </div>
-      </CardContent>
-    </Card>
+        <span className="hidden md:inline text-muted-foreground/80">
+          verde: favorável · amarelo: intermediário · vermelho: desfavorável
+        </span>
+      </div>
+    </section>
   );
 }
 
@@ -427,152 +375,150 @@ function CompanyAvgBars({
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <section aria-label="Média da empresa por dimensão" className="border-b border-border pb-8">
+      <div className="mb-4">
+        <h2 className="font-display text-xl text-foreground flex items-center gap-2">
           <Activity className="h-5 w-5 text-muted-foreground" />
           Média da empresa por dimensão
-        </CardTitle>
-        <CardDescription>
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
           Escore médio ponderado por número de respondentes em GHEs elegíveis.
           Ordenado decrescente. Linhas de referência em 33 (médio) e 66 (alto).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-2.5">
-          <div className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3">
-            <div />
-            <div className="relative h-3 text-[10px] font-mono-numeric">
-              <span
-                className="absolute -translate-x-1/2 text-risk-medium font-semibold"
-                style={{ left: "33%" }}
-              >
-                33
-              </span>
-              <span
-                className="absolute -translate-x-1/2 text-risk-high font-semibold"
-                style={{ left: "66%" }}
-              >
-                66
-              </span>
-            </div>
-            <div />
-            <div />
+        </p>
+      </div>
+      <div className="space-y-2.5">
+        <div className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3">
+          <div />
+          <div className="relative h-3 text-[10px] font-mono-numeric">
+            <span
+              className="absolute -translate-x-1/2 text-[var(--risk-medium)] font-semibold"
+              style={{ left: "33%" }}
+            >
+              33
+            </span>
+            <span
+              className="absolute -translate-x-1/2 text-[var(--risk-high)] font-semibold"
+              style={{ left: "66%" }}
+            >
+              66
+            </span>
           </div>
-          {sorted.map((item) => {
-            const dim = getDimension(item.code);
-            const bg =
-              item.riskLevel === "HIGH"
-                ? "var(--risk-high)"
-                : item.riskLevel === "MEDIUM"
-                ? "var(--risk-medium)"
-                : "var(--risk-low)";
-            const width = Math.max(2, Math.min(100, item.weightedAvgRiskScore));
-            const ariaLabel = `${item.code} ${dim.namePtBr}: risco ${item.weightedAvgRiskScore.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[item.riskLevel]}`;
-            const RiskIcon =
-              item.riskLevel === "HIGH"
-                ? AlertTriangle
-                : item.riskLevel === "MEDIUM"
-                ? AlertCircle
-                : ShieldCheck;
-            const riskIconClass =
-              item.riskLevel === "HIGH"
-                ? "text-risk-high"
-                : item.riskLevel === "MEDIUM"
-                ? "text-risk-medium"
-                : "text-risk-low";
-            return (
+          <div />
+          <div />
+        </div>
+        {sorted.map((item) => {
+          const dim = getDimension(item.code);
+          const bg =
+            item.riskLevel === "HIGH"
+              ? "var(--risk-high)"
+              : item.riskLevel === "MEDIUM"
+              ? "var(--risk-medium)"
+              : "var(--risk-low)";
+          const width = Math.max(2, Math.min(100, item.weightedAvgRiskScore));
+          const ariaLabel = `${item.code} ${dim.namePtBr}: risco ${item.weightedAvgRiskScore.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[item.riskLevel]}`;
+          const RiskIcon =
+            item.riskLevel === "HIGH"
+              ? AlertTriangle
+              : item.riskLevel === "MEDIUM"
+              ? AlertCircle
+              : ShieldCheck;
+          const riskIconClass =
+            item.riskLevel === "HIGH"
+              ? "text-[var(--risk-high)]"
+              : item.riskLevel === "MEDIUM"
+              ? "text-[var(--risk-medium)]"
+              : "text-[var(--risk-low)]";
+          return (
+            <div
+              key={item.code}
+              className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3"
+            >
               <div
-                key={item.code}
-                className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3"
+                className="text-sm flex items-center gap-1.5 min-w-0"
+                title={`${item.code} — ${dim.namePtBr}`}
+              >
+                <Badge
+                  variant="outline"
+                  className="font-mono-numeric text-[10px] px-1.5 py-0 shrink-0"
+                >
+                  {item.code}
+                </Badge>
+                <span className="text-foreground truncate min-w-0">
+                  {dim.namePtBr}
+                </span>
+              </div>
+              <div
+                className="relative h-7 rounded-md bg-[var(--surface)] overflow-hidden"
+                role="img"
+                aria-label={ariaLabel}
               >
                 <div
-                  className="text-sm flex items-center gap-1.5 min-w-0"
-                  title={`${item.code} — ${dim.namePtBr}`}
-                >
-                  <Badge
-                    variant="outline"
-                    className="font-mono-numeric text-[10px] px-1.5 py-0 shrink-0"
-                  >
-                    {item.code}
-                  </Badge>
-                  <span className="text-foreground truncate min-w-0">
-                    {dim.namePtBr}
-                  </span>
-                </div>
+                  className="absolute inset-y-0 z-10"
+                  style={{
+                    left: "33%",
+                    borderLeft: "2px dashed var(--risk-medium)",
+                    opacity: 0.7,
+                  }}
+                  aria-hidden="true"
+                />
                 <div
-                  className="relative h-7 rounded-md bg-muted overflow-hidden"
-                  role="img"
-                  aria-label={ariaLabel}
-                >
-                  <div
-                    className="absolute inset-y-0 z-10"
-                    style={{
-                      left: "33%",
-                      borderLeft: "2px dashed var(--risk-medium)",
-                      opacity: 0.7,
-                    }}
-                    aria-hidden="true"
-                  />
-                  <div
-                    className="absolute inset-y-0 z-10"
-                    style={{
-                      left: "66%",
-                      borderLeft: "2px dashed var(--risk-high)",
-                      opacity: 0.7,
-                    }}
-                    aria-hidden="true"
-                  />
-                  <div
-                    className="h-full transition-all duration-500 ease-out"
-                    style={{ width: `${width}%`, backgroundColor: bg }}
-                  />
-                </div>
-                <div className="text-right font-mono-numeric text-sm font-semibold">
-                  {item.weightedAvgRiskScore.toFixed(0)}
-                </div>
-                <div className="flex justify-center" aria-hidden="true">
-                  <RiskIcon className={`h-4 w-4 ${riskIconClass}`} />
-                </div>
+                  className="absolute inset-y-0 z-10"
+                  style={{
+                    left: "66%",
+                    borderLeft: "2px dashed var(--risk-high)",
+                    opacity: 0.7,
+                  }}
+                  aria-hidden="true"
+                />
+                <div
+                  className="h-full transition-all duration-500 ease-out"
+                  style={{ width: `${width}%`, backgroundColor: bg }}
+                />
               </div>
-            );
-          })}
+              <div className="text-right font-mono-numeric text-sm font-semibold text-foreground">
+                {item.weightedAvgRiskScore.toFixed(0)}
+              </div>
+              <div className="flex justify-center" aria-hidden="true">
+                <RiskIcon className={`h-4 w-4 ${riskIconClass}`} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-sm"
+            style={{ backgroundColor: "var(--risk-low)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.LOW}
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-sm"
-              style={{ backgroundColor: "var(--risk-low)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.LOW}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-sm"
-              style={{ backgroundColor: "var(--risk-medium)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.MEDIUM}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-sm"
-              style={{ backgroundColor: "var(--risk-high)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.HIGH}
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span
-              className="inline-block w-px h-3 bg-foreground/40"
-              aria-hidden="true"
-            />
-            <span>refs. 33 / 66</span>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-sm"
+            style={{ backgroundColor: "var(--risk-medium)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.MEDIUM}
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-sm"
+            style={{ backgroundColor: "var(--risk-high)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.HIGH}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <span
+            className="inline-block w-px h-3 bg-foreground/40"
+            aria-hidden="true"
+          />
+          <span>refs. 33 / 66</span>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -603,27 +549,25 @@ function CriticalDimensionsTable({
 
   if (sorted.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <section aria-label="Dimensões críticas" className="border-b border-border pb-8">
+        <div className="mb-4">
+          <h2 className="font-display text-xl text-foreground flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-muted-foreground" />
             Dimensões críticas
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
             Dimensões com classificação HIGH na média da empresa.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
-            <div className="h-12 w-12 rounded-full bg-risk-low/15 flex items-center justify-center">
-              <ShieldCheck className="h-6 w-6 text-risk-low" />
-            </div>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Nenhuma dimensão com risco alto (HIGH) na média da empresa.
-            </p>
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center text-center py-10 gap-3 border border-dashed border-border rounded-lg">
+          <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center">
+            <ShieldCheck className="h-6 w-6 text-[var(--risk-low)]" />
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Nenhuma dimensão com risco alto (HIGH) na média da empresa.
+          </p>
+        </div>
+      </section>
     );
   }
 
@@ -641,118 +585,123 @@ function CriticalDimensionsTable({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-risk-high" />
+    <section aria-label="Dimensões críticas" className="border-b border-border pb-8">
+      <div className="mb-4">
+        <h2 className="font-display text-xl text-foreground flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5 text-[var(--risk-high)]" />
           Dimensões críticas
-        </CardTitle>
-        <CardDescription>
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
           Dimensões com classificação HIGH na média da empresa. Priorize a
           elaboração de inventário de fatores de risco e ações de melhoria das
           condições de trabalho.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="mb-3 flex items-center gap-2 rounded-md border border-risk-high/30 bg-risk-high/5 px-3 py-2 text-sm">
-          <AlertTriangle
-            className="h-4 w-4 shrink-0 text-risk-high"
-            aria-hidden="true"
-          />
-          <span className="font-medium text-risk-high">
-            Atenção: dimensões críticas identificadas
-          </span>
-          <span className="text-muted-foreground hidden sm:inline">
-            — priorize a elaboração de inventário e plano de ação.
-          </span>
-        </div>
-        <div className="max-h-[28rem] overflow-y-auto scroll-area rounded-md border">
-          <Table>
-            <TableHeader className="sticky top-0 bg-card z-10">
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>GHEs afetados</TableHead>
-                <TableHead className="text-right">Escore médio</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((c) => {
-                const dim = getDimension(c.code);
-                return (
-                  <TableRow key={c.code}>
-                    <TableCell>
-                      <div className="font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground font-mono-numeric">
-                        {c.code} · {dim.groupName}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-md">
-                        {c.affectedDepts.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        ) : (
-                          <>
-                            {c.affectedDepts.slice(0, 5).map((deptId) => (
-                              <button
-                                key={deptId}
-                                type="button"
-                                onClick={() => handleInventory(c.code)}
-                                className="inline-flex items-center text-[10px] px-1.5 h-5 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                aria-label={`Abrir inventário de riscos para a dimensão ${c.code} (${c.name})`}
-                              >
-                                {deptNameMap.get(deptId) ?? deptId.slice(0, 8)}
-                              </button>
-                            ))}
-                            {c.affectedDepts.length > 5 ? (
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] px-1.5 py-0"
-                              >
-                                +{c.affectedDepts.length - 5}
-                              </Badge>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span className="risk-high-bg inline-flex items-center justify-center min-w-[2.5rem] px-2 py-0.5 rounded font-mono-numeric font-semibold text-sm">
-                        {c.avgRiskScore.toFixed(0)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleInventory(c.code)}
-                          aria-label={`Ir para o inventário de riscos com fator ${INVENTORY_TEMPLATES[c.code].mteFactorCode} pré-preenchido (${c.name})`}
-                        >
-                          <ListChecks className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline">Inventário</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleAction(c.code)}
-                          aria-label={`Ir para o plano de ação com dimensão ${c.code} pré-preenchida`}
-                        >
-                          <ClipboardList className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline">Ação</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+        </p>
+      </div>
+      <div className="mb-3 flex items-center gap-2 rounded-md border border-[var(--risk-high)]/30 bg-[var(--surface)] px-3 py-2 text-sm">
+        <AlertTriangle
+          className="h-4 w-4 shrink-0 text-[var(--risk-high)]"
+          aria-hidden="true"
+        />
+        <span className="font-medium text-[var(--risk-high)]">
+          Atenção: dimensões críticas identificadas
+        </span>
+        <span className="text-muted-foreground hidden sm:inline">
+          — priorize a elaboração de inventário e plano de ação.
+        </span>
+      </div>
+      <div className="max-h-[28rem] overflow-y-auto scroll-area rounded-md border border-border">
+        <Table>
+          <TableHeader className="sticky top-0 bg-card z-10">
+            <TableRow className="hover:bg-transparent border-b border-border">
+              <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Nome
+              </TableHead>
+              <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                GHEs afetados
+              </TableHead>
+              <TableHead className="text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Escore médio
+              </TableHead>
+              <TableHead className="text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                Ações
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sorted.map((c) => {
+              const dim = getDimension(c.code);
+              return (
+                <TableRow key={c.code} className="border-b border-border">
+                  <TableCell className="py-3">
+                    <div className="font-display font-medium text-foreground">
+                      {c.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground font-mono-numeric">
+                      {c.code} · {dim.groupName}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="flex flex-wrap gap-1 max-w-md">
+                      {c.affectedDepts.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <>
+                          {c.affectedDepts.slice(0, 5).map((deptId) => (
+                            <button
+                              key={deptId}
+                              type="button"
+                              onClick={() => handleInventory(c.code)}
+                              className="inline-flex items-center text-[10px] px-1.5 h-5 rounded-md border border-border bg-background hover:bg-[var(--surface)] text-muted-foreground hover:text-[var(--brand)] cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label={`Abrir inventário de riscos para a dimensão ${c.code} (${c.name})`}
+                            >
+                              {deptNameMap.get(deptId) ?? deptId.slice(0, 8)}
+                            </button>
+                          ))}
+                          {c.affectedDepts.length > 5 ? (
+                            <span className="inline-flex items-center text-[10px] font-mono-numeric px-1.5 h-5 rounded-md border border-border bg-background text-muted-foreground">
+                              +{c.affectedDepts.length - 5}
+                            </span>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right py-3">
+                    <span className="risk-high-bg inline-flex items-center justify-center min-w-[2.5rem] px-2 py-0.5 rounded font-mono-numeric font-semibold text-sm">
+                      {c.avgRiskScore.toFixed(0)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right py-3">
+                    <div className="flex justify-end gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleInventory(c.code)}
+                        aria-label={`Ir para o inventário de riscos com fator ${INVENTORY_TEMPLATES[c.code].mteFactorCode} pré-preenchido (${c.name})`}
+                      >
+                        <ListChecks className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Inventário</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAction(c.code)}
+                        aria-label={`Ir para o plano de ação com dimensão ${c.code} pré-preenchida`}
+                      >
+                        <ClipboardList className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Ação</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
   );
 }
 
@@ -821,205 +770,203 @@ function DimensionRadar({
       .join("; ")}.`;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <section aria-label="Perfil psicossocial da empresa" className="border-b border-border pb-8">
+      <div className="mb-4">
+        <h2 className="font-display text-xl text-foreground flex items-center gap-2">
           <Activity className="h-5 w-5 text-muted-foreground" />
           Perfil psicossocial da empresa
-        </CardTitle>
-        <CardDescription>
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
           Distribuição do risco médio por dimensão COPSOQ II-BR (média ponderada
           entre GHEs elegíveis).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <svg
-          viewBox="0 0 400 400"
-          className="w-full h-auto max-w-lg mx-auto"
-          role="img"
-          aria-label={ariaSummary}
-        >
-          {/* Concentric reference rings */}
-          {rings.map((r) => {
-            const ringPts = COPSOQ_DIMENSIONS.map((_, i) => {
-              const x = CX + R_MAX * (r / 100) * Math.cos(angleAt(i));
-              const y = CY + R_MAX * (r / 100) * Math.sin(angleAt(i));
-              return `${x.toFixed(1)},${y.toFixed(1)}`;
-            }).join(" ");
-            return (
-              <polygon
-                key={r}
-                points={ringPts}
-                fill="none"
-                stroke="var(--border)"
-                strokeWidth={0.5}
-                opacity={0.7}
-              />
-            );
-          })}
+        </p>
+      </div>
+      <svg
+        viewBox="0 0 400 400"
+        className="w-full h-auto max-w-lg mx-auto"
+        role="img"
+        aria-label={ariaSummary}
+      >
+        {/* Concentric reference rings */}
+        {rings.map((r) => {
+          const ringPts = COPSOQ_DIMENSIONS.map((_, i) => {
+            const x = CX + R_MAX * (r / 100) * Math.cos(angleAt(i));
+            const y = CY + R_MAX * (r / 100) * Math.sin(angleAt(i));
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          }).join(" ");
+          return (
+            <polygon
+              key={r}
+              points={ringPts}
+              fill="none"
+              stroke="var(--border)"
+              strokeWidth={0.5}
+              opacity={0.7}
+            />
+          );
+        })}
 
-          {/* Axis lines from center to outer edge */}
-          {COPSOQ_DIMENSIONS.map((d, i) => {
-            const end = pointFor(i, 100);
-            return (
-              <line
-                key={d.code}
-                x1={CX}
-                y1={CY}
-                x2={end.x}
-                y2={end.y}
-                stroke="var(--border)"
-                strokeWidth={0.5}
-                opacity={0.7}
-              />
-            );
-          })}
+        {/* Axis lines from center to outer edge */}
+        {COPSOQ_DIMENSIONS.map((d, i) => {
+          const end = pointFor(i, 100);
+          return (
+            <line
+              key={d.code}
+              x1={CX}
+              y1={CY}
+              x2={end.x}
+              y2={end.y}
+              stroke="var(--border)"
+              strokeWidth={0.5}
+              opacity={0.7}
+            />
+          );
+        })}
 
-          {/* Ring scale labels along the top axis */}
-          {rings.map((r) => {
-            const y = CY - R_MAX * (r / 100);
-            return (
-              <text
-                key={r}
-                x={CX + 4}
-                y={y + 3}
-                fontSize="9"
-                fill="var(--muted-foreground)"
-                className="font-mono-numeric"
-              >
-                {r}
-              </text>
-            );
-          })}
-
-          {/* Axis labels (D1..D11) at outer edge */}
-          {COPSOQ_DIMENSIONS.map((d, i) => {
-            const x = CX + labelR * Math.cos(angleAt(i));
-            const y = CY + labelR * Math.sin(angleAt(i));
-            return (
-              <text
-                key={d.code}
-                x={x}
-                y={y + 4}
-                textAnchor="middle"
-                fontSize="11"
-                fontWeight="600"
-                fill="var(--muted-foreground)"
-                className="font-mono-numeric"
-              >
-                {d.code}
-              </text>
-            );
-          })}
-
-          {/* Filled polygon — company risk profile */}
-          <polygon
-            points={polygonPoints}
-            fill="var(--brand)"
-            fillOpacity={0.3}
-            stroke="var(--brand)"
-            strokeWidth={2}
-            strokeLinejoin="round"
-          />
-
-          {/* Vertex dots colored by dimension risk level */}
-          {points.map((p) => (
-            <circle
-              key={p.dim.code}
-              cx={p.x}
-              cy={p.y}
-              r={4.5}
-              fill={dotColor(p.riskLevel)}
-              stroke="var(--card)"
-              strokeWidth={1.5}
+        {/* Ring scale labels along the top axis */}
+        {rings.map((r) => {
+          const y = CY - R_MAX * (r / 100);
+          return (
+            <text
+              key={r}
+              x={CX + 4}
+              y={y + 3}
+              fontSize="9"
+              fill="var(--muted-foreground)"
+              className="font-mono-numeric"
             >
-              <title>{`${p.dim.code} ${p.dim.namePtBr}: risco ${p.score.toFixed(0)} de 100 (${RISK_LEVEL_LABELS[p.riskLevel]})`}</title>
-            </circle>
-          ))}
+              {r}
+            </text>
+          );
+        })}
 
-          {/* Center marker */}
+        {/* Axis labels (D1..D11) at outer edge */}
+        {COPSOQ_DIMENSIONS.map((d, i) => {
+          const x = CX + labelR * Math.cos(angleAt(i));
+          const y = CY + labelR * Math.sin(angleAt(i));
+          return (
+            <text
+              key={d.code}
+              x={x}
+              y={y + 4}
+              textAnchor="middle"
+              fontSize="11"
+              fontWeight="600"
+              fill="var(--muted-foreground)"
+              className="font-mono-numeric"
+            >
+              {d.code}
+            </text>
+          );
+        })}
+
+        {/* Filled polygon — company risk profile */}
+        <polygon
+          points={polygonPoints}
+          fill="var(--brand)"
+          fillOpacity={0.3}
+          stroke="var(--brand)"
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+
+        {/* Vertex dots colored by dimension risk level */}
+        {points.map((p) => (
           <circle
-            cx={CX}
-            cy={CY}
-            r={1.5}
-            fill="var(--muted-foreground)"
-            opacity={0.5}
+            key={p.dim.code}
+            cx={p.x}
+            cy={p.y}
+            r={4.5}
+            fill={dotColor(p.riskLevel)}
+            stroke="var(--card)"
+            strokeWidth={1.5}
+          >
+            <title>{`${p.dim.code} ${p.dim.namePtBr}: risco ${p.score.toFixed(0)} de 100 (${RISK_LEVEL_LABELS[p.riskLevel]})`}</title>
+          </circle>
+        ))}
+
+        {/* Center marker */}
+        <circle
+          cx={CX}
+          cy={CY}
+          r={1.5}
+          fill="var(--muted-foreground)"
+          opacity={0.5}
+        />
+      </svg>
+
+      {/* Legend */}
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ backgroundColor: "var(--risk-low)" }}
+            aria-hidden="true"
           />
-        </svg>
-
-        {/* Legend */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-full"
-              style={{ backgroundColor: "var(--risk-low)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.LOW}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-full"
-              style={{ backgroundColor: "var(--risk-medium)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.MEDIUM}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-3 h-3 rounded-full"
-              style={{ backgroundColor: "var(--risk-high)" }}
-              aria-hidden="true"
-            />
-            {RISK_LEVEL_LABELS.HIGH}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-4 h-2 rounded-sm"
-              style={{ backgroundColor: "var(--brand)", opacity: 0.3 }}
-              aria-hidden="true"
-            />
-            <span>Perfil da empresa</span>
-          </div>
+          {RISK_LEVEL_LABELS.LOW}
         </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ backgroundColor: "var(--risk-medium)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.MEDIUM}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ backgroundColor: "var(--risk-high)" }}
+            aria-hidden="true"
+          />
+          {RISK_LEVEL_LABELS.HIGH}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-4 h-2 rounded-sm"
+            style={{ backgroundColor: "var(--brand)", opacity: 0.3 }}
+            aria-hidden="true"
+          />
+          <span>Perfil da empresa</span>
+        </div>
+      </div>
 
-        {/* sr-only data table alternative */}
-        <div className="sr-only">
-          <table>
-            <caption>
-              Tabela alternativa ao radar: escore de risco médio ponderado por
-              dimensão COPSOQ II-BR.
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Código</th>
-                <th scope="col">Dimensão</th>
-                <th scope="col">Grupo</th>
-                <th scope="col">Escore (0–100)</th>
-                <th scope="col">Classificação</th>
+      {/* sr-only data table alternative */}
+      <div className="sr-only">
+        <table>
+          <caption>
+            Tabela alternativa ao radar: escore de risco médio ponderado por
+            dimensão COPSOQ II-BR.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Código</th>
+              <th scope="col">Dimensão</th>
+              <th scope="col">Grupo</th>
+              <th scope="col">Escore (0–100)</th>
+              <th scope="col">Classificação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {points.map((p) => (
+              <tr key={p.dim.code}>
+                <th scope="row">{p.dim.code}</th>
+                <td>{p.dim.namePtBr}</td>
+                <td>{p.dim.groupName}</td>
+                <td>{p.score.toFixed(0)}</td>
+                <td>{RISK_LEVEL_LABELS[p.riskLevel]}</td>
               </tr>
-            </thead>
-            <tbody>
-              {points.map((p) => (
-                <tr key={p.dim.code}>
-                  <th scope="row">{p.dim.code}</th>
-                  <td>{p.dim.namePtBr}</td>
-                  <td>{p.dim.groupName}</td>
-                  <td>{p.score.toFixed(0)}</td>
-                  <td>{RISK_LEVEL_LABELS[p.riskLevel]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
-// ─── DimensionDetailCards ───────────────────────────────────────────────────
+// ─── DimensionDetailRows ────────────────────────────────────────────────────
 
-function DimensionDetailCards({
+function DimensionDetailRows({
   companyAvg,
 }: {
   companyAvg: DashboardData["companyAvg"];
@@ -1047,78 +994,64 @@ function DimensionDetailCards({
 
   const riskTextClass = (level: RiskLevel) =>
     level === "HIGH"
-      ? "text-risk-high"
+      ? "text-[var(--risk-high)]"
       : level === "MEDIUM"
-      ? "text-risk-medium"
-      : "text-risk-low";
+      ? "text-[var(--risk-medium)]"
+      : "text-[var(--risk-low)]";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <section aria-label="Detalhamento por dimensão" className="border-b border-border pb-8">
+      <div className="mb-4">
+        <h2 className="font-display text-xl text-foreground flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-muted-foreground" />
           Detalhamento por dimensão
-        </CardTitle>
-        <CardDescription>
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
           Visão analítica das 11 dimensões psicossociais avaliadas.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {COPSOQ_DIMENSIONS.map((d) => {
-            const entry = scoreMap.get(d.code);
-            const score = entry?.score ?? 0;
-            const level = entry?.riskLevel ?? "LOW";
-            const width = Math.max(2, Math.min(100, score));
-            return (
-              <div
-                key={d.code}
-                className="rounded-lg border border-border/60 bg-card p-4 card-hover relative overflow-hidden min-h-[10rem]"
-                aria-label={`${d.code} ${d.namePtBr}: risco ${score.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[level]}, grupo ${d.groupName}`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <Badge
-                    variant="outline"
-                    className="font-mono-numeric text-xs px-2"
-                  >
-                    {d.code}
-                  </Badge>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: riskColor(level) }}
-                      aria-hidden="true"
-                    />
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {RISK_LEVEL_LABELS[level]}
-                    </span>
-                  </div>
-                </div>
+        </p>
+      </div>
+      <ul className="border-t border-border divide-y divide-border">
+        {COPSOQ_DIMENSIONS.map((d) => {
+          const entry = scoreMap.get(d.code);
+          const score = entry?.score ?? 0;
+          const level = entry?.riskLevel ?? "LOW";
+          const width = Math.max(2, Math.min(100, score));
+          return (
+            <li
+              key={d.code}
+              className="surface-hover py-4 px-1 grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] sm:items-center gap-3 sm:gap-4"
+              aria-label={`${d.code} ${d.namePtBr}: risco ${score.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[level]}, grupo ${d.groupName}`}
+            >
+              {/* Left: code badge + risk dot */}
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="font-mono-numeric text-xs px-2"
+                >
+                  {d.code}
+                </Badge>
+                <span
+                  className="inline-block h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: riskColor(level) }}
+                  aria-hidden="true"
+                />
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {RISK_LEVEL_LABELS[level]}
+                </span>
+              </div>
 
+              {/* Middle: name + group + MTE chips + progress */}
+              <div className="min-w-0">
                 <div
-                  className="text-sm font-medium text-foreground leading-snug mb-2 min-h-[2.5rem]"
+                  className="font-display font-medium text-foreground truncate"
                   title={d.namePtBr}
                 >
                   {d.namePtBr}
                 </div>
-
-                <div
-                  className={`font-mono-numeric text-3xl font-semibold leading-none mb-1 ${riskTextClass(level)}`}
-                >
-                  {score.toFixed(0)}
-                  <span className="text-sm text-muted-foreground font-normal ml-1">
-                    /100
-                  </span>
-                </div>
-
-                <div
-                  className="text-[11px] text-muted-foreground mb-2 truncate"
-                  title={d.groupName}
-                >
+                <div className="text-xs text-muted-foreground truncate" title={d.groupName}>
                   {d.groupName}
                 </div>
-
-                <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
+                <div className="flex flex-wrap gap-1 mt-1.5">
                   {d.mteFactorsCovered.length === 0 ? (
                     <span className="text-[10px] text-muted-foreground italic">
                       Sem fator MTE direto
@@ -1127,28 +1060,39 @@ function DimensionDetailCards({
                     d.mteFactorsCovered.map((f) => (
                       <span
                         key={f}
-                        className="inline-flex items-center text-[10px] font-mono-numeric px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground"
+                        className="inline-flex items-center text-[10px] font-mono-numeric px-1.5 py-0.5 rounded-sm bg-[var(--surface)] text-muted-foreground border border-border"
                       >
                         {f}
                       </span>
                     ))
                   )}
                 </div>
-
-                <div
-                  className="absolute bottom-0 left-0 h-1"
-                  style={{
-                    width: `${width}%`,
-                    backgroundColor: riskColor(level),
-                  }}
-                  aria-hidden="true"
-                />
+                <div className="mt-2 h-1 bg-[var(--surface)] rounded overflow-hidden">
+                  <div
+                    className="h-full transition-all duration-500"
+                    style={{
+                      width: `${width}%`,
+                      backgroundColor: riskColor(level),
+                    }}
+                    aria-hidden="true"
+                  />
+                </div>
               </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+
+              {/* Right: mono score */}
+              <div className="text-right sm:min-w-[5rem]">
+                <span
+                  className={`font-mono-numeric text-2xl font-semibold leading-none ${riskTextClass(level)}`}
+                >
+                  {score.toFixed(0)}
+                </span>
+                <span className="text-xs text-muted-foreground ml-1">/100</span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -1170,26 +1114,24 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
         ? "Nenhum ciclo concluído para esta empresa. Conclua uma avaliação para visualizar a evolução temporal."
         : "Apenas 1 ciclo concluído. Conclua mais avaliações para visualizar a evolução temporal.";
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <section aria-label="Evolução temporal por dimensão">
+        <div className="mb-4">
+          <h2 className="font-display text-xl text-foreground flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-muted-foreground" />
             Evolução temporal
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
             Comparação de ciclos de avaliação concluídos por dimensão
             psicossocial.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <AlertCircle className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <p className="text-sm text-muted-foreground max-w-md">{message}</p>
+          </p>
+        </div>
+        <div className="flex flex-col items-center justify-center text-center py-10 gap-3 border border-dashed border-border rounded-lg">
+          <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center">
+            <AlertCircle className="h-6 w-6 text-muted-foreground" />
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-sm text-muted-foreground max-w-md">{message}</p>
+        </div>
+      </section>
     );
   }
 
@@ -1233,223 +1175,221 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
   const refLines = [33, 66];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <section aria-label="Evolução temporal por dimensão">
+      <div className="mb-4">
+        <h2 className="font-display text-xl text-foreground flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-muted-foreground" />
           Evolução temporal por dimensão
-        </CardTitle>
-        <CardDescription>
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
           Escore médio de risco (0–100) por dimensão psicossocial ao longo dos
           ciclos de avaliação concluídos. Linhas tracejadas marcam os limiares
           de risco médio (33) e alto (66).
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto scroll-area">
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            preserveAspectRatio="xMidYMid meet"
-            className="w-full h-auto min-w-[36rem]"
-            role="img"
-            aria-label={`Gráfico de evolução temporal: ${cycles.length} ciclos concluídos (${cycles
-              .map((c) => fmtShortDate(c.completedAt))
-              .join(", ")}), ${lines.length} dimensões psicossociais. Eixo Y: escore de risco 0 a 100.`}
-          >
-            {/* Y-axis */}
-            <line
-              x1={M.left}
-              y1={M.top}
-              x2={M.left}
-              y2={M.top + plotH}
-              stroke="var(--border)"
-              strokeWidth={1}
-            />
-            {/* X-axis */}
-            <line
-              x1={M.left}
-              y1={M.top + plotH}
-              x2={M.left + plotW}
-              y2={M.top + plotH}
-              stroke="var(--border)"
-              strokeWidth={1}
-            />
+        </p>
+      </div>
+      <div className="overflow-x-auto scroll-area">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="w-full h-auto min-w-[36rem]"
+          role="img"
+          aria-label={`Gráfico de evolução temporal: ${cycles.length} ciclos concluídos (${cycles
+            .map((c) => fmtShortDate(c.completedAt))
+            .join(", ")}), ${lines.length} dimensões psicossociais. Eixo Y: escore de risco 0 a 100.`}
+        >
+          {/* Y-axis */}
+          <line
+            x1={M.left}
+            y1={M.top}
+            x2={M.left}
+            y2={M.top + plotH}
+            stroke="var(--border)"
+            strokeWidth={1}
+          />
+          {/* X-axis */}
+          <line
+            x1={M.left}
+            y1={M.top + plotH}
+            x2={M.left + plotW}
+            y2={M.top + plotH}
+            stroke="var(--border)"
+            strokeWidth={1}
+          />
 
-            {/* Y-axis grid + ticks */}
-            {yTicks.map((t) => {
-              const y = yScale(t);
-              return (
-                <g key={t}>
-                  <line
-                    x1={M.left}
-                    y1={y}
-                    x2={M.left + plotW}
-                    y2={y}
-                    stroke="var(--border)"
-                    strokeWidth={0.5}
-                    strokeDasharray="2 4"
-                    opacity={0.6}
-                  />
-                  <text
-                    x={M.left - 6}
-                    y={y + 3}
-                    textAnchor="end"
-                    fontSize="10"
-                    fill="var(--muted-foreground)"
-                    className="font-mono-numeric"
-                  >
-                    {t}
-                  </text>
-                </g>
-              );
-            })}
+          {/* Y-axis grid + ticks */}
+          {yTicks.map((t) => {
+            const y = yScale(t);
+            return (
+              <g key={t}>
+                <line
+                  x1={M.left}
+                  y1={y}
+                  x2={M.left + plotW}
+                  y2={y}
+                  stroke="var(--border)"
+                  strokeWidth={0.5}
+                  strokeDasharray="2 4"
+                  opacity={0.6}
+                />
+                <text
+                  x={M.left - 6}
+                  y={y + 3}
+                  textAnchor="end"
+                  fontSize="10"
+                  fill="var(--muted-foreground)"
+                  className="font-mono-numeric"
+                >
+                  {t}
+                </text>
+              </g>
+            );
+          })}
 
-            {/* Reference lines at 33 and 66 */}
-            {refLines.map((r) => {
-              const y = yScale(r);
-              return (
-                <g key={r}>
-                  <line
-                    x1={M.left}
-                    y1={y}
-                    x2={M.left + plotW}
-                    y2={y}
-                    stroke="var(--risk-medium)"
-                    strokeWidth={1}
-                    strokeDasharray="6 3"
-                    opacity={0.5}
-                  />
-                  <text
-                    x={M.left + plotW - 4}
-                    y={y - 3}
-                    textAnchor="end"
-                    fontSize="9"
-                    fill="var(--risk-medium)"
-                    className="font-mono-numeric"
-                  >
-                    {r}
-                  </text>
-                </g>
-              );
-            })}
+          {/* Reference lines at 33 and 66 */}
+          {refLines.map((r) => {
+            const y = yScale(r);
+            return (
+              <g key={r}>
+                <line
+                  x1={M.left}
+                  y1={y}
+                  x2={M.left + plotW}
+                  y2={y}
+                  stroke="var(--risk-medium)"
+                  strokeWidth={1}
+                  strokeDasharray="6 3"
+                  opacity={0.5}
+                />
+                <text
+                  x={M.left + plotW - 4}
+                  y={y - 3}
+                  textAnchor="end"
+                  fontSize="9"
+                  fill="var(--risk-medium)"
+                  className="font-mono-numeric"
+                >
+                  {r}
+                </text>
+              </g>
+            );
+          })}
 
-            {/* X-axis labels (cycle dates) */}
-            {cycles.map((c, i) => (
-              <text
-                key={c.assessmentId}
-                x={xScale(i)}
-                y={M.top + plotH + 16}
-                textAnchor="middle"
-                fontSize="10"
-                fill="var(--muted-foreground)"
-                className="font-mono-numeric"
-              >
-                {fmtShortDate(c.completedAt)}
-              </text>
-            ))}
-
-            {/* Lines per dimension */}
-            {lines.map((line) => {
-              if (line.svgPoints.length < 2) return null;
-              const path = line.svgPoints
-                .map((p, i) =>
-                  `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`
-                )
-                .join(" ");
-              return (
-                <g key={line.code}>
-                  <path
-                    d={path}
-                    fill="none"
-                    stroke={line.color}
-                    strokeWidth={1.75}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {line.svgPoints.map((p, i) => (
-                    <circle
-                      key={i}
-                      cx={p.x}
-                      cy={p.y}
-                      r={3}
-                      fill={line.color}
-                      stroke="var(--card)"
-                      strokeWidth={1}
-                    />
-                  ))}
-                </g>
-              );
-            })}
-
-            {/* Y-axis title */}
+          {/* X-axis labels (cycle dates) */}
+          {cycles.map((c, i) => (
             <text
-              x={M.left - 30}
-              y={M.top + plotH / 2}
+              key={c.assessmentId}
+              x={xScale(i)}
+              y={M.top + plotH + 16}
               textAnchor="middle"
               fontSize="10"
               fill="var(--muted-foreground)"
-              transform={`rotate(-90, ${M.left - 30}, ${M.top + plotH / 2})`}
+              className="font-mono-numeric"
             >
-              Risco (0–100)
+              {fmtShortDate(c.completedAt)}
             </text>
-          </svg>
-        </div>
-
-        {/* Legend */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5">
-          {lines.map((line) => (
-            <div
-              key={line.code}
-              className="flex items-center gap-2 text-xs min-w-0"
-            >
-              <span
-                className="inline-block w-3 h-0.5 shrink-0"
-                style={{ backgroundColor: line.color }}
-                aria-hidden="true"
-              />
-              <span className="font-mono-numeric text-muted-foreground shrink-0">
-                {line.code}
-              </span>
-              <span className="truncate" title={line.name}>
-                {line.name}
-              </span>
-            </div>
           ))}
-        </div>
 
-        {/* sr-only data table alternative */}
-        <div className="sr-only">
-          <table>
-            <caption>
-              Tabela alternativa ao gráfico: escore de risco por dimensão e
-              ciclo.
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Dimensão</th>
-                {cycles.map((c) => (
-                  <th key={c.assessmentId} scope="col">
-                    {fmtShortDate(c.completedAt)}
-                  </th>
+          {/* Lines per dimension */}
+          {lines.map((line) => {
+            if (line.svgPoints.length < 2) return null;
+            const path = line.svgPoints
+              .map((p, i) =>
+                `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`
+              )
+              .join(" ");
+            return (
+              <g key={line.code}>
+                <path
+                  d={path}
+                  fill="none"
+                  stroke={line.color}
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {line.svgPoints.map((p, i) => (
+                  <circle
+                    key={i}
+                    cx={p.x}
+                    cy={p.y}
+                    r={3}
+                    fill={line.color}
+                    stroke="var(--card)"
+                    strokeWidth={1}
+                  />
+                ))}
+              </g>
+            );
+          })}
+
+          {/* Y-axis title */}
+          <text
+            x={M.left - 30}
+            y={M.top + plotH / 2}
+            textAnchor="middle"
+            fontSize="10"
+            fill="var(--muted-foreground)"
+            transform={`rotate(-90, ${M.left - 30}, ${M.top + plotH / 2})`}
+          >
+            Risco (0–100)
+          </text>
+        </svg>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5">
+        {lines.map((line) => (
+          <div
+            key={line.code}
+            className="flex items-center gap-2 text-xs min-w-0"
+          >
+            <span
+              className="inline-block w-3 h-0.5 shrink-0"
+              style={{ backgroundColor: line.color }}
+              aria-hidden="true"
+            />
+            <span className="font-mono-numeric text-muted-foreground shrink-0">
+              {line.code}
+            </span>
+            <span className="truncate" title={line.name}>
+              {line.name}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* sr-only data table alternative */}
+      <div className="sr-only">
+        <table>
+          <caption>
+            Tabela alternativa ao gráfico: escore de risco por dimensão e
+            ciclo.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Dimensão</th>
+              {cycles.map((c) => (
+                <th key={c.assessmentId} scope="col">
+                  {fmtShortDate(c.completedAt)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line) => (
+              <tr key={line.code}>
+                <th scope="row">
+                  {line.code} {line.name}
+                </th>
+                {line.scores.map((s, i) => (
+                  <td key={i}>{s === null ? "—" : s.toFixed(0)}</td>
                 ))}
               </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.code}>
-                  <th scope="row">
-                    {line.code} {line.name}
-                  </th>
-                  {line.scores.map((s, i) => (
-                    <td key={i}>{s === null ? "—" : s.toFixed(0)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -1457,16 +1397,12 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
 
 function ResultadosSkeleton() {
   return (
-    <div className="space-y-6" aria-hidden="true">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-24" />
-        ))}
-      </div>
-      <Skeleton className="h-80" />
-      <Skeleton className="h-80" />
-      <Skeleton className="h-64" />
-      <Skeleton className="h-72" />
+    <div className="space-y-8" aria-hidden="true">
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <Skeleton className="h-96 w-full" />
+      <Skeleton className="h-80 w-full" />
+      <Skeleton className="h-96 w-full" />
+      <Skeleton className="h-72 w-full" />
     </div>
   );
 }
@@ -1551,24 +1487,24 @@ export function ResultadosView() {
   if (!assessmentId) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <BarChart3 className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold">Nenhuma avaliação selecionada</h2>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Acesse uma avaliação concluída para visualizar os resultados
-                consolidados.
-              </p>
-            </div>
-            <Button onClick={() => go("painel")}>
-              <ChevronLeft className="h-4 w-4" />
-              Voltar ao painel
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-center py-12 gap-4">
+          <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center">
+            <BarChart3 className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="font-display text-lg text-foreground">
+              Nenhuma avaliação selecionada
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Acesse uma avaliação concluída para visualizar os resultados
+              consolidados.
+            </p>
+          </div>
+          <Button onClick={() => go("painel")}>
+            <ChevronLeft className="h-4 w-4" />
+            Voltar ao painel
+          </Button>
+        </div>
       </div>
     );
   }
@@ -1585,7 +1521,7 @@ export function ResultadosView() {
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
       <TooltipProvider delayDuration={200}>
         {/* Header */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
           <div className="flex items-start gap-2 min-w-0">
             <Button
               variant="ghost"
@@ -1597,8 +1533,10 @@ export function ResultadosView() {
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-2xl font-semibold tracking-tight">Resultados</h1>
-              <p className="text-sm text-muted-foreground mt-0.5 truncate" title={subtitle}>
+              <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
+                Resultados
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 truncate" title={subtitle}>
                 {subtitle}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
@@ -1626,55 +1564,53 @@ export function ResultadosView() {
         </header>
 
         {error ? (
-          <Card className="border-destructive/50">
-            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
-              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-                <AlertCircle className="h-6 w-6 text-destructive" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold">
-                  Não foi possível carregar os resultados
-                </h2>
-                <p className="text-sm text-muted-foreground max-w-md">{error}</p>
-              </div>
-              <div className="flex flex-wrap gap-2 justify-center">
-                <Button
-                  variant="outline"
-                  onClick={() => go("avaliacao", { assessmentId })}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Voltar à avaliação
-                </Button>
-                <Button onClick={refresh}>
-                  <RefreshCw className="h-4 w-4" />
-                  Tentar novamente
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ) : notCompleted ? (
-          <Card className="border-warning/40 bg-warning/5">
-            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
-              <div className="h-12 w-12 rounded-full bg-warning/15 flex items-center justify-center">
-                <Lock className="h-6 w-6 text-warning" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold">Avaliação não concluída</h2>
-                <p className="text-sm text-muted-foreground max-w-md">
-                  Esta avaliação ainda não foi concluída. Encerre a coleta para
-                  visualizar os resultados.
-                </p>
-              </div>
-              <Button onClick={() => go("avaliacao", { assessmentId })}>
+          <div className="border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-center py-12 gap-4">
+            <div className="h-12 w-12 rounded-full risk-high-bg flex items-center justify-center">
+              <AlertCircle className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-display text-lg text-foreground">
+                Não foi possível carregar os resultados
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => go("avaliacao", { assessmentId })}
+              >
                 <ChevronLeft className="h-4 w-4" />
                 Voltar à avaliação
               </Button>
-            </CardContent>
-          </Card>
+              <Button onClick={refresh}>
+                <RefreshCw className="h-4 w-4" />
+                Tentar novamente
+              </Button>
+            </div>
+          </div>
+        ) : notCompleted ? (
+          <div className="border border-[var(--risk-medium)]/40 bg-[var(--surface)] rounded-lg flex flex-col items-center justify-center text-center py-12 gap-4">
+            <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center border border-border">
+              <Lock className="h-6 w-6 text-[var(--risk-medium)]" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-display text-lg text-foreground">
+                Avaliação não concluída
+              </h2>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Esta avaliação ainda não foi concluída. Encerre a coleta para
+                visualizar os resultados.
+              </p>
+            </div>
+            <Button onClick={() => go("avaliacao", { assessmentId })}>
+              <ChevronLeft className="h-4 w-4" />
+              Voltar à avaliação
+            </Button>
+          </div>
         ) : loading ? (
           <ResultadosSkeleton />
         ) : dashboard ? (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <DashboardKpis kpis={dashboard.kpis} />
             <HeatMap heatmap={dashboard.heatmap} />
             <CompanyAvgBars companyAvg={dashboard.companyAvg} />
@@ -1683,7 +1619,7 @@ export function ResultadosView() {
               critical={dashboard.criticalDimensions}
               heatmap={dashboard.heatmap}
             />
-            <DimensionDetailCards companyAvg={dashboard.companyAvg} />
+            <DimensionDetailRows companyAvg={dashboard.companyAvg} />
             <CycleComparisonChart trend={trend ?? []} />
           </div>
         ) : null}
