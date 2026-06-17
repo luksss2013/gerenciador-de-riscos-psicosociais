@@ -1793,3 +1793,71 @@ Comprehensive UX overhaul addressing all user requests: cursor affordances, form
 - [x] Responsive everywhere
 - [x] Console errors/warnings resolved
 - [x] react-doctor run (critical accessibility fixed)
+
+---
+Task ID: SHELL-1
+Agent: orchestrator
+Task: Top bar with logo + global search + user profile (moved from sidebar)
+
+## User request
+- Move user profile from sidebar bottom to horizontal top bar (right corner).
+- Add a global search in the center of the top bar that returns any part of the system with related data.
+- Create an appropriate logo for the application.
+
+## Completed work
+
+### 1. App logo (`src/components/shell/logo.tsx` + `public/logo.svg`)
+- Designed a custom SVG logo representing the psychosocial occupational risk domain:
+  - **Outer protective arc** (pine `#2F4A43`): shield/bowl metaphor — institutional protection
+  - **Head** (terracotta `#B8623E`): human warmth, the individual worker
+  - **Shoulders/body** (pine): the person within the protective structure
+  - **Sprout above head** (sage `#5B8A6A`): well-being, growth, mental health
+- Reusable `Logo` component with `size`, `withWordmark`, and `variant` props. Uses CSS variables (`var(--brand)` etc.) so it adapts to the design system.
+- Updated `layout.tsx` metadata `icons.icon` to `/logo.svg` (was external CDN URL).
+
+### 2. Global search API (`src/app/api/v1/search/route.ts`)
+- `GET /api/v1/search?q=<query>` — searches across the professional's tenant-scoped data:
+  - **Companies**: name, CNPJ, CNAE, city, state
+  - **Departments/GHEs**: name, description (scoped to professional's companies)
+  - **Assessments**: title
+  - **Action items**: what, who, why
+  - **Risk inventory items**: hazardDescription, possibleHarms
+- Min 2 chars, max 5 results per group. Returns grouped results with enough context (company name, assessment title, status) for navigation.
+- Tenant-isolated via `professionalId`.
+
+### 3. Global search UI (`src/components/shell/global-search.tsx`)
+- Popover-based command palette with debounced input (250ms).
+- **Keyboard shortcut**: Cmd/Ctrl+K to open, ESC to close.
+- Grouped results with icons: Building2 (companies), ClipboardList (assessments), Users (GHEs), ListChecks (action items), AlertTriangle (inventory).
+- Each result is clickable → navigates to the relevant view (company detail, assessment detail, plano, inventário) via `go()`.
+- Loading skeleton, empty state, no-results state.
+- Mobile: search icon button that opens the same popover.
+
+### 4. Top bar (`src/components/shell/top-bar.tsx`)
+- Full-width sticky horizontal bar (h-16) with 3 zones:
+  - **Left**: logo + wordmark (clickable → go to painel), mobile nav trigger (hamburger, lg:hidden)
+  - **Center**: global search (flex-1, max-w-md, centered)
+  - **Right**: user profile (avatar + name + email, hidden on mobile) with dropdown menu (Configurações, Sair) + logout confirmation AlertDialog
+- Replaces both the old sidebar user block AND the old MobileTopbar.
+- Avatar initials skip Portuguese honorifics (Dr/Dra/Sr/etc.).
+
+### 5. App shell restructure (`src/components/shell/app-shell.tsx`)
+- **SidebarContent** simplified: brand block now `lg:hidden` (mobile drawer only — desktop uses TopBar), navigation groups unchanged, **user profile block removed entirely**.
+- **MobileTopbar** removed (TopBar handles both mobile + desktop).
+- **AppShell** layout: `<TopBar />` (full-width sticky) → `<div flex>` with sidebar (desktop only, `sticky top-16 h-[calc(100vh-4rem)]`) + content area (BreadcrumbBar + main).
+- Cleaned up unused imports (AlertDialog, Avatar, DropdownMenu, Sheet, api, ApiError, toast, useAuth, LogOut, Menu, X) — moved to top-bar.tsx.
+- Exported `SidebarContent` so top-bar.tsx can import it for the mobile drawer.
+- Removed unused `VIEW_LABELS` constant (was for the old MobileTopbar).
+
+## Verification
+- `bun run lint` → exit 0.
+- Dev server: HTTP 200, no console errors.
+- agent-browser QA:
+  - ✅ Top bar: logo (left, pointer cursor) + "Buscar em todo o sistema…" (center) + user profile "Dr. Ana Paula Souza" (right, pointer cursor)
+  - ✅ Sidebar: nav only (Início, Análise consolidada, Empresas, Configurações) — no user block at bottom
+  - ✅ Breadcrumb bar below top bar
+  - ✅ Global search: click → popover with input "Buscar empresas, avaliações, GHEs, ações…"; typed "indústria" → returned "Indústria Brasileira de Alimentos Ltda" with CNPJ under "Empresas" group
+  - ✅ Ctrl+K keyboard shortcut opens search
+  - ✅ ESC closes search
+  - ✅ All header buttons have `cursor: pointer`
+- Screenshot: `/tmp/topbar-layout.png`

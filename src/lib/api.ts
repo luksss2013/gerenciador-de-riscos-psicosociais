@@ -15,6 +15,7 @@ import type {
   Report,
   RiskInventoryGroup,
   RiskInventoryItem,
+  SearchResults,
   WorkerTokenStatus,
   CopsoqItemDTO,
 } from "./types";
@@ -263,4 +264,7 @@ export const api = {
     seedCopsoq: () =>
       req<{ items: number; dimensions: number; seeded: boolean }>("/system/seed-copsoq", { method: "POST" }),
   },
+
+  search: (q: string) =>
+    req<SearchResults>(`/search?q=${encodeURIComponent(q)}`),
 };

@@ -288,3 +288,47 @@ export interface CompanyBreakdown {
   overallRiskScore: number;
   overallRiskLevel: RiskLevel;
 }
+
+export interface SearchResults {
+  companies: Array<{
+    id: string;
+    name: string;
+    cnpj: string;
+    city: string | null;
+    state: string | null;
+  }>;
+  departments: Array<{
+    id: string;
+    name: string;
+    workerCount: number;
+    companyId: string;
+    companyName: string;
+  }>;
+  assessments: Array<{
+    id: string;
+    title: string;
+    status: AssessmentStatus;
+    companyId: string;
+    companyName: string;
+  }>;
+  actionItems: Array<{
+    id: string;
+    what: string;
+    status: ActionStatus;
+    whenDate: string;
+    assessmentId: string;
+    assessmentTitle: string;
+    companyId: string;
+    companyName: string;
+  }>;
+  inventoryItems: Array<{
+    id: string;
+    hazardDescription: string;
+    mteFactorCode: string | null;
+    dimensionCode: DimensionCode | null;
+    assessmentId: string;
+    assessmentTitle: string;
+    companyId: string;
+    companyName: string;
+  }>;
+}

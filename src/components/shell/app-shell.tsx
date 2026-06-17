@@ -1,53 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
 import {
   BarChart3,
   Building2,
   LayoutDashboard,
   Loader2,
-  LogOut,
-  Menu,
   Settings,
   ShieldCheck,
-  X,
 } from "lucide-react";
-import { toast } from "sonner";
 
-import { api, ApiError } from "@/lib/api";
-import { useAuth, useView, type ViewName } from "@/lib/store";
+import { useView, type ViewName } from "@/lib/store";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { PainelView } from "@/components/painel/painel-view";
 import { ConfiguracoesView } from "@/components/configuracoes/configuracoes-view";
 import { BreadcrumbBar } from "@/components/shell/breadcrumb-bar";
+import { TopBar } from "@/components/shell/top-bar";
+import { Logo } from "@/components/shell/logo";
 
 // ─── View router ────────────────────────────────────────────────────────────
 
@@ -79,22 +49,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [{ view: "configuracoes", label: "Configurações", icon: Settings }],
   },
 ];
-
-// Sensible display label for every view (including detail views not in the
-// sidebar) — drives the mobile topbar title.
-const VIEW_LABELS: Record<ViewName, string> = {
-  painel: "Início",
-  consolidado: "Análise consolidada",
-  empresas: "Empresas",
-  empresa: "Empresa",
-  avaliacao: "Avaliação",
-  resultados: "Resultados",
-  inventario: "Inventário",
-  plano: "Plano de ação",
-  relatorio: "Relatório",
-  configuracoes: "Configurações",
-  worker: "Portal do trabalhador",
-};
 
 type AnyViewComponent = React.ComponentType<Record<string, never>>;
 
@@ -219,54 +173,19 @@ interface SidebarContentProps {
   onNavigate?: () => void;
 }
 
-function SidebarContent({ onNavigate }: SidebarContentProps) {
+export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const { view, go } = useView();
-  const { professional } = useAuth();
-  const [signingOut, setSigningOut] = useState(false);
-  const [signOutOpen, setSignOutOpen] = useState(false);
-
-  const handleSignOut = async () => {
-    setSigningOut(true);
-    try {
-      await api.auth.logout();
-    } catch (e) {
-      // Even if the request fails (e.g. session already gone), clear local state.
-      if (e instanceof ApiError) {
-        // no-op
-      }
-    } finally {
-      useAuth.getState().set(null);
-      toast.success("Sessão encerrada.");
-      setSigningOut(false);
-      setSignOutOpen(false);
-    }
-  };
-
-  const initials = React.useMemo(() => {
-    if (!professional?.name) return "?";
-    const parts = professional.name.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }, [professional?.name]);
 
   return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
-      {/* Brand */}
-      <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0">
-        <div className="h-8 w-8 rounded-md bg-[var(--brand)] flex items-center justify-center">
-          <ShieldCheck className="h-4 w-4 text-[var(--accent-foreground)]" />
-        </div>
-        <div className="leading-tight">
-          <div className="font-display font-semibold text-[15px] text-foreground">NR-1 Copsoq</div>
-          <div className="text-[11px] text-muted-foreground">
-            Riscos psicossociais
-          </div>
-        </div>
+      {/* Brand (shown on mobile drawer; desktop uses TopBar) */}
+      <div className="flex items-center gap-2.5 px-5 h-16 border-b border-sidebar-border shrink-0 lg:hidden">
+        <Logo size={32} withWordmark variant="full" />
       </div>
 
       {/* Nav */}
       <nav
-        className="flex-1 px-3 pt-2 pb-4 overflow-y-auto scroll-area"
+        className="flex-1 px-3 pt-4 pb-4 overflow-y-auto scroll-area"
         aria-label="Navegação principal"
       >
         {NAV_GROUPS.map((group, gi) => (
@@ -306,144 +225,11 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
           </div>
         ))}
       </nav>
-
-      {/* User */}
-      <div className="border-t border-sidebar-border p-3 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex-1 flex items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent/60 cursor-pointer transition-colors text-left">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-[var(--sidebar-accent)] text-[var(--brand)] text-xs">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium truncate">
-                    {professional?.name ?? "—"}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {professional?.email ?? ""}
-                  </div>
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-56">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium">
-                    {professional?.name ?? "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {professional?.email ?? ""}
-                  </span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  go("configuracoes");
-                  onNavigate?.();
-                }}
-              >
-                <Settings className="h-4 w-4" />
-                Configurações
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setSignOutOpen(true);
-                }}
-                disabled={signingOut}
-              >
-                {signingOut ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <LogOut className="h-4 w-4" />
-                )}
-                Sair
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Logout confirmation */}
-      <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-xl">
-              Encerrar sessão?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Você sairá da plataforma e precisará informar suas credenciais
-              novamente para acessar. A sessão atual será encerrada em todos os
-              dispositivos apenas se você confirmar esta ação.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={signingOut}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={signingOut}
-              onClick={(e) => {
-                e.preventDefault();
-                void handleSignOut();
-              }}
-            >
-              {signingOut && <Loader2 className="h-4 w-4 animate-spin" />}
-              Sair
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
 
-// ─── Topbar (mobile) ────────────────────────────────────────────────────────
-
-function MobileTopbar() {
-  const { view } = useView();
-  const [open, setOpen] = useState(false);
-
-  const currentLabel = VIEW_LABELS[view] ?? "NR-1 Copsoq";
-
-  return (
-    <header className="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Abrir menu de navegação"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0">
-          <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
-          <div className="absolute top-3 right-3 z-10">
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" aria-label="Fechar menu">
-                <X className="h-4 w-4" />
-              </Button>
-            </SheetClose>
-          </div>
-          <SidebarContent onNavigate={() => setOpen(false)} />
-        </SheetContent>
-      </Sheet>
-
-      <div className="flex items-center gap-2">
-        <div className="h-7 w-7 rounded-md bg-[var(--brand)] flex items-center justify-center">
-          <ShieldCheck className="h-4 w-4 text-[var(--accent-foreground)]" />
-        </div>
-        <span className="font-display font-semibold text-sm text-foreground">{currentLabel}</span>
-      </div>
-    </header>
-  );
-}
+// (MobileTopbar removed — TopBar handles both mobile + desktop)
 
 // ─── Footer ─────────────────────────────────────────────────────────────────
 
@@ -477,17 +263,19 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Top bar: logo + search + profile (full width, sticky) */}
+      <TopBar />
+
       <div className="flex flex-1">
-        {/* Desktop sidebar (224px) */}
+        {/* Desktop sidebar (nav only, no brand/user — those are in TopBar) */}
         <aside
-          className="hidden lg:block w-56 shrink-0 border-r border-sidebar-border sticky top-0 h-screen"
+          className="hidden lg:block w-56 shrink-0 border-r border-sidebar-border sticky top-16 h-[calc(100vh-4rem)]"
           aria-label="Barra lateral"
         >
           <SidebarContent />
         </aside>
 
         <div className="flex flex-col flex-1 min-w-0">
-          <MobileTopbar />
           <BreadcrumbBar />
           <main className="flex-1 min-w-0">
             <React.Suspense fallback={<ViewLoader />}>
