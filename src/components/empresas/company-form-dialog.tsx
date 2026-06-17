@@ -134,8 +134,9 @@ export function CompanyFormDialog({
     // Clear any inline error on the field the user is editing — both
     // front-side onBlur errors and backend-mapped errors.
     if (key === "name" || key === "cnpj" || key === "contactEmail") {
+      const field = key as FieldKey;
       setErrors((prev) =>
-        prev[key] ? { ...prev, [key]: undefined } : prev
+        prev[field] ? { ...prev, [field]: undefined } : prev
       );
     }
   };

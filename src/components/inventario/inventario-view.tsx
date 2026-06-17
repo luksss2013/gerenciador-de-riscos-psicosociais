@@ -786,11 +786,11 @@ function ManualRiskFormContents({
   const [existingControls, setExistingControls] = useState("");
   const [proposedMeasures, setProposedMeasures] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errs: Record<string, string> = {};
+    const errs: Partial<Record<string, string>> = {};
     if (!mteFactorCode) errs.mteFactorCode = "Selecione um fator FRPRT MTE.";
     if (!validateRequired(hazardDescription, 3))
       errs.hazardDescription = "Mínimo de 3 caracteres.";
@@ -890,7 +890,7 @@ function ManualRiskFormContents({
           <SelectContent>
             {departments.map((d) => (
               <SelectItem key={d.id} value={d.id}>
-                {d.departmentName}
+                {d.name}
               </SelectItem>
             ))}
           </SelectContent>

@@ -355,7 +355,7 @@ function PlanFilters({
               <SelectItem value={DEPT_COMPANY}>Toda a empresa</SelectItem>
               {departments.map((d) => (
                 <SelectItem key={d.id} value={d.id}>
-                  {d.departmentName}
+                  {d.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -843,11 +843,11 @@ function ActionItemFormContents({
   );
 
   const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errs: Record<string, string> = {};
+    const errs: Partial<Record<string, string>> = {};
     if (!validateRequired(what, 2)) errs.what = "Mínimo de 2 caracteres.";
     if (!validateRequired(why, 2)) errs.why = "Mínimo de 2 caracteres.";
     if (!validateRequired(who, 2)) errs.who = "Mínimo de 2 caracteres.";
@@ -1179,7 +1179,7 @@ function ActionItemFormContents({
               <SelectItem value={DEPT_COMPANY}>Toda a empresa</SelectItem>
               {departments.map((d) => (
                 <SelectItem key={d.id} value={d.id}>
-                  {d.departmentName}
+                  {d.name}
                 </SelectItem>
               ))}
             </SelectContent>

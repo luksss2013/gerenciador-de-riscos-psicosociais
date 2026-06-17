@@ -171,7 +171,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
     }).catch(() => {});
 
     return jsonResponse(
-      { id: assessment.id, status: assessment.status, ...serializeAssessment(assessment) },
+      serializeAssessment(assessment),
       201
     );
   } catch (e) {

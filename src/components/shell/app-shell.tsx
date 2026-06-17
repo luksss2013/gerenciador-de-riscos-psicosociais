@@ -62,7 +62,7 @@ type AnyViewComponent = React.ComponentType<Record<string, never>>;
 function lazyView(
   loader: () => Promise<unknown>,
   displayName: string
-): React.LazyExoticObject<AnyViewComponent> {
+): React.ComponentType<Record<string, never>> {
   return React.lazy(async () => {
     try {
       const mod = (await loader()) as {
