@@ -1,14 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Exclude project docs/logs/tool-results from Tailwind v4's content scanner —
-   markdown + agent tool-output text can contain class-like strings that break the build. */
-@source not "../worklog.md";
+/* Exclude project docs/logs from Tailwind v4's content scanner —
+   markdown + log text can contain class-like strings that break the CSS build. */
 @source not "../../worklog.md";
-@source not "../../tool-results";
-@source not "../tool-results";
-
-@custom-variant dark (&:is(.dark *));
+@source not "../../dev.log";
+@source not "../../tool-results/**/*";
 
 @theme inline {
   --color-background: var(--background);
@@ -108,52 +105,6 @@
   --sidebar-accent-foreground: #1E3A5F;
   --sidebar-border: #DDE3EC;
   --sidebar-ring: #2D5A8E;
-}
-
-.dark {
-  --background: #0F172A;
-  --foreground: #E2E8F0;
-  --card: #1E293B;
-  --card-foreground: #E2E8F0;
-  --popover: #1E293B;
-  --popover-foreground: #E2E8F0;
-  --primary: #60A5FA;
-  --primary-foreground: #0F172A;
-  --secondary: #334155;
-  --secondary-foreground: #E2E8F0;
-  --muted: #1E293B;
-  --muted-foreground: #94A3B8;
-  --accent: #334155;
-  --accent-foreground: #E2E8F0;
-  --destructive: #F87171;
-  --border: #334155;
-  --input: #334155;
-  --ring: #60A5FA;
-
-  --brand: #60A5FA;
-  --brand-light: #93C5FD;
-  --risk-high: #F87171;
-  --risk-medium: #FBBF24;
-  --risk-low: #34D399;
-  --surface: #0F172A;
-  --surface-card: #1E293B;
-  --success: #34D399;
-  --warning: #FBBF24;
-
-  --chart-1: #60A5FA;
-  --chart-2: #34D399;
-  --chart-3: #FBBF24;
-  --chart-4: #F97316;
-  --chart-5: #F87171;
-
-  --sidebar: #1E293B;
-  --sidebar-foreground: #E2E8F0;
-  --sidebar-primary: #60A5FA;
-  --sidebar-primary-foreground: #0F172A;
-  --sidebar-accent: #334155;
-  --sidebar-accent-foreground: #E2E8F0;
-  --sidebar-border: #334155;
-  --sidebar-ring: #60A5FA;
 }
 
 @layer base {

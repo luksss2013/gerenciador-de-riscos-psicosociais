@@ -3,7 +3,6 @@ import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "next-themes";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -46,14 +45,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${plexMono.variable} antialiased bg-background text-foreground min-h-screen`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        {children}
         <Toaster />
         <SonnerToaster richColors position="top-right" />
       </body>

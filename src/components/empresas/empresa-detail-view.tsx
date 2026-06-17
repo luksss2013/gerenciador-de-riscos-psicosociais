@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO, isValid as isValidDate } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRight,
   Building2,
@@ -1487,6 +1488,30 @@ function CreateAssessmentDialog({
               </p>
             </div>
           </fieldset>
+
+          {/* Validation feedback — shows what's blocking submission */}
+          {(!dateValid || selectedCount === 0) && !submitting && (
+            <div className="rounded-md border border-warning/40 bg-warning/10 p-3 space-y-1.5" role="status" aria-live="polite">
+              <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                Pendências para criar a avaliação:
+              </p>
+              <ul className="text-xs text-muted-foreground space-y-0.5 ml-5 list-disc">
+                {!title.trim() && (
+                  <li>Informe o título da avaliação</li>
+                )}
+                {!endDate && (
+                  <li>Selecione a data final da coleta</li>
+               )}
+                {endDate && startDate && new Date(endDate) <= new Date(startDate) && (
+                  <li>A data final deve ser posterior à data de início</li>
+                )}
+                {selectedCount === 0 && (
+                  <li>Selecione ao menos um departamento participante</li>
+                )}
+              </ul>
+            </div>
+          )}
 
           <DialogFooter className="gap-2 pt-2">
             <Button

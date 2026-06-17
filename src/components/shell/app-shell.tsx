@@ -37,7 +37,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PainelView } from "@/components/painel/painel-view";
 import { ConfiguracoesView } from "@/components/configuracoes/configuracoes-view";
-import { ThemeToggle } from "@/components/shell/theme-toggle";
 
 // ─── View router ────────────────────────────────────────────────────────────
 
@@ -306,7 +305,6 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <ThemeToggle />
         </div>
       </div>
     </div>
@@ -352,10 +350,6 @@ function MobileTopbar() {
           <ShieldCheck className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="font-semibold text-sm">{currentLabel}</span>
-      </div>
-
-      <div className="ml-auto">
-        <ThemeToggle />
       </div>
     </header>
   );

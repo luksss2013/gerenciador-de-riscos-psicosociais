@@ -379,7 +379,7 @@ Agent: orchestrator
 Task: Integration fixes + end-to-end QA via agent-browser
 
 Work Log:
-- Fixed CSS build break: Tailwind v4 content scanner was extracting `text-[var(--risk-low/high/warning)]` from a worklog.md summary line as a candidate class. Added `@source not` exclusions for worklog.md in globals.css and rephrased the worklog line.
+- Fixed CSS build break: Tailwind v4 content scanner was extracting `text-risk-tokens` from a worklog.md summary line as a candidate class. Added `@source not` exclusions for worklog.md in globals.css and rephrased the worklog line.
 - Converted all `[var(--risk-X)]` / `[var(--brand-X)]` / `[var(--warning)]` arbitrary-value Tailwind classes across 9 component files to registered theme-color names (`risk-low`, `brand-light`, `warning`) so the `/opacity` modifier works correctly in Tailwind v4.
 - Fixed `AssessmentDepartment` type mismatch: API returns `{name, expected, responded}` but frontend type had `{departmentName, expectedResponses, responseCount}`. Updated `src/lib/types.ts` and `src/components/avaliacoes/avaliacao-detail-view.tsx` (collection links + GHE cards) to use the correct field names — fixed "GHE undefined" bug in collection links.
 - Fixed `departmentName` missing from risk-inventory + action-plan API responses: updated 5 API routes (`risk-inventory/route.ts`, `risk-inventory/manual/route.ts`, `risk-inventory-items/[itemId]/route.ts`, `action-plan/route.ts`, `action-items/route.ts`, `action-items/[itemId]/route.ts`) to `include: { department: { select: { name: true } } }` and serialize `departmentName: item.department?.name ?? null`. The inventário and plano views now display department names correctly.
@@ -452,7 +452,7 @@ Agent: full-stack-developer
 Task: Enhanced Painel dashboard + dark mode + audit log viewer
 
 Work Log:
-- Read prior worklog (Tasks 1, 4, 5-a..5-g, 6, 8-a) and inspected existing `src/components/painel/painel-view.tsx` (original CompanyCard + ActivityFeed + EmptyState + alerts banner + deriveStatus/buildAlerts/relativeTime/PainelSkeleton), `src/components/configuracoes/configuracoes-view.tsx` (ProfileSection + AccountSection + SecuritySection + AboutSection), `src/components/shell/app-shell.tsx` (SidebarContent with user DropdownMenu + MobileTopbar), `src/app/layout.tsx` (already had `<html lang="pt-BR" suppressHydrationWarning>`), `src/app/globals.css` (`@source not` exclusions for worklog.md + dark-mode `.dark { ... }` already defined), `src/lib/types.ts` (`ProfessionalDashboard` + `AuditLogEntry` types already present from Task 8-a), `src/lib/api.ts` (`api.me.dashboard()` + `api.auditLogs.list({ page, limit, action?, resourceType? })` already present from Task 8-a), `src/components/ui/table.tsx` (Table primitives with TableCaption), `src/components/shell/nr-status-badge.tsx` (NrStatus type), and `dev.log` (pre-existing CSS build break — Tailwind v4 content scanner picking up `text-[var(--risk-low/high/warning)]` from agent tool-output `.txt` files in `tool-results/` directory).
+- Read prior worklog (Tasks 1, 4, 5-a..5-g, 6, 8-a) and inspected existing `src/components/painel/painel-view.tsx` (original CompanyCard + ActivityFeed + EmptyState + alerts banner + deriveStatus/buildAlerts/relativeTime/PainelSkeleton), `src/components/configuracoes/configuracoes-view.tsx` (ProfileSection + AccountSection + SecuritySection + AboutSection), `src/components/shell/app-shell.tsx` (SidebarContent with user DropdownMenu + MobileTopbar), `src/app/layout.tsx` (already had `<html lang="pt-BR" suppressHydrationWarning>`), `src/app/globals.css` (`@source not` exclusions for worklog.md + dark-mode `.dark { ... }` already defined), `src/lib/types.ts` (`ProfessionalDashboard` + `AuditLogEntry` types already present from Task 8-a), `src/lib/api.ts` (`api.me.dashboard()` + `api.auditLogs.list({ page, limit, action?, resourceType? })` already present from Task 8-a), `src/components/ui/table.tsx` (Table primitives with TableCaption), `src/components/shell/nr-status-badge.tsx` (NrStatus type), and `dev.log` (pre-existing CSS build break — Tailwind v4 content scanner picking up `text-risk-tokens` from agent tool-output `.txt` files in `tool-results/` directory).
 - Pre-work fix: extended `@source not` exclusions in `src/app/globals.css` to also exclude `../../tool-results` + `../tool-results` (the agent CLI tool-output cache contained copies of the worklog text that was breaking the Tailwind v4 content scanner). This resolved the `Parsing CSS source code failed` build break from the prior dev-log tail and is unrelated to the actual task work but necessary for the page to render.
 - WORKSTREAM B (Dark mode toggle):
   - `src/app/layout.tsx` — added `import { ThemeProvider } from "next-themes"` and wrapped `{children}` in `<ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>`. Toaster + SonnerToaster kept outside the provider (they don't need theme context to render).
@@ -477,7 +477,7 @@ Work Log:
 
 Lint verification:
 - `cd /home/z/my-project && bun run lint` → exit 0, 0 errors, 0 warnings on the full project after one iteration (first pass tripped `react-hooks/set-state-in-effect` on the `Promise.allSettled`-with-if/else-setState pattern in the painel-view `load()` — resolved by refactoring to a `Promise.all` + `.catch(() => null)` pattern wrapped in a single `try/catch/finally`, matching the empresas-view load pattern that the linter accepts).
-- Dev log (post-HMR, no server restart) shows clean compiles: "✓ Compiled in 116ms / 142ms / 138ms / 206ms / 139ms / 141ms / 121ms / 215ms / 148ms" with no new errors. The pre-existing `Parsing CSS source code failed` build break (from `text-[var(--risk-low/high/warning)]` getting extracted by Tailwind v4 from `tool-results/*.txt` files) is now resolved by the additional `@source not` exclusions.
+- Dev log (post-HMR, no server restart) shows clean compiles: "✓ Compiled in 116ms / 142ms / 138ms / 206ms / 139ms / 141ms / 121ms / 215ms / 148ms" with no new errors. The pre-existing `Parsing CSS source code failed` build break (from `text-risk-tokens` getting extracted by Tailwind v4 from `tool-results/*.txt` files) is now resolved by the additional `@source not` exclusions.
 - Did NOT start the dev server (per task constraints).
 
 Stage Summary:
@@ -1018,3 +1018,79 @@ Task: Bulk worker response simulation + duplicated-assessment endDate fix
 4. **Cross-company trend comparison** — extend Consolidado view with a time-series chart comparing risk evolution across companies over multiple cycles.
 5. **Export consolidated report** (PDF/CSV) on the Consolidado view for sharing with stakeholders.
 6. **Assessment status timeline** — a visual timeline showing draft → collecting → processing → completed transitions with timestamps, shown on the assessment detail view.
+
+---
+Task ID: 13
+Agent: orchestrator (user-directed round: remove dark mode + fix assessment access)
+Task: Remove dark mode + fix CSS build break + verify assessment flow + improve create-assessment UX
+
+## User instructions
+- Remove dark mode and all related functionality.
+- Continue working on next steps.
+- Assessment access is broken ("a avaliação não é possivel de ser acessada") — assessment is the most important part of the system.
+- Use the spec document `upload/spec_nr1_copsoq_saas_v3.md` for context and verify everything that should be implemented.
+
+## Current project status assessment
+- App was stable from round 5 but had a **critical CSS build break** that caused intermittent "unrecoverable error" full reloads in the browser. This was the likely root cause of the assessment access issue.
+- The CSS error came from Tailwind v4's content scanner picking up the malformed string `text-[var(--risk-low/high/warning)]` from `worklog.md` and `tool-results/*.txt` cache files. The `@source not` exclusions were not working reliably.
+- Dark mode (added in round 1) needed to be removed per user request.
+
+## Completed modifications
+
+### 1. Dark mode removal
+- `src/app/layout.tsx` — removed `ThemeProvider` from next-themes + its import.
+- `src/components/ui/sonner.tsx` — removed `useTheme` import; hardcoded `theme="light"`.
+- `src/components/shell/app-shell.tsx` — removed `ThemeToggle` import + 2 `<ThemeToggle />` instances (sidebar + mobile topbar).
+- `src/components/shell/theme-toggle.tsx` — DELETED.
+- `src/app/globals.css` — removed `@custom-variant dark` + the entire `.dark { ... }` CSS variable block (~45 lines).
+- Verified: no remaining `next-themes`, `ThemeProvider`, `useTheme`, or `ThemeToggle` references in source.
+
+### 2. CSS build break fix (CRITICAL — root cause of assessment access issue)
+- **Root cause**: Tailwind v4 content scanner was extracting `text-[var(--risk-low/high/warning)]` (a malformed class-like string from a worklog summary line) and trying to compile it as CSS, producing `Parsing CSS source code failed: Unexpected token Delim('/')`. This caused intermittent full-page reloads and HTTP 500 errors.
+- **Fix**:
+  - Cleared the `tool-results/` directory (50 cached agent tool-output .txt files, several containing the malformed string).
+  - Replaced all 3 occurrences of `text-[var(--risk-low/high/warning)]` in `worklog.md` with `text-risk-tokens` (safe text).
+  - Updated `@source not` exclusions in `globals.css` to use correct relative paths (`../../worklog.md`, `../../dev.log`, `../../tool-results/**/*`).
+- **Verified**: HTTP 200, no CSS errors in browser console after cache clear.
+
+### 3. Assessment flow verification (end-to-end)
+Created a NEW company from scratch and verified the full flow:
+- ✅ Company creation: "Empresa Teste Fluxo Completo Ltda" with CNPJ validation + UF select
+- ✅ Department creation: "Desenvolvimento" (12 workers)
+- ✅ Assessment creation: "1º Ciclo 2026" via the create-assessment dialog (title + dates + dept selection)
+- ✅ Assessment launch: status → collecting, collection links + simulate buttons appeared
+- ✅ Bulk simulation: 6 responses simulated with "Intermediário" bias → GHE became Elegível
+- ✅ Close assessment: scoring ran → status=completed
+- ✅ Resultados dashboard: heatmap + KPIs + dimension scores all rendered correctly
+- ✅ Navigation to Inventário/Plano/Relatório buttons all present
+
+### 4. Create-assessment UX improvement
+- `src/components/empresas/empresa-detail-view.tsx` — added a **validation feedback panel** above the DialogFooter in the CreateAssessmentDialog. When the submit button is disabled (due to missing title, missing endDate, endDate ≤ startDate, or no departments selected), a yellow warning box appears listing exactly what's pending:
+  - "Pendências para criar a avaliação:"
+  - Bullet list of specific missing items (title, endDate, date order, depts)
+  - Uses `AlertCircle` icon + `warning` color tokens.
+  - `role="status" aria-live="polite"` for screen-reader accessibility.
+- This directly addresses the UX gap where the "Criar avaliação" button was disabled with no feedback, making it unclear why the assessment couldn't be created.
+
+## Verification results
+- `bun run lint` → exit 0, 0 errors, 0 warnings.
+- Dev server: HTTP 200, no CSS errors, no console errors.
+- agent-browser QA:
+  - ✅ Dark mode toggle no longer present in sidebar or mobile topbar.
+  - ✅ Page loads cleanly (no CSS parse errors, no full reloads).
+  - ✅ Full assessment flow verified end-to-end (company → dept → assessment → launch → simulate → close → resultados).
+  - ✅ Create-assessment dialog shows clear validation feedback ("Pendências para criar a avaliação:" with bullet list of missing items).
+
+## Unresolved issues / risks
+- **Radix Calendar Popover** in create-assessment dialog uses `<input type="date">` which renders as native spinbuttons in some browsers — can be tricky to interact with in headless automation. The validation feedback panel (added this round) makes the UX much clearer for human users.
+- **Report DOCX generation** still creates a status='ready' row without a real .docx binary (carried over). The HTML preview + print-to-PDF covers PDF.
+- **Historical audit log gap**: actions before the audit log expansion (round 2) were never captured. Only future actions are logged.
+- The `next-themes` package is still in `package.json` dependencies but no longer imported anywhere — could be uninstalled, but leaving it doesn't cause issues.
+
+## Priority recommendations for next phase
+1. **Assessment templates** — pre-configured sector templates (Indústria, Serviços, Saúde) with preset GHEs + worker counts to speed up setup.
+2. **Cross-company trend comparison** — extend Consolidado view with a time-series chart comparing risk evolution across companies over multiple cycles.
+3. **Webhook/email notifications** — notify when assessment reaches eligibility threshold or end date approaches.
+4. **Export consolidated report** (PDF/CSV) on the Consolidado view.
+5. **Assessment status timeline** — visual timeline on assessment detail showing draft → collecting → completed transitions with timestamps.
+6. **Uninstall next-themes** package since dark mode is removed.
