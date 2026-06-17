@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import { errorJson, jsonResponse } from "@/lib/session";
+import { workerErrorJson, workerJsonResponse } from "@/lib/session";
 
 interface RouteCtx {
   params: Promise<{ token: string }>;
@@ -16,7 +16,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
       },
     });
     if (!rt) {
-      return errorJson(ERROR_CODES.TOKEN_INVALID, "Token not found");
+      return workerErrorJson(ERROR_CODES.TOKEN_INVALID, "Token not found");
     }
 
     const answeredCount = await db.responseAnswer.count({
@@ -29,7 +29,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
         rt.assessmentDepartment.assessment.endDate.getTime() >=
           new Date(new Date().setHours(0, 0, 0, 0)).getTime());
 
-    return jsonResponse({
+    return workerJsonResponse({
       valid: true,
       alreadyUsed: rt.isUsed,
       assessmentOpen,
@@ -38,6 +38,6 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     });
   } catch (e) {
     console.error("[respond/status GET]", e);
-    return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
+    return workerErrorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
   }
 }

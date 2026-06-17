@@ -172,3 +172,31 @@ export function errorJson(code: typeof ERROR_CODES[keyof typeof ERROR_CODES], me
   const status = HTTP_STATUS[code];
   return jsonResponse(errorResponse(code, message, details), status);
 }
+
+// ─── Worker portal anti-fingerprinting (spec §3.7) ──────────────────────────
+// All /respond/* responses must include these headers to prevent correlating
+// worker responses with the professional's identity.
+const WORKER_ANTI_FINGERPRINT_HEADERS: Record<string, string> = {
+  "Content-Type": "application/json; charset=utf-8",
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "no-referrer",
+};
+
+export function workerJsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: WORKER_ANTI_FINGERPRINT_HEADERS,
+  });
+}
+
+export function workerErrorJson(
+  code: typeof ERROR_CODES[keyof typeof ERROR_CODES],
+  message?: string,
+  details?: Record<string, unknown>,
+): Response {
+  const status = HTTP_STATUS[code];
+  return new Response(JSON.stringify(errorResponse(code, message, details)), {
+    status,
+    headers: WORKER_ANTI_FINGERPRINT_HEADERS,
+  });
+}

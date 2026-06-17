@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import { errorJson, jsonResponse } from "@/lib/session";
+import { workerErrorJson, workerJsonResponse } from "@/lib/session";
 
 interface RouteCtx {
   params: Promise<{ token: string }>;
@@ -14,17 +14,17 @@ export async function POST(_request: Request, { params }: RouteCtx) {
       include: { assessmentDepartment: true },
     });
     if (!rt) {
-      return errorJson(ERROR_CODES.TOKEN_INVALID, "Token not found");
+      return workerErrorJson(ERROR_CODES.TOKEN_INVALID, "Token not found");
     }
     if (rt.isUsed) {
-      return errorJson(ERROR_CODES.TOKEN_ALREADY_USED, "Token already used");
+      return workerErrorJson(ERROR_CODES.TOKEN_ALREADY_USED, "Token already used");
     }
 
     const answeredCount = await db.responseAnswer.count({
       where: { tokenId: rt.id },
     });
     if (answeredCount < 40) {
-      return errorJson(
+      return workerErrorJson(
         ERROR_CODES.VALIDATION_ERROR,
         "INCOMPLETE_ANSWERS",
         { answeredCount, totalItems: 40 }
@@ -49,9 +49,9 @@ export async function POST(_request: Request, { params }: RouteCtx) {
       },
     });
 
-    return jsonResponse({ message: "Obrigado pela sua participação" });
+    return workerJsonResponse({ message: "Obrigado pela sua participação" });
   } catch (e) {
     console.error("[respond/complete POST]", e);
-    return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
+    return workerErrorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
   }
 }

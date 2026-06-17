@@ -31,6 +31,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   TOKEN_ALREADY_USED:
     "Este link já foi utilizado. Cada link pode ser usado apenas uma vez.",
   TOKEN_ASSESSMENT_CLOSED: "Esta pesquisa está encerrada.",
+  RATE_LIMIT_EXCEEDED: "Muitas tentativas. Aguarde alguns minutos.",
 };
 
 // ─── localStorage helpers (offline-tolerant) ────────────────────────────────
@@ -203,6 +204,8 @@ export function WorkerPortal({ token }: { token: string }) {
             return;
           } else if (e.code === "TOKEN_ASSESSMENT_CLOSED") {
             setErrorMsg(ERROR_MESSAGES.TOKEN_ASSESSMENT_CLOSED);
+          } else if (e.code === "RATE_LIMIT_EXCEEDED") {
+            setErrorMsg(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
           } else {
             setErrorMsg(e.message || "Não foi possível carregar a pesquisa.");
           }
@@ -255,6 +258,13 @@ export function WorkerPortal({ token }: { token: string }) {
       // 4) TOKEN_ALREADY_USED → straight to thanks
       if (e instanceof ApiError && e.code === "TOKEN_ALREADY_USED") {
         setScreen("thanks");
+        setSubmitting(false);
+        return;
+      }
+      // RATE_LIMIT_EXCEEDED → show the specific message
+      if (e instanceof ApiError && e.code === "RATE_LIMIT_EXCEEDED") {
+        setErrorMsg(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
+        setScreen("error");
         setSubmitting(false);
         return;
       }

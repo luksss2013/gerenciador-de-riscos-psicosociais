@@ -1,5 +1,5 @@
 import { ERROR_CODES } from "@/lib/errors";
-import { errorJson, jsonResponse } from "@/lib/session";
+import { workerErrorJson, workerJsonResponse } from "@/lib/session";
 import { COPSOQ_ITEMS, LIKERT_SCALE } from "@/lib/copsoq-data";
 
 interface RouteCtx {
@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     // Token validity is checked via /status; this endpoint is public for items list.
     // Still expose `token` param via the path; no company/dept info ever returned (RB-03).
     void token;
-    return jsonResponse({
+    return workerJsonResponse({
       items: COPSOQ_ITEMS.map((i) => ({
         index: i.index,
         dimensionCode: i.dimensionCode,
@@ -23,6 +23,6 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     });
   } catch (e) {
     console.error("[respond/items GET]", e);
-    return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
+    return workerErrorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
   }
 }
