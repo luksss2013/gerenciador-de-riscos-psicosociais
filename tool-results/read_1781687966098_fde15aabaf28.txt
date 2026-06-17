@@ -1,0 +1,202 @@
+     1→# NR-1 / COPSOQ II-BR SaaS Platform — Worklog
+     2→
+     3→Spec source: `/home/z/my-project/upload/spec_nr1_copsoq_saas_v3.md` (SSOT v3.0).
+     4→
+     5→## Project Context
+     6→
+     7→Implementing a multi-tenant SaaS for psychosocial occupational risk management per Brazilian NR-1 regulation, using the COPSOQ II-BR instrument (40 items, 11 dimensions, Likert 5-point scale).
+     8→
+     9→### Adaptations to sandbox constraints
+    10→
+    11→- Single Next.js 16 app (no monorepo / apps+packages split).
+    12→- SQLite via Prisma (no Neon/PostgreSQL RLS — tenant isolation enforced at app layer via `professionalId`).
+    13→- All views mounted under `/` (single route). Internal navigation via Zustand store view-state.
+    14→- Worker portal simulated in-app (demo mode) — same `/` route, view-state driven — preserves the privacy contract conceptually (no PII collected from worker).
+    15→- Reports: in-app HTML preview + metadata persistence (no R2/PDF/DOCX binary generation in sandbox).
+    16→- Auth: lightweight session cookie via httpOnly cookie + bcrypt-style hash (no Better Auth dependency).
+    17→
+    18→---
+    19→
+    20→Task ID: 1
+    21→Agent: orchestrator
+    22→Task: Foundation — design system tokens, layout, metadata, worklog.
+    23→
+    24→Work Log:
+    25→- Rewrote `src/app/globals.css` with NR-1 design system tokens (--brand, --risk-low/medium/high, --surface, --text-primary/muted), dark mode, custom scrollbar, mono-numeric font utility, ring-progress animation, print helpers.
+    26→- Rewrote `src/app/layout.tsx` with Inter + IBM Plex Mono fonts (spec §4.4), pt-BR lang, Sonner toaster.
+    27→- Created `worklog.md` (this file).
+    28→
+    29→Stage Summary:
+    30→- Design system aligned to spec §4.4 (color palette, typography).
+    31→- Ready for Prisma schema + data layer.
+    32→
+    33→---
+    34→
+    35→Task ID: 4
+    36→Agent: full-stack-developer
+    37→Task: Build all Next.js 16 App Router API v1 routes — backend contract implementation (spec §3.4–§3.11).
+    38→
+    39→Files created (33):
+    40→- `src/lib/scoring-service.ts` — `runScoring(assessmentId)` helper: iterates AssessmentDepartments, fetches used tokens + answers, calls `scoreDepartment()`, upserts DimensionResult rows (delete-then-insert for SQLite idempotency), updates isEligible/responseCount. Returns `{ eligibleDepts, totalDimensions }`.
+    41→- `src/app/api/v1/auth/register/route.ts` — POST: validates email/password (≥8)/professionType/acceptedTerms, hashes password (PBKDF2 via session.ts), creates Professional, returns 201 + sets `nr1_session` httpOnly cookie. EMAIL_ALREADY_REGISTERED on unique conflict.
+    42→- `src/app/api/v1/auth/login/route.ts` — POST: verifies credentials, returns 200 + sets session cookie. INVALID_CREDENTIALS on miss.
+    43→- `src/app/api/v1/auth/logout/route.ts` — POST: clears session from in-memory registry, sets cookie Max-Age=0, returns 204.
+    44→- `src/app/api/v1/professionals/me/route.ts` — GET (returns public professional fields) + PATCH (updates name/professionType/credentialNumber/phone).
+    45→- `src/app/api/v1/companies/route.ts` — GET (paginated list of active companies for current pro, filtered by name/CNPJ ILIKE q, includes summary: departmentsCount + lastAssessment info) + POST (validates CNPJ via isValidCnpj → CNPJ_INVALID, unique → CNPJ_ALREADY_REGISTERED, returns 201).
+    46→- `src/app/api/v1/companies/[id]/route.ts` — GET (company + summary with departmentsCount/assessmentsCount/lastAssessment) + PATCH (editable fields except cnpj) + DELETE (soft delete; RB-08 check via DEPARTMENT_HAS_ACTIVE_ASSESSMENT if any Assessment in collecting/processing).
+    47→- `src/app/api/v1/companies/[id]/departments/route.ts` — GET (active departments) + POST (name unique per company → DEPARTMENT_NAME_DUPLICATE).
+    48→- `src/app/api/v1/companies/[id]/departments/[deptId]/route.ts` — PATCH (name/description/workerCount, with dup-check) + DELETE (soft delete, RB-08 on department-level active assessment).
+    49→- `src/app/api/v1/companies/[id]/assessments/route.ts` — GET (ordered by createdAt DESC) + POST (validate ≥1 dept, endDate>startDate, creates Assessment + AssessmentDepartment rows; status=draft).
+    50→- `src/app/api/v1/companies/[id]/trend/route.ts` — GET: completed assessments with per-dimension avgRiskScore via `companyWeightedAverage` over eligible GHEs. (Note: param name is `id` to satisfy Next.js routing slug-uniformity at `/companies/[id]/*`.)
+    51→- `src/app/api/v1/assessments/[id]/route.ts` — GET (assessment + departments array with {id,name,expected,responded,isEligible}) + PATCH (only draft/collecting; title/startDate/endDate/participationRegistration).
+    52→- `src/app/api/v1/assessments/[id]/launch/route.ts` — POST: only status=draft; validates endDate≥today; for each AssessmentDepartment generates N=ceil(expected*1.5) ResponseToken rows (crypto.randomUUID()); sets status=collecting, tokenCount=N; returns {status, totalTokens}.
+    53→- `src/app/api/v1/assessments/[id]/close/route.ts` — POST: only status=collecting; sets status=processing; synchronously runs `runScoring()`; sets status=completed + completedAt; returns {status, eligibleDepts, totalDimensions}.
+    54→- `src/app/api/v1/assessments/[id]/progress/route.ts` — GET: returns {globalAdesao, byDept: [{id,name,expected,responded,pct,isEligible}]}.
+    55→- `src/app/api/v1/assessments/[id]/score/route.ts` — POST: force re-score via `runScoring()`; sets status=completed if currently processing/collecting; returns {status, eligibleDepts, totalDimensions}.
+    56→- `src/app/api/v1/assessments/[id]/dashboard/route.ts` — GET: only status=completed; returns {kpis:{globalAdesao,ghesHighRisk,ghesMediumRisk,ghesIneligible,totalRespondents}, heatmap:[{deptId,deptName,nResponses,isEligible,dimensions|<null>}], companyAvg:[{code,weightedAvgRiskScore,riskLevel}], criticalDimensions:[{code,name,avgRiskScore,affectedDepts}]}. Ineligible depts expose `dimensions: null` (RB-03). Uses `companyWeightedAverage` for companyAvg.
+    57→- `src/app/api/v1/assessments/[id]/risk-inventory/route.ts` — GET: idempotent auto-generation on first call. For each eligible AssessmentDept × DimensionResult with riskLevel IN (MEDIUM, HIGH), creates RiskInventoryItem (isManual=false) using INVENTORY_TEMPLATES + defaultInventoryPS, skipping existing. Returns {autoItems, manualItems}.
+    58→- `src/app/api/v1/assessments/[id]/risk-inventory/manual/route.ts` — POST: creates manual item (isManual=true); validates mteFactorCode (F1-F13), hazardDescription/possibleHarms (≥3 chars), probability/severity (1-3).
+    59→- `src/app/api/v1/risk-inventory-items/[itemId]/route.ts` — PATCH (editable fields, with tenant check via assessment) + DELETE (only if isManual=true, else ITEM_NOT_MANUAL).
+    60→- `src/app/api/v1/assessments/[id]/action-plan/route.ts` — GET: idempotent get-or-create ActionPlan; returns {id, actionItems}.
+    61→- `src/app/api/v1/assessments/[id]/action-items/route.ts` — POST: creates ActionItem with status=pending; validates 5W2H fields (what/why/who/where/how ≥2-3 chars, whenDate valid ISO, estimatedCost ≥0).
+    62→- `src/app/api/v1/action-items/[itemId]/route.ts` — PATCH (any 5W2H field + status; tenant via actionPlan.assessment) + DELETE (hard delete).
+    63→- `src/app/api/v1/assessments/[id]/reports/route.ts` — GET: list reports ordered by generatedAt DESC.
+    64→- `src/app/api/v1/assessments/[id]/reports/generate/route.ts` — POST: validates type (pdf|docx|html); RB-04 prerequisite checks (status=completed, participationRegistration present, ≥1 eligible dept); else REPORT_PREREQUISITES_UNMET with failedChecks details. Creates Report with status=ready, storageKey=`reports/{profId}/{companyId}/{assessmentId}/{uuid}.{type}`, metadataJson.
+    65→- `src/app/api/v1/reports/[reportId]/status/route.ts` — GET: returns {status, fileSizeBytes, generatedAt, errorMessage, storageKey, type}.
+    66→- `src/app/api/v1/respond/dept/[assessmentDeptId]/route.ts` — GET: public, anonymous (RB-03). Validates AssessmentDept + Assessment.status=collecting + endDate≥today; creates new ResponseToken (uuid); returns {token, redirectUrl: '/?worker='+token}.
+    67→- `src/app/api/v1/respond/token/[token]/status/route.ts` — GET: returns {valid, alreadyUsed, assessmentOpen, answeredCount, totalItems: 40}.
+    68→- `src/app/api/v1/respond/token/[token]/items/route.ts` — GET: returns COPSOQ_ITEMS + LIKERT_SCALE only. NEVER company/dept info (RB-03).
+    69→- `src/app/api/v1/respond/token/[token]/answer/route.ts` — POST: validates itemIndex 1..40, likertValue 1..5; if token.isUsed → TOKEN_ALREADY_USED; upserts ResponseAnswer (delete-then-insert for unique token+itemIndex); returns {ok, answeredCount, totalItems: 40}.
+    70→- `src/app/api/v1/respond/token/[token]/complete/route.ts` — POST: if isUsed → TOKEN_ALREADY_USED; if answeredCount<40 → VALIDATION_ERROR "INCOMPLETE_ANSWERS"; sets isUsed=true+usedAt, increments responseCount, sets isEligible=true if responseCount≥5; returns {message: 'Obrigado pela sua participação'}.
+    71→- `src/app/api/v1/system/seed-copsoq/route.ts` — POST: idempotent. If CopsoqItem.count==0, inserts 40 items + 11 dimensions; returns {items, dimensions, seeded}.
+    72→
+    73→Key decisions:
+    74→- Single-route constraint: worker portal returns `{token, redirectUrl: '/?worker='+token}` (query-string routing) instead of HTTP 302 redirect to `/q/:token`. Frontend will read `?worker=` query and render worker UI.
+    75→- Trend route param renamed from `:companyId` (spec contract) to `[id]` (Next.js requires slug-name uniformity across sibling dynamic segments under `/companies/[id]/*`). API path/contract semantics preserved.
+    76→- All `Assessment` tenant checks go via `requireTenantOwnership(assessment.professionalId, current.id)`; company checks via `company.professionalId`.
+    77→- Cookie format: `nr1_session=<token>; HttpOnly; Path=/; Max-Age=604800; SameSite=Strict`. Logout clears via Max-Age=0.
+    78→- All worker portal routes use `void token` or `void params` where appropriate to satisfy Next.js route signature; no session cookies, no Set-Cookie headers (RB-03 anti-fingerprinting).
+    79→- All route handlers wrapped in try/catch; unhandled errors return errorJson(INTERNAL_ERROR, "Internal error"). Tenant/auth errors detected via `e.code` and re-thrown as proper errorJson.
+    80→- No new packages installed (no zod — used inline validation helpers).
+    81→
+    82→Verification:
+    83→- `bun run lint` exit code 0, no errors.
+    84→- Dev server: live-tested `POST /api/v1/system/seed-copsoq` (seeded 40 items + 11 dimensions, 200), `POST /api/v1/auth/register` (201 + Set-Cookie), `GET /api/v1/professionals/me` (200), `POST /api/v1/companies` (201 with summary). No remaining dynamic-route slug conflicts in dev.log.
+    85→
+    86→Known limitations / handoffs:
+    87→- `POST /api/v1/assessments/:id/reports/generate` creates Report with `status='ready'` directly (no async PDF/DOCX job in sandbox); binary file generation deferred to in-app HTML preview (frontend task).
+    88→- `GET /api/v1/reports/:reportId/download` route not implemented (sandbox omits binary download). The `status` route returns storageKey + metadata for frontend to construct preview.
+    89→- In-memory session registry (Map) — sessions reset on dev server restart. Acceptable for sandbox.
+    90→- `POST /api/v1/auth/forgot-password` / `reset-password` / `verify-email` not in contract list — skipped (spec mentions but contract omitted).
+    91→
+    92→Stage Summary:
+    93→- Full REST API contract (32 route files + 1 helper lib) live and lint-clean at `src/app/api/v1/**`.
+    94→- Ready for frontend (Task 5+) to consume against the documented request/response shapes.
+    95→
+    96→---
+    97→Task ID: 5-a
+    98→Agent: full-stack-developer
+    99→Task: Build Worker Portal component (Módulo 6)
+   100→
+   101→Work Log:
+   102→- Read prior worklog (Tasks 1 + 4) and inspected `src/app/page.tsx`, `src/lib/api.ts`, `src/lib/types.ts`, `src/lib/copsoq-data.ts`, `src/lib/store.ts`, `src/app/globals.css`, `src/app/api/v1/respond/token/[token]/{status,answer,complete}/route.ts` to understand the contract.
+   103→- Created `src/components/worker/worker-portal.tsx` with named export `WorkerPortal({ token })`.
+   104→- Implemented three sequential screens via `useState<"welcome" | "questions" | "thanks" | "error">` plus a full-screen boot loader state.
+   105→- `WorkerWelcome`: title "Pesquisa sobre Condições de Trabalho", anonymity/voluntary/~15-min bullets, primary CTA "Começar".
+   106→- `WorkerQuestionItem`: progress bar (`Progress` from `@/components/ui/progress`) with `Questão X de 40` label + sr-only live announcement, question text in `text-xl sm:text-2xl` (Inter ~20px), 5 Likert buttons stacked vertically (`min-h-14` = 56px, `w-full`), with numbered circle + label from `LIKERT_SCALE`.
+   107→- `WorkerThanks`: "Obrigado pela sua participação. Suas respostas foram registradas." with no results/links (spec §4.8).
+   108→- `WorkerError`: calm error screen with the spec-mandated messages for TOKEN_INVALID / TOKEN_ALREADY_USED / TOKEN_ASSESSMENT_CLOSED.
+   109→- Sticky discreet footer on all screens: "Pesquisa confidencial — suas respostas são anônimas" with `Lock` icon.
+   110→- Boot flow on mount: `api.worker.tokenStatus(token)` → hydrate from `localStorage` key `nr1_worker_answers_${token}` → reconcile via `firstUnansweredIndex(localAnswers, serverAnsweredCount)` → set `currentIndex`; if `!valid` → error; if `alreadyUsed` → thanks; if `!assessmentOpen` → closed error; if all 40 answered locally but token not yet completed → auto-call `complete()`.
+   111→- On Likert select: (1) save to local state + `localStorage` immediately, (2) `api.worker.answer(token, { itemIndex, likertValue })`, (3) on 200 OK advance after ~300ms with brief selected-state ring (`border-primary bg-primary/5 ring-2 ring-primary/30`), (4) on `TOKEN_ALREADY_USED` go straight to thanks, (5) on non-fatal error stay on question with retry info banner.
+   112→- After answering Q40: call `api.worker.complete(token)` with `submitting` locked during the async call; on `VALIDATION_ERROR "INCOMPLETE_ANSWERS"` re-read fresh localStorage answers, compute `firstUnansweredIndex` against `details.answeredCount`, resume there with an info banner; on `TOKEN_ALREADY_USED` go to thanks; on other errors show error screen.
+   113→- Optional discreet "Sair" link in header corner calls `useView(s => s.closeWorker)` (Zustand store) to return to painel.
+   114→- No back button anywhere; no analytics; no PII collected.
+   115→- Used brand color system (`bg-primary`, `text-primary-foreground`, `bg-surface-card`, `border-border`, `text-muted-foreground`) — no indigo/blue, no emojis.
+   116→- Semantic HTML throughout (`<main>`, `<header>`, `<section>`, `<footer>`), `aria-label` on icon-only buttons, `aria-pressed`/`aria-label` on Likert buttons, `role="group"` on options, `role="status"`/`role="alert"` on loader/error, sr-only live announcement for question changes, keyboard-accessible native `<button>` Likert controls.
+   117→- Ran `bun run lint` → exit 0, 0 errors, 0 warnings (after fixing unused eslint-disable by promoting `complete` to the boot effect deps array since `complete` is a stable `useCallback([token])`).
+   118→
+   119→Stage Summary:
+   120→- `src/components/worker/worker-portal.tsx` live and lint-clean. `src/app/page.tsx` import `WorkerPortal` now resolves; the worker route (`view === "worker" && workerToken`) renders the full-screen portal.
+   121→- All spec §4.8 behaviors implemented: anonymous one-question-per-screen flow, 3 screens, localStorage persistence with server reconciliation, TOKEN_ALREADY_USED short-circuit on both `answer` and `complete`, INCOMPLETE_ANSWERS resume path, sticky confidentiality footer, brand-aligned calm/trustworthy styling, mobile-first responsive layout, full a11y coverage.
+   122→- Only remaining dev.log error is unrelated (`@/components/resultados/resultados-view` not yet built — belongs to another task/agent).
+   123→
+   124→---
+   125→Task ID: 5-b
+   126→Agent: full-stack-developer
+   127→Task: Build Empresas list + Empresa detail views (Módulo 4)
+   128→
+   129→Work Log:
+   130→- Read prior worklog (Tasks 1, 4, 5-a) and inspected `src/lib/api.ts`, `src/lib/types.ts`, `src/lib/store.ts`, `src/lib/cnpj.ts`, `src/lib/errors.ts`, `src/components/painel/painel-view.tsx` (for design patterns), `src/components/shell/nr-status-badge.tsx`, `src/components/shell/app-shell.tsx` (for lazy-load contract), and shadcn UI primitives (dialog, alert-dialog, select, checkbox, table) to align with project conventions.
+   131→- Created `src/components/empresas/empresas-view.tsx` exporting `EmpresasView` (named, no props).
+   132→  - Page wrapper matches painel-view: `px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full`.
+   133→  - Header with title + "Nova Empresa" primary CTA.
+   134→  - Search input (name/CNPJ) with sr-only `<Label>` + `aria-label`, 300ms debounce via `useRef<setTimeout>` (clear on cleanup), and an X clear-button.
+   135→  - `api.companies.list({ limit: 100 })` then client-side filter on name + sanitized CNPJ + formatted CNPJ; client-side pagination at 20 items/page with prev/next nav + "X–Y de N" counter (semantic `<nav aria-label="Paginação de empresas">`).
+   136→  - Loading → `EmpresasSkeleton` (6 × h-44 cards); error → destructive card with retry button; empty → "Nenhuma empresa cadastrada. Adicione seu primeiro cliente." + primary CTA; no-results (filtered empty) → "Nenhuma empresa encontrada" + clear-busca button.
+   137→  - `CompanyCard` (3-col desktop grid via `md:grid-cols-2 lg:grid-cols-3`): name (line-clamp-2), formatted CNPJ, location/CNAE w/ icons, GHE/aval count in footer, ghost Pencil edit button (`aria-label`), outline "Acessar" button → `go("empresa", { companyId: c.id })`. NR-1 status badge derived via local `deriveStatus` (replicated from painel-view).
+   138→- Created `src/components/empresas/company-form-dialog.tsx` exporting `CompanyFormDialog` — shared by EmpresasView (create) and EmpresaDetailView (edit). Reused rather than duplicated for cleanliness.
+   139→  - Fields: `name*`, `cnpj*` (maskCnpj + isValidCnpj real-time DV validation, green check icon when valid, red "CNPJ inválido" inline msg otherwise), `cnaePrimary`, `employeeCount` (numeric, sanitized), `city`, `state` (Select UF from BRAZILIAN_UFS), `contactName`, `contactEmail`, `contactPhone`, `dpoPoc`.
+   140→  - On edit: cnpj field is `disabled` (immutable per spec §3.5); a hint informs the user. PATCH body omits the cnpj key.
+   141→  - Server errors `CNPJ_INVALID` / `CNPJ_ALREADY_REGISTERED` surface inline on the cnpj field; other ApiErrors → toast.
+   142→  - On success: caller-supplied `onCreated`/`onUpdated` callbacks fire (parent closes modal, toasts, refreshes list).
+   143→  - Semantic `<fieldset>`/`<legend>` groupings, `aria-invalid`/`aria-describedby` on cnpj input, sr-only `DialogDescription` for screen readers.
+   144→- Created `src/components/empresas/empresa-detail-view.tsx` exporting `EmpresaDetailView` (named, no props).
+   145→  - Reads `companyId` from `useView(s => s.companyId)`; if null → empty-state card with "Ver empresas" CTA.
+   146→  - Top-left back-to-painel ghost button (chevron rotates 180deg to point left).
+   147→  - `CompanyDetailHeader` Card: title, formatted CNPJ, NrStatusBadge, refresh + edit buttons, `<dl>` grid of metadata (localização, CNAE, empregados, responsável, e-mail, telefone) with icons. Edit opens `CompanyFormDialog` pre-filled → `api.companies.update`.
+   148→  - `CompanyTabs` (default "overview"): Visão Geral | Departamentos | Avaliações.
+   149→  - **Visão Geral**: 3 KPI cards (departamentos, avaliações, última avaliação status+date) + "Dados da empresa" metadata card with "Nova Avaliação" CTA opening `CreateAssessmentDialog`.
+   150→  - **Departamentos**: `DepartmentsTab` — Card with header "+ Departamento" CTA, `DepartmentTable` (overflow-x-auto on mobile) with sr-only `<caption>`, columns: Nome (+description), Trabalhadores (right-aligned mono), Status (ativo/inativo badge), Ações (Pencil edit + Trash2 deactivate icon buttons, disabled when inactive). Empty state with primary CTA. `DepartmentFormDialog` (name*, description?, workerCount* ≥1) reused for create+edit. Deactivate uses `AlertDialog` confirm; `DEPARTMENT_HAS_ACTIVE_ASSESSMENT` → specific toast "Este departamento possui uma avaliação ativa e não pode ser desativado."; `DEPARTMENT_NAME_DUPLICATE` → inline field error.
+   151→  - **Avaliações**: `AssessmentsTab` — Card with "Nova Avaliação" CTA, list (max-h-96 overflow-y-auto .scroll-area) of `AssessmentRow`s. Each row: title + status Badge (color-coded per status), period (startDate→endDate formatted dd/MM/yyyy), adesão preview (only if collecting — fetched via `api.assessments.progress(id)`), completedAt date if present. "Acessar" button → `go("avaliacao", { assessmentId: a.id, companyId: a.companyId })`.
+   152→  - `CreateAssessmentDialog`: step-free simple form. Fields: title*, startDate (default today, yyyy-MM-dd), endDate*, department multi-select via `Checkbox` listing active depts (loaded via `api.departments.list(companyId)` filtered by `isActive`). Each checked dept exposes an editable `<Input type="number">` for `expectedResponses` (default = dept.workerCount). Validation: endDate > startDate and ≥1 dept with expectedResponses ≥1. On submit → `api.assessments.create(companyId, body)` then `onAssessmentCreated` callback navigates to `go("avaliacao", { assessmentId: created.id, companyId })`.
+   153→- Used brand color system (`bg-primary`, `text-primary-foreground`, `risk-low-bg`, `risk-medium-bg`, `bg-muted`, `border-border`, `text-muted-foreground`, `bg-[var(--brand-light)]`) — no indigo/blue, no emojis.
+   154→- All async buttons use `Loader2 animate-spin` during in-flight state and are `disabled` while submitting.
+   155→- Long lists use `max-h-96 overflow-y-auto scroll-area` for custom scrollbar styling.
+   156→- Accessibility: semantic `<header>`, `<main>`, `<section>`, `<nav>`, `<dl>/<dt>/<dd>`, `<fieldset>/<legend>`, `<table>` with `<caption class="sr-only">`; `aria-label` on all icon-only buttons; sr-only `<Label>` on search input; sr-only `DialogDescription` on every modal; `aria-invalid` + `aria-describedby` on validated inputs.
+   157→
+   158→Stage Summary:
+   159→- 3 files created under `src/components/empresas/`: `empresas-view.tsx` (list), `empresa-detail-view.tsx` (detail), `company-form-dialog.tsx` (shared create/edit form).
+   160→- `bun run lint` exit 0, 0 errors, 0 warnings (after fixing one `react-hooks/set-state-in-effect` lint error by moving the `if (!isCollecting) return` guard before any setState call in `AssessmentRow`'s progress-fetch effect).
+   161→- Both views load via the existing `lazyView` helper in `src/components/shell/app-shell.tsx` (named exports `EmpresasView` and `EmpresaDetailView`); dev.log shows no compile errors for the empresas modules — only pre-existing "Module not found" entries for other agents' modules (avaliacoes/resultados/inventario/plano/relatorio) which are out of scope for this task.
+   162→- All spec §4.6 behaviors implemented: debounced search + 20-item pagination, reusable CompanyForm w/ CNPJ DV validation, CompanyDetailHeader with edit, 3-tab layout (overview/departamentos/avaliações), DepartmentTable w/ AlertDialog confirm + DEPARTMENT_HAS_ACTIVE_ASSESSMENT handling, assessment list w/ adesão preview + create-assessment modal w/ dept multi-select + expectedResponses per dept.
+   163→
+   164→---
+   165→Task ID: 5-c
+   166→Agent: full-stack-developer
+   167→Task: Build Avaliação detail view with 3-step wizard (Módulo 5)
+   168→
+   169→Work Log:
+   170→- Read prior worklog (Tasks 1, 4, 5-a, 5-b) and inspected `src/lib/api.ts`, `src/lib/types.ts`, `src/lib/store.ts`, `src/lib/errors.ts`, `src/components/shell/app-shell.tsx`, `src/components/shell/nr-status-badge.tsx`, `src/components/empresas/empresa-detail-view.tsx` (for patterns), `src/app/globals.css` (for `.ring-progress`, `.scroll-area`, `.font-mono-numeric`, `.risk-*` tokens), and spec §4.7 to align with project conventions.
+   171→- Created `src/components/avaliacoes/avaliacao-detail-view.tsx` exporting `AvaliacaoDetailView` (named, no props). Mounted via `React.lazy(() => import("@/components/avaliacoes/avaliacao-detail-view"))` in `app-shell.tsx` (already wired).
+   172→- Page wrapper matches painel/empresa: `px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full`.
+   173→- `AvaliacaoDetailView` reads `assessmentId` from `useView(s => s.assessmentId)`. If null → empty-state dashed Card with "Voltar ao painel" CTA.
+   174→- Loading → `DetailSkeleton` (back button + 32-row header card + 3 × h-44 GHE cards + h-40 participation card).
+   175→- Error → destructive-bordered Card with "Voltar ao painel" + "Tentar novamente" buttons calling `load()`.
+   176→- Top-left back button: `ChevronLeft` ghost → `go("empresa", { companyId })` when companyId present, else `go("painel")`. Top-right Refresh icon button triggers `refresh()` via `refreshKey` state.
+   177→- `AssessmentHeader` Card: title (xl/2xl), instrument badge "COPSOQ II-BR · 40 itens" (mono-numeric outline badge), period (`fmtPeriod` dd/MM/yyyy → dd/MM/yyyy with pt-BR locale), `StatusBadge` (`ASSESSMENT_STATUS_LABELS[status]` + color class via `statusBadgeClass`), and `AdesaoRing` (only when collecting/completed AND progress present). Edit button shown only when `draft` or `collecting`.
+   178→- `AdesaoRing` — pure SVG (viewBox 0 0 100 100, R=36, C=2πR). Stroke color: `var(--muted-foreground)` (<30%), `var(--risk-medium)` (30–69%), `var(--risk-low)` (≥70%). Uses `.ring-progress` CSS animation class with `--ring-circumference`/`--ring-offset` CSS vars per the recipe. Center text uses `font-mono-numeric` fill-foreground 18px/700. `role="img"` + `aria-label`.
+   179→- `StatusBadge` — color-coded Badge using `bg-[var(--brand-light)]` (collecting/processing), `risk-low-bg` (completed), `bg-muted text-muted-foreground` (draft/archived).
+   180→- `GheProgressCards` — grid (`sm:grid-cols-2 lg:grid-cols-3`) wrapped in `max-h-96 overflow-y-auto scroll-area` for long lists. Each card: GHE name (truncate + title attr), eligibility badge (`EligibilityBadge` — green "Elegível" or outline "Inelegível" wrapped in `TooltipProvider`/`Tooltip` "Menos de 5 respostas registradas."), Esperados/Respondidos numeric grid (mono-numeric), adesão Progress bar with colored percentage text. When status=collecting, a footer button "Simular resposta (demo)" calls `api.worker.enterDept(ad.id)` → `useView(s => s.openWorker)(token)` to open the worker portal in-app. Per-card loading state via `simulatingId`.
+   181→- `ParticipationField` — Card with textarea. Label sr-only "Registre como os trabalhadores foram comunicados." Debounced 1s save via `api.assessments.update(id, { participationRegistration })`. "Salvando…"/"Salvo" indicators in header (CheckCircle2 green). When disabled (status not draft/collecting), the displayed value comes directly from `initial` to avoid `setState`-in-effect lint (used `value = disabled ? initial : draft` pattern with `useState(initial)` for draft). Cleanup effect clears debounce/saved timers on unmount.
+   182→- `CollectionLinks` — Card shown only when collecting. For each AssessmentDepartment (from `assessment.departments`), pre-mints one demo token via `api.worker.enterDept(ad.id)` on mount, cached in `useRef<Map>` keyed by dept id so subsequent parent re-renders (30s polling) don't mint fresh single-use tokens. Displays `${window.location.origin}/?worker=${token}` in a `<code>` block (mono-numeric, truncate). Two buttons per row: "Copiar link" (Copy icon → `navigator.clipboard.writeText(link)`) and "WhatsApp" (MessageCircle icon → copies the spec template message). Toast on success/error. Brief "Copiado." inline confirmation. Long lists scroll via `max-h-96 overflow-y-auto scroll-area`.
+   183→- `StatusActions` — Card section whose content depends on `status`:
+   184→  - `draft`: Rocket icon + "Avaliação pronta para lançar" text + primary "Lançar Avaliação" button → `api.assessments.launch(id)`. On success toast "Avaliação lançada. Links de coleta disponíveis." + `load()` refresh.
+   185→  - `collecting`: Lock icon + "Coleta em andamento" + irreversible warning + outline "Encerrar Coleta" button wrapped in `AlertDialog` confirm. Dialog: bold "irreversível" warning, Cancel/Encerrar-e-calcular buttons. On confirm → `api.assessments.close(id)` → toast `Avaliação concluída. {eligibleDepts} GHE(s) elegível(is), {totalDimensions} dimensão(ões) processadas.` + `go("resultados", { assessmentId })`.
+   186→  - `completed`: CheckCircle2 green icon + 4-button grid — primary "Ver Resultados" (BarChart3 → `go("resultados")`), outline "Inventário de Riscos" (ListChecks → `go("inventario")`), "Plano de Ação" (ClipboardList → `go("plano")`), "Relatório" (FileText → `go("relatorio")`).
+   187→  - `processing`: spinner + "Processando resultados…".
+   188→  - `archived`: AlertTriangle + "Esta avaliação foi arquivada."
+   189→- `EditAssessmentDialog` — Dialog with form (title, startDate, endDate, participationRegistration textarea). Form is conditionally rendered with `key={assessment.id}` so it remounts with fresh `useState(initial)` on each open, avoiding any setState-in-effect for prop sync. Validates title non-empty, endDate present, endDate ≥ startDate. PATCH via `api.assessments.update`. On success toast + `onSaved` callback updates parent state and refreshes.
+   190→- Polling: `useEffect` with `setInterval(... 30000)` only when `assessmentId` && `isCollecting`. Calls `Promise.all([api.assessments.get(id), api.assessments.progress(id)])` and setState on both. `clearInterval` on cleanup. Deps `[assessmentId, isCollecting]` so the timer resets only when status actually flips (not on every poll cycle). Small "Atualizando a cada 30s." hint with Clock icon and `aria-live="polite"` region; also surfaces "Encerra em X dias." / "Encerra hoje." / "Prazo encerrado há X dia(s)…" hint derived from `differenceInDays(endDate, today)`.
+   191→- Brand color system throughout (`bg-primary`, `text-primary-foreground`, `bg-[var(--brand-light)]`, `risk-low-bg`, `text-[var(--risk-low)]`/`text-[var(--risk-medium)]`, `bg-muted`, `text-muted-foreground`, `border-border`) — no indigo/blue, no emojis.
+   192→- Accessibility: semantic `<nav>`, `<section>`, `<Card>` headers with `aria-label`s on each section, `aria-label` on all icon-only buttons (refresh, copy link, copy WhatsApp, simulate response), `role="img"` + `aria-label` on AdesaoRing SVG, `role="status"`/`aria-live="polite"` on participation save indicator + polling hint + copy confirmation, `role="alert"` on error messages, `Tooltip` on Inelegível badge with descriptive `aria-label`, sr-only `<Label>` for participation textarea, `DialogDescription` (sr-only via shadcn) on Edit dialog, `AlertDialogDescription` on Encerrar confirm with bold irreversível warning.
+   193→
+   194→Stage Summary:
+   195→- 1 file created at `src/components/avaliacoes/avaliacao-detail-view.tsx` exporting `AvaliacaoDetailView` (named, no props).
+   196→- `bun run lint` exit 0, 0 errors, 0 warnings (after one iteration: initial `ParticipationField` used a sync `setValue(initial)` inside an effect which tripped `react-hooks/set-state-in-effect`; refactored to a `value = disabled ? initial : draft` derived-value pattern so the disabled/read-only path reads server truth directly while the editable path keeps user input stable across polls — no setState-in-effect needed).
+   197→- Dev log shows no compile errors for the avaliacoes module — only pre-existing `Module not found` entries for other agents' modules (`resultados`, `inventario`, `plano`, `relatorio`) which are out of scope for this task. The app-shell's `lazyView` wrapper resolves the `avaliacao-detail-view` import successfully.
+   198→- All spec §4.7 behaviors implemented: header with instrument badge + period + status + animated adesão ring (collecting/completed), GHE progress cards with eligibility tooltip + adesão bar + demo simulation button, debounced participation field with "Salvo" indicator, collection links per dept with WhatsApp template + clipboard copy, status-dependent action buttons (launch / encerrar-with-confirm / 4-button completed grid / processing / archived), edit dialog (draft/collecting only), 30s polling when collecting with live region hint, sticky footer handled by AppShell, long GHE list scroll via `max-h-96 overflow-y-auto scroll-area`.
+   199→
+   200→---
+
+[showing lines 1-200 of 236; use offset=201 with limit to continue reading]

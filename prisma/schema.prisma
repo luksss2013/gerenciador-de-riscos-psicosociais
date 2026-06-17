@@ -1,0 +1,284 @@
+// NR-1 / COPSOQ II-BR SaaS Platform — Prisma schema (SQLite)
+// Adapted from spec §2 (Drizzle/Postgres) to SQLite for sandbox.
+// Tenant isolation enforced at application layer via professionalId.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Identity ──────────────────────────────────────────────────────────────
+
+model Professional {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  name             String
+  professionType   String   @default("other") // psychologist | sst_engineer | sst_technician | occupational_physician | other
+  credentialNumber String?
+  phone            String?
+  acceptedTerms    Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  companies   Company[]
+  assessments Assessment[]
+  auditLogs   AuditLog[]
+}
+
+model Company {
+  id            String   @id @default(cuid())
+  professionalId String
+  name          String
+  cnpj          String   @unique // 14 digits
+  cnaePrimary   String?
+  employeeCount Int?
+  city          String?
+  state         String? // UF (2 chars)
+  contactName   String?
+  contactEmail  String?
+  contactPhone  String?
+  dpoPoc        String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  professional  Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  departments   Department[]
+  assessments   Assessment[]
+
+  @@index([professionalId, isActive, createdAt])
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  workerCount Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company              Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assessmentDepartments AssessmentDepartment[]
+  riskInventoryItems   RiskInventoryItem[]
+  actionItems          ActionItem[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+}
+
+// ─── COPSOQ seed (immutable, RB-05) ─────────────────────────────────────────
+
+model CopsoqItem {
+  index            Int    @id // 1..40
+  dimensionCode    String // D1..D11
+  textPtBr         String
+  responseType     String // frequency | degree | agreement
+  orderInDimension Int
+
+  @@index([dimensionCode])
+}
+
+model CopsoqDimension {
+  code              String @id // D1..D11
+  namePtBr          String
+  groupName         String
+  itemCount         Int
+  direction         String // DIRECT | INVERTED
+  descriptionPtBr   String
+  mteFactorsCovered String // comma-separated e.g. "F1,F8"
+}
+
+// ─── Assessment & anonymous tokenization ────────────────────────────────────
+
+model Assessment {
+  id                       String   @id @default(cuid())
+  companyId                String
+  professionalId           String
+  instrument               String   @default("COPSOQ2_BR_SHORT")
+  title                    String
+  status                   String   @default("draft") // draft | collecting | processing | completed | archived
+  startDate                DateTime?
+  endDate                  DateTime?
+  participationRegistration String?
+  workerCommunicationSentAt DateTime?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  completedAt              DateTime?
+
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  professional Professional          @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  departments  AssessmentDepartment[]
+  inventory    RiskInventoryItem[]
+  actionPlan   ActionPlan?
+  reports      Report[]
+
+  @@index([companyId, status])
+  @@index([professionalId, status, updatedAt])
+}
+
+model AssessmentDepartment {
+  id                String   @id @default(cuid())
+  assessmentId      String
+  departmentId      String
+  expectedResponses Int
+  tokenCount        Int      @default(0)
+  responseCount     Int      @default(0)
+  isEligible        Boolean  @default(false) // responseCount >= 5 (RB-10)
+  createdAt         DateTime @default(now())
+
+  assessment     Assessment       @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  department     Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  responseTokens ResponseToken[]
+  dimensionResults DimensionResult[]
+  riskInventoryItems RiskInventoryItem[]
+
+  @@unique([assessmentId, departmentId])
+  @@index([assessmentId])
+}
+
+model ResponseToken {
+  id                    String   @id @default(cuid())
+  assessmentDepartmentId String
+  token                 String   @unique
+  isUsed                Boolean  @default(false)
+  usedAt                DateTime?
+  createdAt             DateTime @default(now())
+
+  assessmentDepartment AssessmentDepartment @relation(fields: [assessmentDepartmentId], references: [id], onDelete: Cascade)
+  answers              ResponseAnswer[]
+
+  @@index([assessmentDepartmentId, isUsed])
+}
+
+model ResponseAnswer {
+  id           String   @id @default(cuid())
+  tokenId      String
+  itemIndex    Int // 1..40
+  likertValue  Int // 1..5
+  answeredAt   DateTime @default(now())
+
+  token ResponseToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenId, itemIndex])
+  @@index([tokenId, itemIndex])
+}
+
+// ─── Scoring results (idempotent upsert, RB-06) ─────────────────────────────
+
+model DimensionResult {
+  id                    String   @id @default(cuid())
+  assessmentDepartmentId String
+  dimensionCode         String
+  rawScore              Float
+  riskScore             Float
+  riskLevel             String // LOW | MEDIUM | HIGH
+  cronbachAlpha         Float?
+  nResponses            Int
+  calculatedAt          DateTime @default(now())
+
+  assessmentDepartment AssessmentDepartment @relation(fields: [assessmentDepartmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentDepartmentId, dimensionCode])
+  @@index([assessmentDepartmentId])
+}
+
+// ─── NR-1 Risk Inventory & 5W2H Action Plan ──────────────────────────────────
+
+model RiskInventoryItem {
+  id                     String   @id @default(cuid())
+  assessmentId           String
+  assessmentDepartmentId String?
+  departmentId           String?
+  dimensionCode          String?
+  mteFactorCode          String? // F1..F13
+  isManual               Boolean  @default(false) // true = AEP manual
+  hazardDescription      String
+  possibleHarms          String
+  probability            Int // 1..3
+  severity               Int // 1..3
+  existingControls       String?
+  proposedMeasures       String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  assessment           Assessment          @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessmentDepartment AssessmentDepartment? @relation(fields: [assessmentDepartmentId], references: [id], onDelete: SetNull)
+  department           Department?         @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([assessmentId])
+}
+
+model ActionPlan {
+  id           String   @id @default(cuid())
+  assessmentId String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assessment Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  items      ActionItem[]
+}
+
+model ActionItem {
+  id               String   @id @default(cuid())
+  actionPlanId     String
+  departmentId     String?
+  dimensionCode    String?
+  riskLevelTrigger String? // LOW | MEDIUM | HIGH
+  what             String
+  why              String
+  who              String
+  where            String
+  whenDate         DateTime
+  how              String
+  estimatedCost    Float?
+  status           String   @default("pending") // pending | in_progress | completed | cancelled
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  actionPlan  ActionPlan  @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+  department  Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([actionPlanId, status, whenDate])
+}
+
+// ─── Reports ────────────────────────────────────────────────────────────────
+
+model Report {
+  id           String   @id @default(cuid())
+  assessmentId String
+  type         String // pdf | docx | html
+  storageKey   String
+  fileSizeBytes Int?
+  generatedAt  DateTime @default(now())
+  status       String   @default("ready") // processing | ready | error
+  errorMessage String?
+  metadataJson String? // responsibleName, credentialNumber, reportDate, notes
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, generatedAt])
+}
+
+// ─── Audit ──────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  professionalId String?
+  action        String
+  resourceType  String
+  resourceId    String?
+  metadataJson  String?
+  createdAt     DateTime @default(now())
+
+  professional Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+
+  @@index([professionalId, createdAt])
+  @@index([resourceType, resourceId])
+}
