@@ -2034,3 +2034,18 @@ Spec §3.13 defines two cleanup jobs: "Expurgo de `response_answers` antigas (do
   - Maintenance script: all 3 endpoints responded (0 processed each — correct for current data).
   - Maintenance user created + login works.
   - Cron job 212820 scheduled (hourly).
+
+---
+Task ID: MAINT-$(date -u +%Y%m%dT%H%M%SZ)
+Agent: cron (job 212820 — hourly maintenance)
+Task: Scheduled maintenance run
+
+Work Log:
+- Executed `bash scripts/maintenance.sh` at 2026-06-17T21:25:33Z.
+- Login as maintenance@nr1copsoq.local succeeded.
+- RB-07 close-expired: 0 expired assessments processed.
+- RB-06 run-pending-scoring: 0 stuck processing assessments.
+- Cleanup: 0 expired sessions, 0 old unused tokens, 0 old audit logs purged.
+
+Stage Summary:
+- All maintenance endpoints responded correctly. No data required processing this cycle (all assessments are either completed or actively collecting with future end dates; no stuck processing assessments; no expired sessions/tokens/logs). System is healthy.
