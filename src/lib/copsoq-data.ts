@@ -264,12 +264,6 @@ export const COPSOQ_ITEMS: CopsoqItemSeed[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export function getItemsForDimension(code: DimensionCode): CopsoqItemSeed[] {
-  return COPSOQ_ITEMS.filter((i) => i.dimensionCode === code).sort(
-    (a, b) => a.orderInDimension - b.orderInDimension
-  );
-}
-
 export function getDimension(code: DimensionCode): CopsoqDimensionSeed {
   const d = COPSOQ_DIMENSIONS.find((x) => x.code === code);
   if (!d) throw new Error(`Unknown dimension: ${code}`);

@@ -101,6 +101,3 @@ export async function runScoring(
 
   return { eligibleDepts, totalDimensions };
 }
-
-export { K_ANONYMITY_THRESHOLD };
-export type { DimensionCode };

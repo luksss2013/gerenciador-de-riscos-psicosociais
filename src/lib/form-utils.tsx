@@ -41,13 +41,6 @@ export function maskPhone(input: string): string {
   return `(${s.slice(0, 2)}) ${s.slice(2, 7)}-${s.slice(7)}`;
 }
 
-/** Brazilian CEP mask: `12345-678`. */
-export function maskCep(input: string): string {
-  const s = input.replace(/\D/g, "").slice(0, 8);
-  if (s.length <= 5) return s;
-  return `${s.slice(0, 5)}-${s.slice(5)}`;
-}
-
 /**
  * Strip non-digits and clamp to [min, max]. Returns a string so the calling
  * input's `value` prop stays a string (the controlled-input invariant).

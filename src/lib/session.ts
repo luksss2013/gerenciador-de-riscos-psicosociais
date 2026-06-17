@@ -146,13 +146,6 @@ function hexToBytes(hex: string): Uint8Array {
 
 // ─── Pagination helper ──────────────────────────────────────────────────────
 
-export function paginate<T>(items: T[], page: number, limit: number) {
-  const total = items.length;
-  const pages = Math.max(1, Math.ceil(total / limit));
-  const data = items.slice((page - 1) * limit, page * limit);
-  return { data, meta: { total, page, limit, pages } };
-}
-
 export function parsePagination(req: Request) {
   const url = new URL(req.url);
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
