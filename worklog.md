@@ -914,3 +914,107 @@ Task: Cross-company consolidated analytics view
 4. **Webhook/email notifications** — notify when assessment reaches eligibility threshold or end date approaches.
 5. **Cross-company trend comparison** — extend the Consolidado view with a time-series chart comparing risk evolution across companies over multiple cycles.
 6. **Export consolidated report** — a "Exportar análise consolidada" button (PDF/CSV) on the Consolidado view for sharing with stakeholders.
+
+---
+Task ID: 12-a
+Agent: full-stack-developer
+Task: Bulk worker response simulation feature
+
+Work Log:
+- Read prior worklog (Task 4, Task 8-a, Task 10, Task 11-a/11) and inspected `src/app/api/v1/assessments/[id]/close/route.ts` (the reference mutation route pattern — requireProfessional + tenant ownership check + status gate + fire-and-forget audit log + try/catch with UNAUTHORIZED/UNAUTHORIZED_TENANT_ACCESS branches), `src/app/api/v1/assessments/[id]/launch/route.ts` (token minting via crypto.randomUUID() + createMany batching), `src/app/api/v1/respond/token/[token]/complete/route.ts` (the real worker answer-completion flow — sets `isUsed`/`usedAt`, increments `responseCount`, sets `isEligible` when responseCount>=5), `src/lib/scoring-service.ts` (confirms how responses are counted and how the AssessmentDepartment.responseCount/isEligible fields are read during scoring), `src/lib/copsoq-data.ts` (COPSOQ_ITEMS = 40 items with index 1-40 + dimensionCode; COPSOQ_DIMENSIONS = 11 dims with `direction: "DIRECT"|"INVERTED"`), `src/lib/session.ts` (requireProfessional/requireTenantOwnership/errorJson/jsonResponse), `src/lib/errors.ts` (ERROR_CODES taxonomy — ASSESSMENT_NOT_COLLECTING, ASSESSMENT_DEPT_NOT_FOUND, VALIDATION_ERROR, NOT_FOUND), `prisma/schema.prisma` (ResponseToken/ResponseAnswer/AssessmentDepartment models with `isUsed`/`usedAt`/`responseCount`/`isEligible` fields), and the existing `src/components/avaliacoes/avaliacao-detail-view.tsx` (the GheProgressCards single-simulate button that minted ONE token via api.worker.enterDept and opened the worker portal — to be replaced with a bulk dialog).
+- PART 1 — Created `src/app/api/v1/assessments/[id]/simulate/route.ts` (new POST endpoint):
+  - Auth: `requireProfessional()` + `requireTenantOwnership(assessment.professionalId, professional.id)`.
+  - Status gate: assessment must be `collecting` → else `ASSESSMENT_NOT_COLLECTING`.
+  - Body parsing is defensive: empty/invalid JSON is swallowed and defaults are applied. Validated fields:
+    - `count`: integer 1-50, default 5 (returns VALIDATION_ERROR on out-of-range/non-integer).
+    - `bias`: "low"|"medium"|"high", default "medium" (returns VALIDATION_ERROR otherwise).
+    - `assessmentDeptId`: optional string. If provided, validated to belong to this assessment (else ASSESSMENT_DEPT_NOT_FOUND). If omitted, all AssessmentDepartments are targeted.
+  - Bias-aware Gaussian Likert generation:
+    - `gaussian(mean, std)` via Box-Muller transform (with `Math.max(..., EPSILON)` guard against `log(0)`).
+    - `biasedLikert(direction, bias)`: For DIRECT dimensions, high Likert = high risk, so "high" bias → mean=4.0; "low" bias → mean=2.0. For INVERTED dimensions (D2,D3,D4,D5,D6,D7,D10), low Likert = high risk, so the bias is INVERTED — "high" bias → mean=2.0, "low" bias → mean=4.0. "medium" → mean=3.0 always. The Likert value is `Math.round(gaussian(mean, 0.9))` clamped to [1,5]. This ensures the chosen bias actually produces the intended risk level after scoring.
+    - `ITEM_DIRECTIONS` is precomputed once at module load (40-element array mapping each COPSOQ item index → its dimension direction) so we don't re-scan COPSOQ_DIMENSIONS per item per simulated response.
+  - Simulation loop inside `db.$transaction(async (tx) => ...)` for atomicity:
+    - For each target GHE, for `count` iterations: (1) mint a token via `tx.responseToken.create({ data: { assessmentDepartmentId, token: randomUUID() } })` (single create so we get the returned id), (2) `tx.responseAnswer.createMany({ data: 40 answer rows })` in one batched call (40 items × 1 row each per token), (3) `tx.responseToken.update` to set `isUsed: true, usedAt: now`, (4) increment `simulated`.
+    - After all `count` iterations for a GHE, `tx.assessmentDepartment.update` sets `responseCount: ad.responseCount + count` and `isEligible: newCount >= 5` (matches the real worker complete flow + the scoring-service eligibility threshold).
+    - Pushes the post-simulation `{ id, name (from ad.department.name), responseCount, isEligible }` into `byDeptResults`.
+  - Returns `{ simulated: <total>, byDept: [...] }`.
+  - Fire-and-forget audit log: `assessment.simulate` action, `assessment` resourceType, `resourceId: assessment.id`, `metadataJson: JSON.stringify({ count, bias, deptCount: targetDepts.length })`. `.catch(() => {})` so it never blocks the response.
+  - try/catch: UNAUTHORIZED → 401, UNAUTHORIZED_TENANT_ACCESS → 403, everything else → INTERNAL_ERROR 500 + `console.error("[simulate POST]", e)`.
+  - Imports: `randomUUID` from `crypto` (Node builtin), `db` from `@/lib/db`, `ERROR_CODES` from `@/lib/errors`, `errorJson`/`jsonResponse`/`requireProfessional`/`requireTenantOwnership` from `@/lib/session`, `COPSOQ_ITEMS`/`COPSOQ_DIMENSIONS` + `Direction` type from `@/lib/copsoq-data`.
+- PART 2 — Frontend changes:
+  - Added `api.assessments.simulate(id, body)` method in `src/lib/api.ts` returning `{ simulated: number; byDept: Array<{ id; name; responseCount; isEligible }> }`. Placed inline right after `close` in the assessments object.
+  - Modified `src/components/avaliacoes/avaliacao-detail-view.tsx`:
+    - Imports: added `FlaskConical` (lucide), `Alert`/`AlertDescription` from `@/components/ui/alert`, `Select`/`SelectContent`/`SelectItem`/`SelectTrigger`/`SelectValue` from `@/components/ui/select`. Removed now-unused `ExternalLink` import (was only used by the old single-simulate button). Removed `useView(s => s.openWorker)` since the new bulk dialog doesn't open the worker portal anymore.
+    - GheProgressCards: replaced the per-GHE "Simular resposta (demo)" button (which minted ONE token via `api.worker.enterDept` + opened the worker portal) with a "Simular respostas" button (FlaskConical icon) that opens the new `SimulateResponsesDialog` with that GHE pre-selected. aria-label updated accordingly.
+    - StatusActions: added a new global "Simular respostas" button row at the bottom of the `collecting`-status card (separated from the "Encerrar Coleta" row by a `border-t border-border pt-4` divider), visible ONLY when status=collecting. Uses the warning color tokens (icon tile `bg-warning/15`, icon `text-warning`) to signal demo/test nature. Clicking opens the dialog with "Todos os GHEs" pre-selected. Button is disabled while `simulating` is true. The StatusActions component signature gained two new props: `simulating: boolean` + `onSimulate: () => void`.
+    - New `SimulateResponsesDialog` + `SimulateResponsesForm` components (placed right before the `Skeleton` section):
+      - Dialog title: "Simular respostas (demo)" with DialogDescription (verbatim from spec): "Gera respostas simuladas para demonstração e testes. Os dados são fictícios e não representam trabalhadores reais. Use apenas em ambientes de demonstração."
+      - Fields: GHE `<Select>` (default "Todos os GHEs" + each department by name, bound to `assessmentDeptId` — internally uses sentinel `"__all__"` since Radix Select values can't be empty strings); "Respostas por GHE" `<Input type="number">` min=1 max=50 step=1 default="5" with help text "Entre 1 e 50 respostas serão geradas por GHE selecionado."; "Perfil de risco" `<Select>` with options Favorável/Intermediário/Desfavorável mapped to low/medium/high, default Intermediário, with help text explaining the bias semantics.
+      - Warning `<Alert>` (yellow — `border-warning/40 bg-warning/10 text-warning` with AlertTriangle icon): "As respostas simuladas não podem ser removidas individualmente. Se necessário, encerre e duplique a avaliação para recomeçar." (verbatim from spec).
+      - Footer: "Cancelar" (ghost) + "Simular" (default primary) with FlaskConical icon → spinner (Loader2 animate-spin) while `saving`. Submit button is disabled when `saving` or when `countValid` is false.
+      - On submit: calls `api.assessments.simulate(assessment.id, { count: countNum, assessmentDeptId: targetDeptId, bias })`. On success: toast `${r.simulated} respostas simuladas com sucesso.` + close dialog + call `onSuccess` (which triggers `load()` to refresh the assessment + progress data so the new responseCount/isEligible are reflected immediately). On error: shows inline error text + toast with the ApiError message (or generic fallback).
+      - The dialog form is keyed by `${assessment.id}:${initialAssessmentDeptId ?? "all"}` so the form state resets correctly when a different assessment or pre-selected GHE is opened (same lazy-mount + key pattern as DuplicateAssessmentDialog/EditAssessmentDialog).
+    - Main view state: replaced `simulatingId: string | null` (the old single-simulate in-flight marker) with three new state vars: `simulateOpen: boolean`, `simulateInitialDeptId: string | null`, `simulating: boolean`. Two new callbacks: `onSimulatePerGhe(ad)` (sets initialDeptId to the GHE id + opens dialog) and `onSimulateAll()` (sets initialDeptId to null = "Todos os GHEs" + opens dialog). The GheProgressCards `simulatingId` prop now receives `"__global__"` when the dialog is in-flight so all per-GHE buttons disable during a bulk simulation (avoids conflicting concurrent simulations). The dialog is rendered near the EditAssessmentDialog at the bottom of the main view tree.
+  - Audit log labels: Added `"assessment.simulate": "Respostas simuladas"` to `ACTION_LABELS` in `src/components/configuracoes/configuracoes-view.tsx` and `{ value: "assessment.simulate", label: "Respostas simuladas", icon: FlaskConical }` to `ACTION_OPTIONS`. Added `FlaskConical` to the lucide-react import block in the same file.
+- Verification: `bun run lint` → exit 0, 0 errors, 0 warnings. Did NOT restart the dev server (auto dev). Triggered `GET /` (HTTP 200) and `POST /api/v1/assessments/test/simulate` with `{"count":5,"bias":"medium"}` (HTTP 401 — proves the route compiles + auth gate works; the route compiled in 538ms on first hit). The transient "FlaskConical is not defined" error in dev.log was from the edit-to-configuracoes window before the FlaskConical import was added — once the import landed, the page recompiled and the most recent GET / returned 200.
+
+Stage Summary:
+- New backend endpoint: `POST /api/v1/assessments/[id]/simulate` — atomic `db.$transaction` mints N tokens + 40 answers each + marks them used + increments responseCount/isEligible for one or all GHEs. Bias-aware Gaussian Likert generation that correctly inverts the Likert for INVERTED dimensions (D2,D3,D4,D5,D6,D7,D10) so "high"/"medium"/"low" bias actually produces high/medium/low risk after scoring. Returns `{ simulated, byDept: [{ id, name, responseCount, isEligible }] }`. Fire-and-forget audit log records `{ count, bias, deptCount }`.
+- New frontend: replaced the old single-simulate-per-GHE button (which opened the worker portal for one token) with a `SimulateResponsesDialog` accessible from (a) each GHE card (pre-selects that GHE) and (b) a new global "Simular respostas" row in the collecting-status card (pre-selects "Todos os GHEs"). Dialog has GHE select + count input (1-50) + risk-profile select (Favorável/Intermediário/Desfavorável) + yellow warning Alert that simulated responses can't be removed individually. On success, the assessment + progress data refreshes immediately.
+- Audit log: new `assessment.simulate` action appears in the Configurações → Auditoria filter dropdown (FlaskConical icon) and renders as "Respostas simuladas".
+- Files created: `src/app/api/v1/assessments/[id]/simulate/route.ts`. Files modified: `src/lib/api.ts` (added `simulate` method), `src/components/avaliacoes/avaliacao-detail-view.tsx` (replaced single-simulate button + added SimulateResponsesDialog/Form + new StatusActions simulate row + state wiring), `src/components/configuracoes/configuracoes-view.tsx` (added assessment.simulate to ACTION_LABELS + ACTION_OPTIONS + FlaskConical import).
+- Lint: `bun run lint` exit 0. Dev server: GET / 200, POST /api/v1/assessments/test/simulate 401 (auth gate works — route compiles cleanly).
+
+---
+Task ID: 12
+Agent: orchestrator (cron review round 5)
+Task: Bulk worker response simulation + duplicated-assessment endDate fix
+
+## Current project status assessment
+- App stable from round 4. `bun run lint` exit 0. Dev server HTTP 200.
+- QA via agent-browser confirmed: Consolidado view (cross-company analytics) working with heatmap + distribution chart + detail cards.
+- **Bug found during QA**: duplicated assessments had `endDate: null`, which caused launch to fail with 422 (endDate must be ≥ today). The duplicated draft was unlaunchable without manually editing the end date first — a UX gap.
+- Selected the #2 recommendation from round 4: bulk worker response simulation — the most impactful feature for demo/test workflow (previously required an external Python script).
+
+## Completed modifications (Tasks 12, 12-a)
+
+### Bug fix: Duplicated assessment endDate (Task 12 — orchestrator)
+- `src/app/api/v1/assessments/[id]/duplicate/route.ts` — the duplication now sets `startDate = now` and `endDate = now + 30 days` by default, so the new draft is immediately launchable without manual date editing. Sensible default for recurring NR-1 cycles (every 2 years, but a 30-day collection window is standard).
+- Also patched the existing duplicated draft (`cmqi4mbd80001oojztmfrl5wb`) via API to set its endDate, so it could be launched for the bulk simulation test.
+
+### Bulk worker response simulation (Task 12-a — subagent)
+- **NEW** `POST /api/v1/assessments/[id]/simulate/route.ts` — simulates N worker responses per GHE:
+  - `count` (1-50, default 5), `bias` ("low"|"medium"|"high", default "medium"), optional `assessmentDeptId` (else all GHEs).
+  - **Bias-aware Gaussian Likert** via Box-Muller transform: for DIRECT dimensions, "high" bias → high Likert (4.0 mean); for INVERTED dimensions, "high" bias → low Likert (2.0 mean). This ensures the bias actually produces the intended risk level after scoring inverts INVERTED dimensions.
+  - Atomic `db.$transaction`: per GHE, per iteration — mint token, `createMany` 40 answers (batched), mark token used, update responseCount + isEligible.
+  - Returns `{ simulated, byDept: [{ id, name, responseCount, isEligible }] }`.
+  - Fire-and-forget `assessment.simulate` audit log.
+- `src/lib/api.ts` — added `assessments.simulate(id, body)`.
+- `src/components/avaliacoes/avaliacao-detail-view.tsx` — replaced the old single-token "Simular resposta (demo)" button with a "Simular respostas" button (per-GHE + global) that opens a `SimulateResponsesDialog` with GHE Select, count input, risk profile Select, yellow warning Alert, and "Simular" button with spinner.
+- `src/components/configuracoes/configuracoes-view.tsx` — added `assessment.simulate` to ACTION_LABELS ("Respostas simuladas") + ACTION_OPTIONS (FlaskConical icon).
+
+## Verification results
+- `bun run lint` → exit 0, 0 errors, 0 warnings.
+- Dev server: clean restart, HTTP 200.
+- agent-browser QA:
+  - ✅ **endDate fix**: duplicated draft launched successfully (no more 422 error).
+  - ✅ **Simular dialog**: global "Simular respostas em todos os GHEs" button + per-GHE buttons appear when status=collecting.
+  - ✅ Dialog fields: GHE Select (default "Todos os GHEs"), "Respostas por GHE" (default 5), "Perfil de risco" (Favorável/Intermediário/Desfavorável), yellow warning Alert.
+  - ✅ **Simulation with high bias**: set count=6, bias=Desfavorável → both GHEs became Elegível with 6 responses each.
+  - ✅ **Bias inversion verified**: after closing + viewing resultados, D1 (DIRECT) = 77 risk, D2 (INVERTED) = 73 risk (from raw 27), D5 (INVERTED) = 80 risk (from raw 20), D8 (DIRECT) = 71 risk. The "high" bias correctly produced HIGH risk scores across both DIRECT and INVERTED dimensions.
+  - ✅ Assessment closed successfully → resultados dashboard rendered with the simulated high-risk scores.
+- Screenshots: `/tmp/qa5-resultados-high-bias.png`.
+
+## Unresolved issues / risks
+- **Dark mode QA on inventário/plano/relatório** — still not screenshot-tested in dark mode (carried over). The report preview uses hardcoded `bg-white text-black` which is intentional for print.
+- **Radix Calendar Popover** in create-assessment dialog still hard to drive in headless automation (carried over). Low priority.
+- **Report DOCX generation** still creates a status='ready' row without a real .docx binary (carried over).
+- **Bulk simulation performance**: for large counts (50 × multiple GHEs × 40 items), the transaction creates thousands of rows. Tested with 6 responses × 2 GHEs = 480 answer rows — completed in ~8 seconds. Acceptable for demo use. For production-scale load testing, would need batching or background jobs.
+
+## Priority recommendations for next phase
+1. **Dark mode QA on remaining views** (inventário, plano, relatório) — screenshot each in dark mode; fix contrast issues.
+2. **Assessment templates** — pre-configured templates by company size/sector to speed up setup.
+3. **Webhook/email notifications** — notify when assessment reaches eligibility threshold or end date approaches.
+4. **Cross-company trend comparison** — extend Consolidado view with a time-series chart comparing risk evolution across companies over multiple cycles.
+5. **Export consolidated report** (PDF/CSV) on the Consolidado view for sharing with stakeholders.
+6. **Assessment status timeline** — a visual timeline showing draft → collecting → processing → completed transitions with timestamps, shown on the assessment detail view.

@@ -14,8 +14,8 @@ import {
   Clock,
   Copy,
   CopyPlus,
-  ExternalLink,
   FileText,
+  FlaskConical,
   ListChecks,
   Loader2,
   Lock,
@@ -52,6 +52,14 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -381,14 +389,14 @@ function GheProgressCards({
                     className="w-full"
                     onClick={() => onSimulate({ id: d.id, name: d.name })}
                     disabled={simulatingId === d.id}
-                    aria-label={`Simular resposta do GHE ${d.name}`}
+                    aria-label={`Simular respostas do GHE ${d.name}`}
                   >
                     {simulatingId === d.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      <FlaskConical className="h-3.5 w-3.5" />
                     )}
-                    Simular resposta (demo)
+                    Simular respostas
                   </Button>
                 </CardFooter>
               )}
@@ -725,15 +733,19 @@ function StatusActions({
   status,
   launching,
   closing,
+  simulating,
   onLaunch,
   onClose,
+  onSimulate,
   onNavigate,
 }: {
   status: AssessmentStatus;
   launching: boolean;
   closing: boolean;
+  simulating: boolean;
   onLaunch: () => void;
   onClose: () => void;
+  onSimulate: () => void;
   onNavigate: (view: ResultView) => void;
 }) {
   if (status === "draft") {
@@ -772,54 +784,84 @@ function StatusActions({
   if (status === "collecting") {
     return (
       <Card>
-        <CardContent className="py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-md bg-risk-medium/15 flex items-center justify-center shrink-0">
-              <Lock className="h-4 w-4 text-risk-medium" />
+        <CardContent className="py-5 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="h-9 w-9 rounded-md bg-risk-medium/15 flex items-center justify-center shrink-0">
+                <Lock className="h-4 w-4 text-risk-medium" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium">Coleta em andamento</p>
+                <p className="text-sm text-muted-foreground">
+                  Encerre a coleta para calcular os escores. Esta ação é
+                  irreversível e bloqueará novas respostas.
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="font-medium">Coleta em andamento</p>
-              <p className="text-sm text-muted-foreground">
-                Encerre a coleta para calcular os escores. Esta ação é
-                irreversível e bloqueará novas respostas.
-              </p>
-            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="shrink-0">
+                  <Lock className="h-4 w-4" />
+                  Encerrar Coleta
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Encerrar coleta?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação é <strong>irreversível</strong>. Após o
+                    encerramento, novos respondentes não poderão participar, os
+                    escores serão calculados e o status mudará para
+                    &quot;Concluída&quot;. GHEs com menos de 5 respostas serão
+                    marcados como inelegíveis.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={closing}>
+                    Cancelar
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={closing}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onClose();
+                    }}
+                  >
+                    {closing && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Encerrar e calcular
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="shrink-0">
-                <Lock className="h-4 w-4" />
-                Encerrar Coleta
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Encerrar coleta?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta ação é <strong>irreversível</strong>. Após o
-                  encerramento, novos respondentes não poderão participar, os
-                  escores serão calculados e o status mudará para
-                  &quot;Concluída&quot;. GHEs com menos de 5 respostas serão
-                  marcados como inelegíveis.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={closing}>
-                  Cancelar
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={closing}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onClose();
-                  }}
-                >
-                  {closing && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Encerrar e calcular
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-border pt-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="h-9 w-9 rounded-md bg-warning/15 flex items-center justify-center shrink-0">
+                <FlaskConical className="h-4 w-4 text-warning" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium">Simular respostas (demo)</p>
+                <p className="text-sm text-muted-foreground">
+                  Gere respostas fictícias em massa para demonstração e testes.
+                  Use apenas em ambientes de demonstração.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={onSimulate}
+              disabled={simulating}
+              className="shrink-0"
+              aria-label="Simular respostas em todos os GHEs"
+            >
+              {simulating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FlaskConical className="h-4 w-4" />
+              )}
+              Simular respostas
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -1188,6 +1230,222 @@ function EditAssessmentForm({
   );
 }
 
+// ─── SimulateResponsesDialog ─────────────────────────────────────────────────
+
+type SimulateBias = "low" | "medium" | "high";
+
+const BIAS_OPTIONS: Array<{ value: SimulateBias; label: string }> = [
+  { value: "low", label: "Favorável" },
+  { value: "medium", label: "Intermediário" },
+  { value: "high", label: "Desfavorável" },
+];
+
+function SimulateResponsesDialog({
+  open,
+  onOpenChange,
+  assessment,
+  departments,
+  initialAssessmentDeptId,
+  onSavingChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  assessment: Assessment;
+  departments: AssessmentDepartment[];
+  initialAssessmentDeptId: string | null;
+  onSavingChange: (v: boolean) => void;
+  onSuccess: (simulated: number) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Simular respostas (demo)</DialogTitle>
+          <DialogDescription>
+            Gera respostas simuladas para demonstração e testes. Os dados são
+            fictícios e não representam trabalhadores reais. Use apenas em
+            ambientes de demonstração.
+          </DialogDescription>
+        </DialogHeader>
+        {open && (
+          <SimulateResponsesForm
+            key={`${assessment.id}:${initialAssessmentDeptId ?? "all"}`}
+            assessment={assessment}
+            departments={departments}
+            initialAssessmentDeptId={initialAssessmentDeptId}
+            onSavingChange={onSavingChange}
+            onSuccess={(simulated) => {
+              onSuccess(simulated);
+              onOpenChange(false);
+            }}
+            onCancel={() => onOpenChange(false)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SimulateResponsesForm({
+  assessment,
+  departments,
+  initialAssessmentDeptId,
+  onSavingChange,
+  onSuccess,
+  onCancel,
+}: {
+  assessment: Assessment;
+  departments: AssessmentDepartment[];
+  initialAssessmentDeptId: string | null;
+  onSavingChange: (v: boolean) => void;
+  onSuccess: (simulated: number) => void;
+  onCancel: () => void;
+}) {
+  // initialAssessmentDeptId === null means "Todos os GHEs" pre-selected.
+  const [assessmentDeptId, setAssessmentDeptId] = useState<string>(
+    initialAssessmentDeptId ?? "__all__",
+  );
+  const [countStr, setCountStr] = useState<string>("5");
+  const [bias, setBias] = useState<SimulateBias>("medium");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const countNum = Number.parseInt(countStr, 10);
+  const countValid =
+    Number.isFinite(countNum) && Number.isInteger(countNum) && countNum >= 1 && countNum <= 50;
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    if (!countValid) {
+      setErr("Número de respostas deve ser um inteiro entre 1 e 50.");
+      return;
+    }
+    setSaving(true);
+    onSavingChange(true);
+    try {
+      const targetDeptId =
+        assessmentDeptId === "__all__" ? undefined : assessmentDeptId;
+      const r = await api.assessments.simulate(assessment.id, {
+        count: countNum,
+        assessmentDeptId: targetDeptId,
+        bias,
+      });
+      toast.success(`${r.simulated} respostas simuladas com sucesso.`);
+      onSuccess(r.simulated);
+    } catch (e2) {
+      const msg =
+        e2 instanceof ApiError
+          ? e2.message
+          : "Falha ao simular respostas.";
+      setErr(msg);
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+      onSavingChange(false);
+    }
+  };
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="simulate-dept">GHE</Label>
+        <Select
+          value={assessmentDeptId}
+          onValueChange={(v) => setAssessmentDeptId(v)}
+        >
+          <SelectTrigger id="simulate-dept" className="w-full">
+            <SelectValue placeholder="Selecione o GHE" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todos os GHEs</SelectItem>
+            {departments.map((ad) => (
+              <SelectItem key={ad.id} value={ad.id}>
+                {ad.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="simulate-count">Respostas por GHE</Label>
+        <Input
+          id="simulate-count"
+          type="number"
+          min={1}
+          max={50}
+          step={1}
+          value={countStr}
+          onChange={(e) => setCountStr(e.target.value)}
+          inputMode="numeric"
+          aria-describedby="simulate-count-help"
+        />
+        <p id="simulate-count-help" className="text-xs text-muted-foreground">
+          Entre 1 e 50 respostas serão geradas por GHE selecionado.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="simulate-bias">Perfil de risco</Label>
+        <Select
+          value={bias}
+          onValueChange={(v) => setBias(v as SimulateBias)}
+        >
+          <SelectTrigger id="simulate-bias" className="w-full">
+            <SelectValue placeholder="Selecione o perfil" />
+          </SelectTrigger>
+          <SelectContent>
+            {BIAS_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Controla a tendência das respostas simuladas (Favorável = baixo risco,
+          Desfavorável = alto risco).
+        </p>
+      </div>
+
+      <Alert className="border-warning/40 bg-warning/10 text-warning">
+        <AlertTriangle className="h-4 w-4 text-warning" />
+        <AlertDescription className="text-warning">
+          As respostas simuladas não podem ser removidas individualmente. Se
+          necessário, encerre e duplique a avaliação para recomeçar.
+        </AlertDescription>
+      </Alert>
+
+      {err && (
+        <p className="text-sm text-destructive" role="alert">
+          {err}
+        </p>
+      )}
+
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={saving}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={saving || !countValid}>
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <FlaskConical className="h-4 w-4" />
+          )}
+          Simular
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
 function DetailSkeleton() {
@@ -1211,7 +1469,6 @@ export function AvaliacaoDetailView() {
   const assessmentId = useView((s) => s.assessmentId);
   const companyId = useView((s) => s.companyId);
   const go = useView((s) => s.go);
-  const openWorker = useView((s) => s.openWorker);
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [progress, setProgress] = useState<AssessmentProgress | null>(null);
@@ -1224,7 +1481,12 @@ export function AvaliacaoDetailView() {
   const [duplicating, setDuplicating] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [closing, setClosing] = useState(false);
-  const [simulatingId, setSimulatingId] = useState<string | null>(null);
+  // Simulate-responses dialog state.
+  const [simulateOpen, setSimulateOpen] = useState(false);
+  const [simulateInitialDeptId, setSimulateInitialDeptId] = useState<
+    string | null
+  >(null);
+  const [simulating, setSimulating] = useState(false);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -1326,25 +1588,18 @@ export function AvaliacaoDetailView() {
     }
   }, [assessment, go]);
 
-  const onSimulate = useCallback(
-    async (ad: { id: string; name: string }) => {
-      setSimulatingId(ad.id);
-      try {
-        const r = await api.worker.enterDept(ad.id);
-        openWorker(r.token);
-        toast.info(`Abrindo portal do trabalhador para "${ad.name}".`);
-      } catch (e) {
-        if (e instanceof ApiError) {
-          toast.error(e.message);
-        } else {
-          toast.error("Não foi possível iniciar a simulação.");
-        }
-      } finally {
-        setSimulatingId(null);
-      }
-    },
-    [openWorker]
-  );
+  // Per-GHE simulate button: opens the dialog with that GHE pre-selected.
+  const onSimulatePerGhe = useCallback((ad: { id: string; name: string }) => {
+    setSimulateInitialDeptId(ad.id);
+    setSimulateOpen(true);
+  }, []);
+
+  // Global simulate button (status=collecting only): opens the dialog with
+  // "Todos os GHEs" pre-selected.
+  const onSimulateAll = useCallback(() => {
+    setSimulateInitialDeptId(null);
+    setSimulateOpen(true);
+  }, []);
 
   const onNavigate = useCallback(
     (view: ResultView) => {
@@ -1511,8 +1766,10 @@ export function AvaliacaoDetailView() {
           status={status}
           launching={launching}
           closing={closing}
+          simulating={simulating}
           onLaunch={() => void onLaunch()}
           onClose={() => void onClose()}
+          onSimulate={() => onSimulateAll()}
           onNavigate={onNavigate}
         />
       </section>
@@ -1526,8 +1783,8 @@ export function AvaliacaoDetailView() {
           <GheProgressCards
             byDept={progress.byDept}
             status={status}
-            onSimulate={(d) => void onSimulate(d)}
-            simulatingId={simulatingId}
+            onSimulate={(d) => onSimulatePerGhe(d)}
+            simulatingId={simulating ? "__global__" : null}
           />
         ) : (
           <Card>
@@ -1563,6 +1820,26 @@ export function AvaliacaoDetailView() {
             />
           </section>
         )}
+
+      {/* Simulate responses dialog (demo) */}
+      <SimulateResponsesDialog
+        open={simulateOpen}
+        onOpenChange={(v) => {
+          setSimulateOpen(v);
+          if (!v) setSimulating(false);
+        }}
+        assessment={assessment}
+        departments={assessment.departments ?? []}
+        initialAssessmentDeptId={simulateInitialDeptId}
+        onSavingChange={setSimulating}
+        onSuccess={() => {
+          setSimulating(false);
+          setSimulateOpen(false);
+          // Refresh the assessment + progress so the new response counts
+          // and eligibility badges are reflected immediately.
+          void load();
+        }}
+      />
 
       {/* Edit dialog */}
       <EditAssessmentDialog

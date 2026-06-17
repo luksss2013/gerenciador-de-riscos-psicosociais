@@ -182,6 +182,20 @@ export const api = {
       req<{ status: string; eligibleDepts: number; totalDimensions: number }>(
         `/assessments/${id}/close`, { method: "POST" }
       ),
+    simulate: (id: string, body: {
+      count?: number;
+      assessmentDeptId?: string;
+      bias?: "low" | "medium" | "high";
+    }) =>
+      req<{
+        simulated: number;
+        byDept: Array<{
+          id: string;
+          name: string;
+          responseCount: number;
+          isEligible: boolean;
+        }>;
+      }>(`/assessments/${id}/simulate`, { method: "POST", json: body }),
     score: (id: string) =>
       req<{ status: string; eligibleDepts: number; totalDimensions: number }>(
         `/assessments/${id}/score`, { method: "POST" }

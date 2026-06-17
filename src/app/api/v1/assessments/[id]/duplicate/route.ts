@@ -49,13 +49,16 @@ export async function POST(request: Request, { params }: RouteCtx) {
 
     // Atomic: clone Assessment + AssessmentDepartment rows (config only —
     // responses/tokens/eligibility are reset to a fresh draft state).
+    // Default startDate=today, endDate=today+30d so the draft is immediately launchable.
+    const now = new Date();
+    const defaultEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
     const newAssessment = await db.$transaction(async (tx) => {
       const created = await tx.assessment.create({
         data: {
           title: newTitle,
           status: "draft",
-          startDate: null,
-          endDate: null,
+          startDate: now,
+          endDate: defaultEndDate,
           participationRegistration: null,
           workerCommunicationSentAt: null,
           completedAt: null,
