@@ -1,0 +1,915 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { useCallback, useEffect, useMemo, useState } from "react";
+     5→import { format, isValid, parseISO } from "date-fns";
+     6→import { ptBR } from "date-fns/locale";
+     7→import {
+     8→  AlertTriangle,
+     9→  ArrowRight,
+    10→  BarChart3,
+    11→  Building2,
+    12→  ChevronRight,
+    13→  Loader2,
+    14→  MapPin,
+    15→  RefreshCw,
+    16→  ShieldAlert,
+    17→  ShieldCheck,
+    18→  TrendingUp,
+    19→  Users,
+    20→} from "lucide-react";
+    21→import { toast } from "sonner";
+    22→
+    23→import { api, ApiError } from "@/lib/api";
+    24→import { useView } from "@/lib/store";
+    25→import type { CompanyBreakdown, DimensionCode, RiskLevel } from "@/lib/types";
+    26→import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
+    27→import { ASSESSMENT_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
+    28→import { formatCnpj } from "@/lib/cnpj";
+    29→
+    30→import { Button } from "@/components/ui/button";
+    31→import { Skeleton } from "@/components/ui/skeleton";
+    32→import {
+    33→  Table,
+    34→  TableBody,
+    35→  TableCell,
+    36→  TableHead,
+    37→  TableHeader,
+    38→  TableRow,
+    39→} from "@/components/ui/table";
+    40→import {
+    41→  Tooltip,
+    42→  TooltipContent,
+    43→  TooltipProvider,
+    44→  TooltipTrigger,
+    45→} from "@/components/ui/tooltip";
+    46→
+    47→// ─── Color helpers (muted sage → ochre → clay ramp) ──────────────────────────
+    48→
+    49→function riskScoreBg(score: number): string {
+    50→  // Interpolate hue 120° (sage) → 45° (ochre) → 10° (clay) across 0..100.
+    51→  // Lower saturation (~45%) and ~48% lightness for the muted ramp.
+    52→  const clamped = Math.max(0, Math.min(100, score));
+    53→  const h =
+    54→    clamped <= 50
+    55→      ? 120 - (clamped / 50) * 75 // 120 → 45 (sage → ochre)
+    56→      : 45 - ((clamped - 50) / 50) * 35; // 45 → 10 (ochre → clay)
+    57→  return `hsl(${h}, 45%, 48%)`;
+    58→}
+    59→
+    60→function riskScoreFg(score: number): string {
+    61→  // Warm paper on the darker clay end, warm ink on the lighter sage end.
+    62→  return score > 55 ? "#FAF8F4" : "#2A2620";
+    63→}
+    64→
+    65→function riskBg(level: RiskLevel): string {
+    66→  return level === "HIGH"
+    67→    ? "risk-high-bg"
+    68→    : level === "MEDIUM"
+    69→    ? "risk-medium-bg"
+    70→    : "risk-low-bg";
+    71→}
+    72→
+    73→function riskText(level: RiskLevel): string {
+    74→  return level === "HIGH"
+    75→    ? "text-risk-high"
+    76→    : level === "MEDIUM"
+    77→    ? "text-risk-medium"
+    78→    : "text-risk-low";
+    79→}
+    80→
+    81→const DIM_SHORT_NAMES: Record<DimensionCode, string> = {
+    82→  D1: "Demandas",
+    83→  D2: "Influência",
+    84→  D3: "Significado",
+    85→  D4: "Valores",
+    86→  D5: "Liderança",
+    87→  D6: "Relações",
+    88→  D7: "Saúde",
+    89→  D8: "Burnout",
+    90→  D9: "Conflito T-F",
+    91→  D10: "Satisfação",
+    92→  D11: "Ofensivos",
+    93→};
+    94→
+    95→function fmtShortDate(iso: string | null): string {
+    96→  if (!iso) return "—";
+    97→  try {
+    98→    const d = parseISO(iso);
+    99→    if (!isValid(d)) return "—";
+   100→    return format(d, "dd/MM/yy", { locale: ptBR });
+   101→  } catch {
+   102→    return "—";
+   103→  }
+   104→}
+   105→
+   106→// ─── Stat strip (replaces gradient-tinted KPI cards) ────────────────────────
+   107→
+   108→function SummaryKpis({ data }: { data: CompanyBreakdown[] }) {
+   109→  const highRisk = data.filter((c) => c.overallRiskLevel === "HIGH").length;
+   110→  const mediumRisk = data.filter((c) => c.overallRiskLevel === "MEDIUM").length;
+   111→  const atRiskGhesTotal = data.reduce((s, c) => s + c.atRiskGhes, 0);
+   112→
+   113→  const stats: {
+   114→    value: number;
+   115→    label: string;
+   116→    secondary?: string;
+   117→    ariaLabel: string;
+   118→  }[] = [
+   119→    {
+   120→      value: data.length,
+   121→      label: "Total de empresas",
+   122→      secondary: "Clientes ativos",
+   123→      ariaLabel: `Total de empresas: ${data.length}. Clientes ativos sob sua gestão.`,
+   124→    },
+   125→    {
+   126→      value: highRisk,
+   127→      label: "Em risco alto",
+   128→      secondary: "overallRiskLevel = HIGH",
+   129→      ariaLabel: `Empresas em risco alto: ${highRisk}.`,
+   130→    },
+   131→    {
+   132→      value: mediumRisk,
+   133→      label: "Em risco intermediário",
+   134→      secondary: "overallRiskLevel = MEDIUM",
+   135→      ariaLabel: `Empresas em risco intermediário: ${mediumRisk}.`,
+   136→    },
+   137→    {
+   138→      value: atRiskGhesTotal,
+   139→      label: "GHEs em risco",
+   140→      secondary: "≥1 dimensão HIGH",
+   141→      ariaLabel: `GHEs em risco: ${atRiskGhesTotal}. GHEs elegíveis com ao menos uma dimensão HIGH.`,
+   142→    },
+   143→  ];
+   144→
+   145→  return (
+   146→    <section
+   147→      aria-label="Indicadores-chave"
+   148→      className="bg-[var(--surface)] rounded-lg p-5"
+   149→    >
+   150→      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
+   151→        {stats.map((s, i) => (
+   152→          <div
+   153→            key={i}
+   154→            className={`px-4 sm:px-6 py-1 ${i === 0 ? "pl-0" : ""}`}
+   155→            role="group"
+   156→            aria-label={s.ariaLabel}
+   157→          >
+   158→            <div className="font-mono-numeric text-2xl leading-none text-foreground">
+   159→              {s.value}
+   160→            </div>
+   161→            <div className="text-xs text-muted-foreground mt-2">
+   162→              {s.label}
+   163→            </div>
+   164→            {s.secondary && (
+   165→              <div className="text-[11px] text-muted-foreground/80 mt-1">
+   166→                {s.secondary}
+   167→              </div>
+   168→            )}
+   169→          </div>
+   170→        ))}
+   171→      </div>
+   172→    </section>
+   173→  );
+   174→}
+   175→
+   176→// ─── Heatmap table (companies × D1..D11 + Geral) — no Card wrapper ──────────
+   177→
+   178→function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
+   179→  const go = useView((s) => s.go);
+   180→
+   181→  return (
+   182→    <section aria-label="Mapa de calor por dimensão">
+   183→      <div className="flex items-baseline justify-between mb-4">
+   184→        <h2 className="font-display text-xl tracking-tight text-foreground">
+   185→          Mapa de calor — Empresa × Dimensão
+   186→        </h2>
+   187→        <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+   188→      </div>
+   189→      <p className="text-sm text-muted-foreground mb-5">
+   190→        Escore médio ponderado (0 a 100) por dimensão COPSOQ II-BR para cada
+   191→        cliente. Clique em uma linha para acessar o detalhe da empresa.
+   192→      </p>
+   193→
+   194→      <div className="max-h-[32rem] overflow-auto scroll-area rounded-md border border-border">
+   195→        <table className="w-full text-sm border-collapse" role="grid">
+   196→          <caption className="sr-only">
+   197→            Mapa de calor dos escores médios ponderados de risco por empresa
+   198→            (linha) e dimensão psicossocial D1 a D11 (coluna). A última
+   199→            coluna apresenta o escore geral da empresa.
+   200→          </caption>
+   201→          <thead className="sticky top-0 z-20">
+   202→            <TableRow>
+   203→              <TableHead
+   204→                scope="col"
+   205→                className="sticky left-0 z-30 bg-card px-3 py-3 text-left font-medium border-b border-r border-border min-w-[12rem] shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+   206→              >
+   207→                Empresa
+   208→              </TableHead>
+   209→              {COPSOQ_DIMENSIONS.map((d) => (
+   210→                <TableHead
+   211→                  key={d.code}
+   212→                  scope="col"
+   213→                  className="px-2 py-3 text-center font-medium border-b border-border min-w-[3.5rem]"
+   214→                >
+   215→                  <div className="font-mono-numeric text-xs">{d.code}</div>
+   216→                  <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+   217→                    {DIM_SHORT_NAMES[d.code]}
+   218→                  </div>
+   219→                </TableHead>
+   220→              ))}
+   221→              <TableHead
+   222→                scope="col"
+   223→                className="px-3 py-3 text-center font-medium border-b border-border min-w-[4rem] sticky right-0 z-30 bg-card shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+   224→              >
+   225→                Geral
+   226→              </TableHead>
+   227→            </TableRow>
+   228→          </thead>
+   229→          <TableBody>
+   230→            {data.map((c) => {
+   231→              const dimMap = new Map(
+   232→                c.dimensions.map((d) => [d.code, d])
+   233→              );
+   234→              return (
+   235→                <TableRow
+   236→                  key={c.companyId}
+   237→                  className="border-b border-border hover:bg-[var(--surface)] transition-colors cursor-pointer"
+   238→                  onClick={() => go("empresa", { companyId: c.companyId })}
+   239→                  tabIndex={0}
+   240→                  onKeyDown={(e) => {
+   241→                    if (e.key === "Enter" || e.key === " ") {
+   242→                      e.preventDefault();
+   243→                      go("empresa", { companyId: c.companyId });
+   244→                    }
+   245→                  }}
+   246→                >
+   247→                  <TableCell className="sticky left-0 z-10 bg-card px-3 py-3 font-medium border-r border-b border-border shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
+   248→                    <div
+   249→                      className="truncate max-w-[12rem]"
+   250→                      title={c.companyName}
+   251→                    >
+   252→                      {c.companyName}
+   253→                    </div>
+   254→                    <div className="text-xs text-muted-foreground font-normal font-mono-numeric">
+   255→                      {formatCnpj(c.cnpj)}
+   256→                    </div>
+   257→                  </TableCell>
+   258→                  {COPSOQ_DIMENSIONS.map((d) => {
+   259→                    const dr = dimMap.get(d.code);
+   260→                    const score = dr?.weightedAvgRiskScore ?? 0;
+   261→                    const bg = riskScoreBg(score);
+   262→                    const fg = riskScoreFg(score);
+   263→                    const level =
+   264→                      dr?.riskLevel ?? ("LOW" as RiskLevel);
+   265→                    const ariaLabel = `${c.companyName} — ${d.code} ${d.namePtBr}: risco ${score.toFixed(0)}, nível ${RISK_LEVEL_LABELS[level]}`;
+   266→                    const tooltipText = `${d.namePtBr} — ${c.companyName}: ${score.toFixed(0)} (${RISK_LEVEL_LABELS[level]})`;
+   267→                    return (
+   268→                      <TableCell
+   269→                        key={d.code}
+   270→                        className="p-0 text-center align-middle border-r border-border"
+   271→                        style={{ background: bg, color: fg }}
+   272→                      >
+   273→                        <Tooltip>
+   274→                          <TooltipTrigger asChild>
+   275→                            <div
+   276→                              tabIndex={0}
+   277→                              role="gridcell"
+   278→                              aria-label={ariaLabel}
+   279→                              className="flex items-center justify-center px-2 py-2.5 min-w-[3rem] min-h-[2.5rem] cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+   280→                            >
+   281→                              <span
+   282→                                className="font-mono-numeric text-sm font-semibold"
+   283→                                aria-hidden="true"
+   284→                              >
+   285→                                {score.toFixed(0)}
+   286→                              </span>
+   287→                            </div>
+   288→                          </TooltipTrigger>
+   289→                          <TooltipContent>{tooltipText}</TooltipContent>
+   290→                        </Tooltip>
+   291→                      </TableCell>
+   292→                    );
+   293→                  })}
+   294→                  <TableCell className="sticky right-0 z-10 bg-card px-3 py-3 text-center border-l border-b border-border shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]">
+   295→                    <div
+   296→                      className={`inline-flex flex-col items-center gap-0.5 px-2 py-1 rounded-md ${riskBg(
+   297→                        c.overallRiskLevel
+   298→                      )}`}
+   299→                      role="gridcell"
+   300→                      aria-label={`${c.companyName} — Geral: ${c.overallRiskScore.toFixed(
+   301→                        0
+   302→                      )}, nível ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`}
+   303→                    >
+   304→                      <span className="font-mono-numeric text-sm font-semibold leading-none">
+   305→                        {c.overallRiskScore.toFixed(0)}
+   306→                      </span>
+   307→                      <span className="text-[9px] uppercase tracking-wide opacity-80 leading-none">
+   308→                        {RISK_LEVEL_LABELS[c.overallRiskLevel]}
+   309→                      </span>
+   310→                    </div>
+   311→                  </TableCell>
+   312→                </TableRow>
+   313→              );
+   314→            })}
+   315→          </TableBody>
+   316→        </table>
+   317→      </div>
+   318→
+   319→      {/* Legend with muted sage → ochre → clay ramp */}
+   320→      <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
+   321→        <span className="font-medium">Escala de risco:</span>
+   322→        <div className="flex flex-col gap-0.5">
+   323→          <div
+   324→            className="h-3 w-40 sm:w-48 rounded-sm border border-border"
+   325→            style={{
+   326→              background:
+   327→                "linear-gradient(to right, hsl(120,45%,48%), hsl(45,45%,48%), hsl(10,45%,48%))",
+   328→            }}
+   329→            aria-hidden="true"
+   330→          />
+   331→          <div className="flex justify-between w-40 sm:w-48 text-[10px] font-mono-numeric">
+   332→            <span>0</span>
+   333→            <span>33</span>
+   334→            <span>66</span>
+   335→            <span>100</span>
+   336→          </div>
+   337→        </div>
+   338→        <span className="hidden md:inline text-muted-foreground/80">
+   339→          verde: favorável · amarelo: intermediário · vermelho: desfavorável
+   340→        </span>
+   341→      </div>
+   342→    </section>
+   343→  );
+   344→}
+   345→
+   346→// ─── Risk distribution chart (horizontal bars) — no Card wrapper ────────────
+   347→
+   348→function RiskDistributionChart({ data }: { data: CompanyBreakdown[] }) {
+   349→  const sorted = useMemo(
+   350→    () =>
+   351→      [...data].sort(
+   352→        (a, b) => b.overallRiskScore - a.overallRiskScore
+   353→      ),
+   354→    [data]
+   355→  );
+   356→
+   357→  return (
+   358→    <section aria-label="Distribuição de risco geral">
+   359→      <div className="flex items-baseline justify-between mb-4">
+   360→        <h2 className="font-display text-xl tracking-tight text-foreground">
+   361→          Distribuição de risco geral
+   362→        </h2>
+   363→        <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+   364→      </div>
+   365→      <p className="text-sm text-muted-foreground mb-5">
+   366→        Escore geral (0–100) por empresa, ordenado decrescente. Linhas de
+   367→        referência em 33 (médio) e 66 (alto).
+   368→      </p>
+   369→
+   370→      {sorted.length === 0 ? null : (
+   371→        <div className="space-y-2.5">
+   372→          <div className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[16rem_1fr_3rem] items-center gap-2 sm:gap-3">
+   373→            <div />
+   374→            <div className="relative h-3 text-[10px] font-mono-numeric">
+   375→              <span
+   376→                className="absolute -translate-x-1/2 text-risk-medium font-semibold"
+   377→                style={{ left: "33%" }}
+   378→              >
+   379→                33
+   380→              </span>
+   381→              <span
+   382→                className="absolute -translate-x-1/2 text-risk-high font-semibold"
+   383→                style={{ left: "66%" }}
+   384→              >
+   385→                66
+   386→              </span>
+   387→            </div>
+   388→            <div />
+   389→          </div>
+   390→          {sorted.map((c) => {
+   391→            const bg =
+   392→              c.overallRiskLevel === "HIGH"
+   393→                ? "var(--risk-high)"
+   394→                : c.overallRiskLevel === "MEDIUM"
+   395→                ? "var(--risk-medium)"
+   396→                : "var(--risk-low)";
+   397→            const width = Math.max(
+   398→              2,
+   399→              Math.min(100, c.overallRiskScore)
+   400→            );
+   401→            const ariaLabel = `${c.companyName}: risco geral ${c.overallRiskScore.toFixed(
+   402→              0
+   403→            )} de 100, classificação ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`;
+   404→            return (
+   405→              <div
+   406→                key={c.companyId}
+   407→                className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[16rem_1fr_3rem] items-center gap-2 sm:gap-3"
+   408→              >
+   409→                <div
+   410→                  className="text-sm flex items-center gap-1.5 min-w-0"
+   411→                  title={c.companyName}
+   412→                >
+   413→                  <Building2
+   414→                    className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+   415→                    aria-hidden="true"
+   416→                  />
+   417→                  <span className="text-foreground truncate min-w-0">
+   418→                    {c.companyName}
+   419→                  </span>
+   420→                </div>
+   421→                <div
+   422→                  className="relative h-7 rounded-md bg-[var(--surface)] overflow-hidden"
+   423→                  role="img"
+   424→                  aria-label={ariaLabel}
+   425→                >
+   426→                  <div
+   427→                    className="absolute inset-y-0 z-10"
+   428→                    style={{
+   429→                      left: "33%",
+   430→                      borderLeft: "2px dashed var(--risk-medium)",
+   431→                      opacity: 0.7,
+   432→                    }}
+   433→                    aria-hidden="true"
+   434→                  />
+   435→                  <div
+   436→                    className="absolute inset-y-0 z-10"
+   437→                    style={{
+   438→                      left: "66%",
+   439→                      borderLeft: "2px dashed var(--risk-high)",
+   440→                      opacity: 0.7,
+   441→                    }}
+   442→                    aria-hidden="true"
+   443→                  />
+   444→                  <div
+   445→                    className="h-full transition-all duration-500 ease-out"
+   446→                    style={{ width: `${width}%`, backgroundColor: bg }}
+   447→                  />
+   448→                </div>
+   449→                <div className="text-right font-mono-numeric text-sm font-semibold">
+   450→                  {c.overallRiskScore.toFixed(0)}
+   451→                </div>
+   452→              </div>
+   453→            );
+   454→          })}
+   455→        </div>
+   456→      )}
+   457→
+   458→      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+   459→        <div className="flex items-center gap-1.5">
+   460→          <span
+   461→            className="inline-block w-3 h-3 rounded-sm"
+   462→            style={{ backgroundColor: "var(--risk-low)" }}
+   463→            aria-hidden="true"
+   464→          />
+   465→          {RISK_LEVEL_LABELS.LOW}
+   466→        </div>
+   467→        <div className="flex items-center gap-1.5">
+   468→          <span
+   469→            className="inline-block w-3 h-3 rounded-sm"
+   470→            style={{ backgroundColor: "var(--risk-medium)" }}
+   471→            aria-hidden="true"
+   472→          />
+   473→          {RISK_LEVEL_LABELS.MEDIUM}
+   474→        </div>
+   475→        <div className="flex items-center gap-1.5">
+   476→          <span
+   477→            className="inline-block w-3 h-3 rounded-sm"
+   478→            style={{ backgroundColor: "var(--risk-high)" }}
+   479→            aria-hidden="true"
+   480→          />
+   481→          {RISK_LEVEL_LABELS.HIGH}
+   482→        </div>
+   483→        <div className="ml-auto flex items-center gap-2">
+   484→          <span
+   485→            className="inline-block w-px h-3 bg-foreground/40"
+   486→            aria-hidden="true"
+   487→          />
+   488→          <span>refs. 33 / 66</span>
+   489→        </div>
+   490→      </div>
+   491→    </section>
+   492→  );
+   493→}
+   494→
+   495→// ─── Company detail row (replaces Card) ─────────────────────────────────────
+   496→
+   497→function topRiskDimensions(c: CompanyBreakdown, n: number) {
+   498→  return [...c.dimensions]
+   499→    .sort((a, b) => b.weightedAvgRiskScore - a.weightedAvgRiskScore)
+   500→    .slice(0, n);
+   501→}
+   502→
+   503→function CompanyRow({ c }: { c: CompanyBreakdown }) {
+   504→  const go = useView((s) => s.go);
+   505→  const top3 = topRiskDimensions(c, 3);
+   506→  const lastStatusLabel = c.lastAssessmentStatus
+   507→    ? ASSESSMENT_STATUS_LABELS[c.lastAssessmentStatus] ?? c.lastAssessmentStatus
+   508→    : "Sem avaliação";
+   509→
+   510→  const overallColor =
+   511→    c.overallRiskLevel === "HIGH"
+   512→      ? "var(--risk-high)"
+   513→      : c.overallRiskLevel === "MEDIUM"
+   514→      ? "var(--risk-medium)"
+   515→      : "var(--risk-low)";
+   516→
+   517→  return (
+   518→    <div
+   519→      className="surface-hover py-5 -mx-2 px-2 rounded-sm cursor-pointer transition-colors"
+   520→      onClick={() => go("empresa", { companyId: c.companyId })}
+   521→      onKeyDown={(e) => {
+   522→        if (e.key === "Enter" || e.key === " ") {
+   523→          e.preventDefault();
+   524→          go("empresa", { companyId: c.companyId });
+   525→        }
+   526→      }}
+   527→      tabIndex={0}
+   528→      role="button"
+   529→      aria-label={`Acessar detalhe de ${c.companyName}. Risco geral ${c.overallRiskScore.toFixed(0)} — ${RISK_LEVEL_LABELS[c.overallRiskLevel]}.`}
+   530→    >
+   531→      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+   532→        {/* Left: identity + status badge */}
+   533→        <div className="flex items-start gap-3 min-w-0 lg:w-[20rem] lg:shrink-0">
+   534→          <span
+   535→            className="mt-1.5 h-2 w-2 rounded-full shrink-0"
+   536→            style={{ backgroundColor: overallColor }}
+   537→            aria-hidden="true"
+   538→          />
+   539→          <div className="min-w-0 flex-1">
+   540→            <div className="flex items-center gap-2 flex-wrap">
+   541→              <h3
+   542→                className="font-display font-medium text-base text-foreground leading-tight truncate"
+   543→                title={c.companyName}
+   544→              >
+   545→                {c.companyName}
+   546→              </h3>
+   547→            </div>
+   548→            <div className="font-mono-numeric text-xs text-muted-foreground mt-1">
+   549→              {formatCnpj(c.cnpj)}
+   550→            </div>
+   551→            {(c.city || c.state) && (
+   552→              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+   553→                <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+   554→                <span className="truncate">
+   555→                  {[c.city, c.state].filter(Boolean).join(" — ")}
+   556→                </span>
+   557→              </div>
+   558→            )}
+   559→            <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border mt-3 pt-2">
+   560→              <span className="truncate">{lastStatusLabel}</span>
+   561→              <span className="font-mono-numeric shrink-0 ml-2">
+   562→                {fmtShortDate(c.lastAssessmentCompletedAt)}
+   563→              </span>
+   564→            </div>
+   565→          </div>
+   566→          {/* Overall risk badge */}
+   567→          <div
+   568→            className={`inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-md shrink-0 ${riskBg(
+   569→              c.overallRiskLevel
+   570→            )}`}
+   571→            aria-label={`Risco geral: ${RISK_LEVEL_LABELS[c.overallRiskLevel]} (${c.overallRiskScore.toFixed(
+   572→              0
+   573→            )})`}
+   574→          >
+   575→            <span className="font-mono-numeric text-base font-semibold leading-none">
+   576→              {c.overallRiskScore.toFixed(0)}
+   577→            </span>
+   578→            <span className="text-[9px] uppercase tracking-wide opacity-90 leading-none">
+   579→              {RISK_LEVEL_LABELS[c.overallRiskLevel]}
+   580→            </span>
+   581→          </div>
+   582→        </div>
+   583→
+   584→        {/* Middle: counts */}
+   585→        <div className="grid grid-cols-3 gap-3 lg:gap-6 lg:flex-1 lg:max-w-md">
+   586→          <div>
+   587→            <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+   588→              Avaliações
+   589→            </div>
+   590→            <div className="font-mono-numeric text-lg font-semibold text-foreground mt-0.5">
+   591→              {c.assessmentsCount}
+   592→            </div>
+   593→          </div>
+   594→          <div>
+   595→            <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+   596→              GHEs elegíveis
+   597→            </div>
+   598→            <div className="font-mono-numeric text-lg font-semibold text-foreground mt-0.5">
+   599→              {c.eligibleGhes}
+   600→            </div>
+   601→          </div>
+   602→          <div>
+   603→            <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+   604→              Respondentes
+   605→            </div>
+   606→            <div className="font-mono-numeric text-lg font-semibold text-foreground mt-0.5">
+   607→              {c.totalRespondents}
+   608→            </div>
+   609→          </div>
+   610→        </div>
+   611→
+   612→        {/* Right: top risk dimensions + action */}
+   613→        <div className="lg:flex-1 lg:min-w-0">
+   614→          <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1.5">
+   615→            Dimensões de maior risco
+   616→          </div>
+   617→          <ul className="space-y-1">
+   618→            {top3.map((d) => {
+   619→              const dim = getDimension(d.code);
+   620→              return (
+   621→                <li
+   622→                  key={d.code}
+   623→                  className="flex items-center gap-2 text-xs"
+   624→                  aria-label={`${d.code} ${dim.namePtBr}: risco ${d.weightedAvgRiskScore.toFixed(
+   625→                    0
+   626→                  )}, nível ${RISK_LEVEL_LABELS[d.riskLevel]}`}
+   627→                >
+   628→                  <span
+   629→                    className="font-mono-numeric text-[10px] px-1.5 py-0.5 rounded-sm border border-border shrink-0"
+   630→                  >
+   631→                    {d.code}
+   632→                  </span>
+   633→                  <span
+   634→                    className="flex-1 truncate text-foreground"
+   635→                    title={dim.namePtBr}
+   636→                  >
+   637→                    {dim.namePtBr}
+   638→                  </span>
+   639→                  <span
+   640→                    className={`font-mono-numeric font-semibold ${riskText(
+   641→                      d.riskLevel
+   642→                    )}`}
+   643→                  >
+   644→                    {d.weightedAvgRiskScore.toFixed(0)}
+   645→                  </span>
+   646→                </li>
+   647→              );
+   648→            })}
+   649→          </ul>
+   650→          <div className="mt-3 flex justify-end">
+   651→            <Button
+   652→              variant="ghost"
+   653→              size="sm"
+   654→              className="text-[var(--brand)] hover:bg-[var(--surface)] hover:text-[var(--brand)]"
+   655→              onClick={(e) => {
+   656→                e.stopPropagation();
+   657→                go("empresa", { companyId: c.companyId });
+   658→              }}
+   659→            >
+   660→              Acessar
+   661→              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+   662→            </Button>
+   663→          </div>
+   664→        </div>
+   665→      </div>
+   666→    </div>
+   667→  );
+   668→}
+   669→
+   670→function CompanyDetailCards({ data }: { data: CompanyBreakdown[] }) {
+   671→  const sorted = useMemo(
+   672→    () =>
+   673→      [...data].sort(
+   674→        (a, b) => b.overallRiskScore - a.overallRiskScore
+   675→      ),
+   676→    [data]
+   677→  );
+   678→
+   679→  return (
+   680→    <section aria-label="Detalhe por empresa" className="border-b border-border pb-4">
+   681→      <div className="flex items-baseline justify-between mb-4">
+   682→        <h2 className="font-display text-xl tracking-tight text-foreground">
+   683→          Detalhe por empresa
+   684→        </h2>
+   685→        <span className="text-xs text-muted-foreground">
+   686→          Ordenado por risco geral decrescente
+   687→        </span>
+   688→      </div>
+   689→      <div className="divide-y divide-border border-t border-border">
+   690→        {sorted.map((c) => (
+   691→          <CompanyRow key={c.companyId} c={c} />
+   692→        ))}
+   693→      </div>
+   694→    </section>
+   695→  );
+   696→}
+   697→
+   698→// ─── Loading / empty / error (no Card wrappers) ─────────────────────────────
+   699→
+   700→function LoadingState() {
+   701→  return (
+   702→    <div className="space-y-10" aria-hidden="true">
+   703→      {/* Stat strip skeleton — surface-backed rounded bar with 4 divided cells */}
+   704→      <div className="bg-[var(--surface)] rounded-lg p-5">
+   705→        <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
+   706→          {Array.from({ length: 4 }).map((_, i) => (
+   707→            <div key={i} className={`px-4 sm:px-6 py-1 ${i === 0 ? "pl-0" : ""}`}>
+   708→              <Skeleton className="h-7 w-12" />
+   709→              <Skeleton className="h-3 w-20 mt-3" />
+   710→            </div>
+   711→          ))}
+   712→        </div>
+   713→      </div>
+   714→
+   715→      {/* Heatmap table skeleton — header + 6 rows of cells */}
+   716→      <div>
+   717→        <div className="flex items-baseline justify-between mb-4">
+   718→          <Skeleton className="h-6 w-64" />
+   719→          <Skeleton className="h-4 w-4" />
+   720→        </div>
+   721→        <Skeleton className="h-4 w-full mb-4" />
+   722→        <div className="rounded-md border border-border overflow-hidden">
+   723→          {/* Header row */}
+   724→          <div className="flex border-b border-border bg-[var(--surface)]">
+   725→            <Skeleton className="h-9 flex-1 m-2" />
+   726→            {Array.from({ length: 6 }).map((_, i) => (
+   727→              <Skeleton key={i} className="h-9 w-12 m-2" />
+   728→            ))}
+   729→          </div>
+   730→          {/* Body rows */}
+   731→          {Array.from({ length: 6 }).map((_, r) => (
+   732→            <div key={r} className="flex border-b border-border last:border-b-0">
+   733→              <div className="flex-1 flex items-center gap-2 p-2">
+   734→                <Skeleton className="h-2 w-2 rounded-full" />
+   735→                <Skeleton className="h-3.5 w-32" />
+   736→              </div>
+   737→              {Array.from({ length: 6 }).map((_, c) => (
+   738→                <Skeleton key={c} className="h-7 w-12 m-2 rounded-sm" />
+   739→              ))}
+   740→            </div>
+   741→          ))}
+   742→        </div>
+   743→      </div>
+   744→
+   745→      {/* Risk distribution chart skeleton */}
+   746→      <div>
+   747→        <Skeleton className="h-6 w-48 mb-4" />
+   748→        <Skeleton className="h-64 w-full rounded-md" />
+   749→      </div>
+   750→
+   751→      {/* Company detail cards skeleton — 3 stacked cards */}
+   752→      <div className="space-y-4">
+   753→        {Array.from({ length: 3 }).map((_, i) => (
+   754→          <div key={i} className="rounded-md border border-border p-5 space-y-3">
+   755→            <div className="flex items-center justify-between">
+   756→              <Skeleton className="h-5 w-40" />
+   757→              <Skeleton className="h-3.5 w-20" />
+   758→            </div>
+   759→            <Skeleton className="h-3 w-full" />
+   760→            <Skeleton className="h-3 w-3/4" />
+   761→            <div className="flex gap-2 pt-2">
+   762→              <Skeleton className="h-7 w-20 rounded-sm" />
+   763→              <Skeleton className="h-7 w-20 rounded-sm" />
+   764→            </div>
+   765→          </div>
+   766→        ))}
+   767→      </div>
+   768→    </div>
+   769→  );
+   770→}
+   771→
+   772→function EmptyState() {
+   773→  const go = useView((s) => s.go);
+   774→  return (
+   775→    <section className="border border-dashed border-border rounded-lg py-16 flex flex-col items-center justify-center text-center gap-4">
+   776→      <div className="h-14 w-14 rounded-full bg-[var(--surface)] flex items-center justify-center">
+   777→        <Building2 className="h-7 w-7 text-muted-foreground" />
+   778→      </div>
+   779→      <div className="space-y-1">
+   780→        <h3 className="font-display text-base tracking-tight text-foreground">
+   781→          Nenhuma empresa cadastrada
+   782→        </h3>
+   783→        <p className="text-sm text-muted-foreground max-w-md">
+   784→          Adicione seu primeiro cliente para visualizar a análise
+   785→          consolidada.
+   786→        </p>
+   787→      </div>
+   788→      <Button onClick={() => go("empresas")}>
+   789→        <Building2 className="h-4 w-4" aria-hidden="true" />
+   790→        Cadastrar empresa
+   791→      </Button>
+   792→    </section>
+   793→  );
+   794→}
+   795→
+   796→function ErrorState({ onRetry }: { onRetry: () => void }) {
+   797→  return (
+   798→    <section className="border border-dashed border-border rounded-lg py-16 flex flex-col items-center justify-center text-center gap-4">
+   799→      <div className="h-14 w-14 rounded-full risk-high-bg flex items-center justify-center">
+   800→        <ShieldAlert className="h-7 w-7 text-risk-high" />
+   801→      </div>
+   802→      <div className="space-y-1">
+   803→        <h3 className="font-display text-base tracking-tight text-foreground">
+   804→          Não foi possível carregar a análise consolidada
+   805→        </h3>
+   806→        <p className="text-sm text-muted-foreground max-w-md">
+   807→          Tente novamente em instantes. Se o erro persistir, verifique sua
+   808→          conexão.
+   809→        </p>
+   810→      </div>
+   811→      <Button variant="outline" onClick={onRetry}>
+   812→        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+   813→        Tentar novamente
+   814→      </Button>
+   815→    </section>
+   816→  );
+   817→}
+   818→
+   819→// ─── Header (serif + border-b, no gradient) ─────────────────────────────────
+   820→
+   821→interface HeaderProps {
+   822→  onRefresh: () => void;
+   823→  refreshing: boolean;
+   824→}
+   825→
+   826→function Header({ onRefresh, refreshing }: HeaderProps) {
+   827→  return (
+   828→    <header className="border-b border-border pb-6 mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+   829→      <div>
+   830→        <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
+   831→          Análise Consolidada
+   832→        </h1>
+   833→        <p className="text-sm text-muted-foreground mt-1.5">
+   834→          Comparação de risco psicossocial entre todos os clientes
+   835→        </p>
+   836→      </div>
+   837→      <Button
+   838→        variant="outline"
+   839→        onClick={onRefresh}
+   840→        disabled={refreshing}
+   841→        className="self-start sm:self-auto"
+   842→      >
+   843→        {refreshing ? (
+   844→          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+   845→        ) : (
+   846→          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+   847→        )}
+   848→        Atualizar
+   849→      </Button>
+   850→    </header>
+   851→  );
+   852→}
+   853→
+   854→// ─── Main view ──────────────────────────────────────────────────────────────
+   855→
+   856→export function ConsolidadoView() {
+   857→  const [data, setData] = useState<CompanyBreakdown[] | null>(null);
+   858→  const [loading, setLoading] = useState(true);
+   859→  const [refreshing, setRefreshing] = useState(false);
+   860→  const [error, setError] = useState(false);
+   861→
+   862→  const load = useCallback(async (silent = false) => {
+   863→    if (silent) setRefreshing(true);
+   864→    else setLoading(true);
+   865→    setError(false);
+   866→    try {
+   867→      const res = await api.me.companiesBreakdown();
+   868→      setData(res.data);
+   869→    } catch (e) {
+   870→      if (e instanceof ApiError) {
+   871→        toast.error(e.message || "Falha ao carregar análise consolidada.");
+   872→      } else {
+   873→        toast.error("Falha ao carregar análise consolidada.");
+   874→      }
+   875→      setError(true);
+   876→    } finally {
+   877→      setLoading(false);
+   878→      setRefreshing(false);
+   879→    }
+   880→  }, []);
+   881→
+   882→  useEffect(() => {
+   883→    load();
+   884→  }, [load]);
+   885→
+   886→  return (
+   887→    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+   888→      <TooltipProvider delayDuration={200}>
+   889→        <Header onRefresh={() => load(true)} refreshing={refreshing} />
+   890→
+   891→        <div className="space-y-10">
+   892→          {loading ? (
+   893→            <LoadingState />
+   894→          ) : error ? (
+   895→            <ErrorState onRetry={() => load()} />
+   896→          ) : !data || data.length === 0 ? (
+   897→            <EmptyState />
+   898→          ) : (
+   899→            <div className="animate-in fade-in duration-300">
+   900→            <>
+   901→              <SummaryKpis data={data} />
+   902→              <HeatmapTable data={data} />
+   903→              <RiskDistributionChart data={data} />
+   904→              <CompanyDetailCards data={data} />
+   905→            </>
+   906→            </div>
+   907→          )}
+   908→        </div>
+   909→      </TooltipProvider>
+   910→    </div>
+   911→  );
+   912→}
+   913→
+   914→export default ConsolidadoView;
+   915→

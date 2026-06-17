@@ -1,0 +1,1559 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { useCallback, useEffect, useMemo, useState } from "react";
+     5→import { format, parseISO, isValid as isValidDate } from "date-fns";
+     6→import { ptBR } from "date-fns/locale";
+     7→import {
+     8→  AlertCircle,
+     9→  AlertTriangle,
+    10→  ArrowRight,
+    11→  Building2,
+    12→  Calendar,
+    13→  Check,
+    14→  ClipboardList,
+    15→  FileText,
+    16→  Layers,
+    17→  Loader2,
+    18→  Mail,
+    19→  MapPin,
+    20→  Pencil,
+    21→  Phone,
+    22→  Plus,
+    23→  RefreshCw,
+    24→  Trash2,
+    25→  User,
+    26→  Users,
+    27→  X,
+    28→} from "lucide-react";
+    29→import { toast } from "sonner";
+    30→
+    31→import { api, ApiError } from "@/lib/api";
+    32→import { useView } from "@/lib/store";
+    33→import type {
+    34→  Assessment,
+    35→  CompanySummary,
+    36→  Department,
+    37→} from "@/lib/types";
+    38→import { formatCnpj } from "@/lib/cnpj";
+    39→import {
+    40→  ASSESSMENT_STATUS_LABELS,
+    41→} from "@/lib/errors";
+    42→import { NrStatusBadge, type NrStatus } from "@/components/shell/nr-status-badge";
+    43→import { CompanyFormDialog } from "@/components/empresas/company-form-dialog";
+    44→
+    45→import { Button } from "@/components/ui/button";
+    46→import { Input } from "@/components/ui/input";
+    47→import { Label } from "@/components/ui/label";
+    48→import { Textarea } from "@/components/ui/textarea";
+    49→import { Skeleton } from "@/components/ui/skeleton";
+    50→import { Badge } from "@/components/ui/badge";
+    51→import {
+    52→  Tabs,
+    53→  TabsContent,
+    54→  TabsList,
+    55→  TabsTrigger,
+    56→} from "@/components/ui/tabs";
+    57→import {
+    58→  Dialog,
+    59→  DialogContent,
+    60→  DialogDescription,
+    61→  DialogFooter,
+    62→  DialogHeader,
+    63→  DialogTitle,
+    64→} from "@/components/ui/dialog";
+    65→import {
+    66→  AlertDialog,
+    67→  AlertDialogAction,
+    68→  AlertDialogCancel,
+    69→  AlertDialogContent,
+    70→  AlertDialogDescription,
+    71→  AlertDialogFooter,
+    72→  AlertDialogHeader,
+    73→  AlertDialogTitle,
+    74→} from "@/components/ui/alert-dialog";
+    75→import {
+    76→  Table,
+    77→  TableBody,
+    78→  TableCell,
+    79→  TableHead,
+    80→  TableHeader,
+    81→  TableRow,
+    82→} from "@/components/ui/table";
+    83→import { Checkbox } from "@/components/ui/checkbox";
+    84→
+    85→// ─── Helpers ─────────────────────────────────────────────────────────────────
+    86→
+    87→const TWO_YEARS_MS = 1000 * 60 * 60 * 24 * 365 * 2;
+    88→
+    89→function deriveStatus(c: CompanySummary): NrStatus {
+    90→  const { lastAssessmentStatus, lastAssessmentCompletedAt } = c.summary;
+    91→  if (!lastAssessmentStatus) return "no_assessment";
+    92→  if (lastAssessmentStatus === "collecting") return "collecting";
+    93→  if (lastAssessmentStatus === "processing") return "processing";
+    94→  if (lastAssessmentStatus === "draft") return "draft";
+    95→  if (lastAssessmentStatus === "archived") return "archived";
+    96→  if (lastAssessmentStatus === "completed") {
+    97→    if (lastAssessmentCompletedAt) {
+    98→      const age = Date.now() - new Date(lastAssessmentCompletedAt).getTime();
+    99→      if (age > TWO_YEARS_MS) return "review_recommended";
+   100→    }
+   101→    return "completed";
+   102→  }
+   103→  return "no_assessment";
+   104→}
+   105→
+   106→function fmtDate(iso: string | null, fallback = "—"): string {
+   107→  if (!iso) return fallback;
+   108→  try {
+   109→    const d = parseISO(iso);
+   110→    if (!isValidDate(d)) return fallback;
+   111→    return format(d, "dd/MM/yyyy", { locale: ptBR });
+   112→  } catch {
+   113→    return fallback;
+   114→  }
+   115→}
+   116→
+   117→function fmtPeriod(start: string | null, end: string | null): string {
+   118→  const s = start ? fmtDate(start) : "—";
+   119→  const e = end ? fmtDate(end) : "—";
+   120→  return `${s} → ${e}`;
+   121→}
+   122→
+   123→// ─── View ────────────────────────────────────────────────────────────────────
+   124→
+   125→export function EmpresaDetailView() {
+   126→  const companyId = useView((s) => s.companyId);
+   127→  const go = useView((s) => s.go);
+   128→
+   129→  const [company, setCompany] = useState<CompanySummary | null>(null);
+   130→  const [loading, setLoading] = useState(true);
+   131→  const [error, setError] = useState<string | null>(null);
+   132→  const [refreshKey, setRefreshKey] = useState(0);
+   133→
+   134→  const load = useCallback(async () => {
+   135→    if (!companyId) {
+   136→      setError("Nenhuma empresa selecionada.");
+   137→      setLoading(false);
+   138→      return;
+   139→    }
+   140→    setLoading(true);
+   141→    setError(null);
+   142→    try {
+   143→      const c = await api.companies.get(companyId);
+   144→      setCompany(c);
+   145→    } catch (e) {
+   146→      if (e instanceof ApiError) {
+   147→        setError(e.message);
+   148→      } else {
+   149→        setError("Não foi possível carregar a empresa.");
+   150→      }
+   151→    } finally {
+   152→      setLoading(false);
+   153→    }
+   154→  }, [companyId]);
+   155→
+   156→  useEffect(() => {
+   157→    void load();
+   158→  }, [load, refreshKey]);
+   159→
+   160→  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+   161→
+   162→  // Edit dialog state
+   163→  const [editOpen, setEditOpen] = useState(false);
+   164→
+   165→  if (!companyId) {
+   166→    return (
+   167→      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-3xl mx-auto w-full">
+   168→        <section className="border border-dashed border-border rounded-lg py-12 flex flex-col items-center text-center gap-3">
+   169→          <div className="h-11 w-11 rounded-full bg-[var(--surface)] flex items-center justify-center">
+   170→            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+   171→          </div>
+   172→          <div>
+   173→            <p className="font-display text-lg">Nenhuma empresa selecionada</p>
+   174→            <p className="text-sm text-muted-foreground mt-1">
+   175→              Volte para a lista de empresas e escolha um cliente para
+   176→              visualizar seus detalhes.
+   177→            </p>
+   178→          </div>
+   179→          <Button onClick={() => go("empresas")}>
+   180→            Ver empresas
+   181→          </Button>
+   182→        </section>
+   183→      </div>
+   184→    );
+   185→  }
+   186→
+   187→  if (loading) return <DetailSkeleton />;
+   188→  if (error || !company) {
+   189→    return (
+   190→      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-3xl mx-auto w-full">
+   191→        <section
+   192→          role="alert"
+   193→          className="border border-dashed border-border rounded-lg py-10 flex flex-col items-center text-center gap-3"
+   194→        >
+   195→          <div className="h-11 w-11 rounded-full risk-high-bg flex items-center justify-center">
+   196→            <AlertTriangle className="h-5 w-5" />
+   197→          </div>
+   198→          <div>
+   199→            <p className="font-display text-lg">Falha ao carregar a empresa</p>
+   200→            <p className="text-sm text-muted-foreground mt-1">
+   201→              {error ?? "Tente novamente."}
+   202→            </p>
+   203→          </div>
+   204→          <div className="flex gap-2">
+   205→            <Button variant="outline" onClick={() => go("painel")}>
+   206→              Voltar ao painel
+   207→            </Button>
+   208→            <Button variant="outline" onClick={() => void load()}>
+   209→              <RefreshCw className="h-4 w-4" />
+   210→              Tentar novamente
+   211→            </Button>
+   212→          </div>
+   213→        </section>
+   214→      </div>
+   215→    );
+   216→  }
+   217→
+   218→  return (
+   219→    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+   220→      {/* Back link */}
+   221→      <nav className="mb-4" aria-label="Navegação breadcrumb">
+   222→        <Button
+   223→          variant="ghost"
+   224→          size="sm"
+   225→          onClick={() => go("painel")}
+   226→          className="-ml-2 text-muted-foreground hover:text-foreground"
+   227→        >
+   228→          <ArrowRight className="h-4 w-4 rotate-180" />
+   229→          Voltar ao painel
+   230→        </Button>
+   231→      </nav>
+   232→
+   233→      <CompanyDetailHeader
+   234→        company={company}
+   235→        onEdit={() => setEditOpen(true)}
+   236→        onRefresh={refresh}
+   237→      />
+   238→
+   239→      <div className="mt-8">
+   240→        <CompanyTabs
+   241→          company={company}
+   242→          onRefresh={refresh}
+   243→          onAssessmentCreated={(a) =>
+   244→            go("avaliacao", { assessmentId: a.id, companyId: a.companyId })
+   245→          }
+   246→        />
+   247→      </div>
+   248→
+   249→      {/* Edit dialog (reuses CompanyFormDialog) */}
+   250→      <CompanyFormDialog
+   251→        open={editOpen}
+   252→        onOpenChange={setEditOpen}
+   253→        editing={company}
+   254→        onCreated={() => setEditOpen(false)}
+   255→        onUpdated={(c) => {
+   256→          setEditOpen(false);
+   257→          setCompany(c);
+   258→          toast.success("Empresa atualizada.");
+   259→          refresh();
+   260→        }}
+   261→      />
+   262→    </div>
+   263→  );
+   264→}
+   265→
+   266→// ─── Header ──────────────────────────────────────────────────────────────────
+   267→
+   268→function CompanyDetailHeader({
+   269→  company,
+   270→  onEdit,
+   271→  onRefresh,
+   272→}: {
+   273→  company: CompanySummary;
+   274→  onEdit: () => void;
+   275→  onRefresh: () => void;
+   276→}) {
+   277→  const status = deriveStatus(company);
+   278→  const location =
+   279→    company.city || company.state
+   280→      ? [company.city, company.state].filter(Boolean).join(" · ")
+   281→      : null;
+   282→
+   283→  return (
+   284→    <header className="border-b border-border pb-6">
+   285→      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+   286→        <div className="min-w-0 flex-1">
+   287→          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
+   288→            <Building2 className="h-3.5 w-3.5" />
+   289→            <span>Empresa</span>
+   290→          </div>
+   291→          <h1 className="font-display text-2xl sm:text-3xl tracking-tight leading-tight">
+   292→            {company.name}
+   293→          </h1>
+   294→          <p className="font-mono-numeric text-sm text-muted-foreground mt-1.5">
+   295→            {formatCnpj(company.cnpj)}
+   296→          </p>
+   297→        </div>
+   298→        <div className="flex items-center gap-2 shrink-0">
+   299→          <NrStatusBadge status={status} />
+   300→          <Button variant="outline" size="sm" onClick={onRefresh}>
+   301→            <RefreshCw className="h-3.5 w-3.5" />
+   302→            <span className="sr-only">Atualizar</span>
+   303→          </Button>
+   304→          <Button variant="outline" size="sm" onClick={onEdit}>
+   305→            <Pencil className="h-3.5 w-3.5" />
+   306→            Editar
+   307→          </Button>
+   308→        </div>
+   309→      </div>
+   310→
+   311→      {/* Quick metadata strip */}
+   312→      {(location ||
+   313→        company.cnaePrimary ||
+   314→        company.employeeCount != null ||
+   315→        company.contactName ||
+   316→        company.contactEmail ||
+   317→        company.contactPhone) && (
+   318→        <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+   319→          {location && (
+   320→            <DetailItem icon={MapPin} label="Localização">
+   321→              {location}
+   322→            </DetailItem>
+   323→          )}
+   324→          {company.cnaePrimary && (
+   325→            <DetailItem icon={ClipboardList} label="CNAE principal">
+   326→              <span className="font-mono-numeric">{company.cnaePrimary}</span>
+   327→            </DetailItem>
+   328→          )}
+   329→          {company.employeeCount != null && (
+   330→            <DetailItem icon={Users} label="Empregados">
+   331→              <span className="font-mono-numeric">
+   332→                {company.employeeCount.toLocaleString("pt-BR")}
+   333→              </span>
+   334→            </DetailItem>
+   335→          )}
+   336→          {company.contactName && (
+   337→            <DetailItem icon={User} label="Responsável">
+   338→              {company.contactName}
+   339→            </DetailItem>
+   340→          )}
+   341→          {company.contactEmail && (
+   342→            <DetailItem icon={Mail} label="E-mail">
+   343→              <a
+   344→                href={`mailto:${company.contactEmail}`}
+   345→                className="hover:underline"
+   346→              >
+   347→                {company.contactEmail}
+   348→              </a>
+   349→            </DetailItem>
+   350→          )}
+   351→          {company.contactPhone && (
+   352→            <DetailItem icon={Phone} label="Telefone">
+   353→              <span className="font-mono-numeric">{company.contactPhone}</span>
+   354→            </DetailItem>
+   355→          )}
+   356→        </dl>
+   357→      )}
+   358→    </header>
+   359→  );
+   360→}
+   361→
+   362→function DetailItem({
+   363→  icon: Icon,
+   364→  label,
+   365→  children,
+   366→}: {
+   367→  icon: React.ElementType;
+   368→  label: string;
+   369→  children: React.ReactNode;
+   370→}) {
+   371→  return (
+   372→    <div className="flex items-start gap-2.5 min-w-0">
+   373→      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+   374→      <div className="min-w-0">
+   375→        <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+   376→          {label}
+   377→        </dt>
+   378→        <dd className="text-sm font-medium truncate">{children}</dd>
+   379→      </div>
+   380→    </div>
+   381→  );
+   382→}
+   383→
+   384→// ─── Tabs ────────────────────────────────────────────────────────────────────
+   385→
+   386→function CompanyTabs({
+   387→  company,
+   388→  onRefresh,
+   389→  onAssessmentCreated,
+   390→}: {
+   391→  company: CompanySummary;
+   392→  onRefresh: () => void;
+   393→  onAssessmentCreated: (a: Assessment) => void;
+   394→}) {
+   395→  return (
+   396→    <Tabs defaultValue="overview" className="w-full">
+   397→      <TabsList className="w-full sm:w-auto justify-start overflow-x-auto">
+   398→        <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+   399→        <TabsTrigger value="departments">Departamentos</TabsTrigger>
+   400→        <TabsTrigger value="assessments">Avaliações</TabsTrigger>
+   401→      </TabsList>
+   402→
+   403→      <TabsContent value="overview" className="mt-6">
+   404→        <OverviewTab company={company} onAssessmentCreated={onAssessmentCreated} />
+   405→      </TabsContent>
+   406→
+   407→      <TabsContent value="departments" className="mt-6">
+   408→        <DepartmentsTab company={company} onChanged={onRefresh} />
+   409→      </TabsContent>
+   410→
+   411→      <TabsContent value="assessments" className="mt-6">
+   412→        <AssessmentsTab
+   413→          company={company}
+   414→          onAssessmentCreated={onAssessmentCreated}
+   415→          onRefresh={onRefresh}
+   416→        />
+   417→      </TabsContent>
+   418→    </Tabs>
+   419→  );
+   420→}
+   421→
+   422→// ─── Visão Geral tab ─────────────────────────────────────────────────────────
+   423→
+   424→function OverviewTab({
+   425→  company,
+   426→  onAssessmentCreated,
+   427→}: {
+   428→  company: CompanySummary;
+   429→  onAssessmentCreated: (a: Assessment) => void;
+   430→}) {
+   431→  const [createOpen, setCreateOpen] = useState(false);
+   432→  const summary = company.summary;
+   433→  const lastStatus = summary.lastAssessmentStatus
+   434→    ? ASSESSMENT_STATUS_LABELS[summary.lastAssessmentStatus] ?? summary.lastAssessmentStatus
+   435→    : null;
+   436→  const lastDate = fmtDate(summary.lastAssessmentCompletedAt);
+   437→
+   438→  return (
+   439→    <div className="space-y-8">
+   440→      {/* Stat strip */}
+   441→      <section aria-label="Indicadores">
+   442→        <div className="bg-[var(--surface)] rounded-lg p-5 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+   443→          <div className="sm:pr-5 py-3 sm:py-0 first:pt-0 last:pb-0">
+   444→            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+   445→              Departamentos
+   446→            </div>
+   447→            <div className="font-mono-numeric text-2xl mt-1">
+   448→              {summary.departmentsCount}
+   449→            </div>
+   450→            <div className="text-xs text-muted-foreground mt-0.5">
+   451→              GHEs cadastrados
+   452→            </div>
+   453→          </div>
+   454→          <div className="sm:px-5 py-3 sm:py-0">
+   455→            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+   456→              Avaliações
+   457→            </div>
+   458→            <div className="font-mono-numeric text-2xl mt-1">
+   459→              {summary.assessmentsCount}
+   460→            </div>
+   461→            <div className="text-xs text-muted-foreground mt-0.5">
+   462→              Ciclos registrados
+   463→            </div>
+   464→          </div>
+   465→          <div className="sm:pl-5 py-3 sm:py-0">
+   466→            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+   467→              Última avaliação
+   468→            </div>
+   469→            <div className="font-mono-numeric text-2xl mt-1">
+   470→              {lastStatus ?? "—"}
+   471→            </div>
+   472→            <div className="text-xs text-muted-foreground mt-0.5">
+   473→              {lastDate !== "—" ? `Concluída em ${lastDate}` : "Sem conclusões"}
+   474→            </div>
+   475→          </div>
+   476→        </div>
+   477→      </section>
+   478→
+   479→      {/* Metadata */}
+   480→      <section aria-label="Dados da empresa" className="border-b border-border pb-8">
+   481→        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+   482→          <div>
+   483→            <h2 className="font-display text-xl">Dados da empresa</h2>
+   484→            <p className="text-sm text-muted-foreground mt-0.5">
+   485→              Informações cadastrais usadas nos relatórios NR-1.
+   486→            </p>
+   487→          </div>
+   488→          <Button onClick={() => setCreateOpen(true)}>
+   489→            <Plus className="h-4 w-4" />
+   490→            Nova Avaliação
+   491→          </Button>
+   492→        </div>
+   493→        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+   494→          <Meta label="CNPJ" value={<span className="font-mono-numeric">{formatCnpj(company.cnpj)}</span>} />
+   495→          <Meta label="CNAE principal" value={company.cnaePrimary ?? "—"} />
+   496→          <Meta
+   497→            label="Localização"
+   498→            value={
+   499→              company.city || company.state
+   500→                ? [company.city, company.state].filter(Boolean).join(" · ")
+   501→                : "—"
+   502→            }
+   503→          />
+   504→          <Meta
+   505→            label="Nº de empregados"
+   506→            value={
+   507→              company.employeeCount != null
+   508→                ? <span className="font-mono-numeric">{company.employeeCount.toLocaleString("pt-BR")}</span>
+   509→                : "—"
+   510→            }
+   511→          />
+   512→          <Meta label="Responsável" value={company.contactName ?? "—"} />
+   513→          <Meta label="E-mail" value={company.contactEmail ?? "—"} />
+   514→          <Meta label="Telefone" value={company.contactPhone ?? "—"} />
+   515→          <Meta label="Encarregado LGPD / DPO" value={company.dpoPoc ?? "—"} />
+   516→          <Meta label="Criada em" value={fmtDate(company.createdAt)} />
+   517→        </dl>
+   518→      </section>
+   519→
+   520→      <CreateAssessmentDialog
+   521→        open={createOpen}
+   522→        onOpenChange={setCreateOpen}
+   523→        companyId={company.id}
+   524→        onCreated={onAssessmentCreated}
+   525→      />
+   526→    </div>
+   527→  );
+   528→}
+   529→
+   530→function Meta({ label, value }: { label: string; value: React.ReactNode }) {
+   531→  return (
+   532→    <div className="min-w-0">
+   533→      <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+   534→        {label}
+   535→      </dt>
+   536→      <dd className="text-sm font-medium mt-0.5 truncate">{value}</dd>
+   537→    </div>
+   538→  );
+   539→}
+   540→
+   541→// ─── Departamentos tab ───────────────────────────────────────────────────────
+   542→
+   543→function DepartmentsTab({
+   544→  company,
+   545→  onChanged,
+   546→}: {
+   547→  company: CompanySummary;
+   548→  onChanged: () => void;
+   549→}) {
+   550→  const [departments, setDepartments] = useState<Department[] | null>(null);
+   551→  const [loading, setLoading] = useState(true);
+   552→  const [error, setError] = useState<string | null>(null);
+   553→
+   554→  const [formOpen, setFormOpen] = useState(false);
+   555→  const [editing, setEditing] = useState<Department | null>(null);
+   556→  const [confirmDelete, setConfirmDelete] = useState<Department | null>(null);
+   557→  const [deleting, setDeleting] = useState(false);
+   558→
+   559→  const load = useCallback(async () => {
+   560→    setLoading(true);
+   561→    setError(null);
+   562→    try {
+   563→      const res = await api.departments.list(company.id);
+   564→      setDepartments(res.data);
+   565→    } catch (e) {
+   566→      if (e instanceof ApiError) {
+   567→        setError(e.message);
+   568→      } else {
+   569→        setError("Não foi possível carregar os departamentos.");
+   570→      }
+   571→    } finally {
+   572→      setLoading(false);
+   573→    }
+   574→  }, [company.id]);
+   575→
+   576→  useEffect(() => {
+   577→    void load();
+   578→  }, [load]);
+   579→
+   580→  const openCreate = () => {
+   581→    setEditing(null);
+   582→    setFormOpen(true);
+   583→  };
+   584→  const openEdit = (d: Department) => {
+   585→    setEditing(d);
+   586→    setFormOpen(true);
+   587→  };
+   588→
+   589→  const onSaved = () => {
+   590→    setFormOpen(false);
+   591→    void load();
+   592→    onChanged();
+   593→  };
+   594→
+   595→  const onConfirmDelete = async () => {
+   596→    if (!confirmDelete) return;
+   597→    setDeleting(true);
+   598→    try {
+   599→      await api.departments.delete(company.id, confirmDelete.id);
+   600→      toast.success(`Departamento "${confirmDelete.name}" desativado.`);
+   601→      setConfirmDelete(null);
+   602→      void load();
+   603→      onChanged();
+   604→    } catch (e) {
+   605→      if (e instanceof ApiError) {
+   606→        if (e.code === "DEPARTMENT_HAS_ACTIVE_ASSESSMENT") {
+   607→          toast.error(
+   608→            "Este departamento possui uma avaliação ativa e não pode ser desativado."
+   609→          );
+   610→        } else {
+   611→          toast.error(e.message);
+   612→        }
+   613→      } else {
+   614→        toast.error("Falha ao desativar departamento.");
+   615→      }
+   616→    } finally {
+   617→      setDeleting(false);
+   618→    }
+   619→  };
+   620→
+   621→  return (
+   622→    <section aria-label="Departamentos" className="space-y-4">
+   623→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   624→        <div>
+   625→          <h2 className="font-display text-xl">Departamentos (GHEs)</h2>
+   626→          <p className="text-sm text-muted-foreground mt-0.5">
+   627→            Grupos Homogêneos de Exposição nos quais a coleta de dados é
+   628→            estratificada.
+   629→          </p>
+   630→        </div>
+   631→        <Button onClick={openCreate}>
+   632→          <Plus className="h-4 w-4" />
+   633→          Departamento
+   634→        </Button>
+   635→      </div>
+   636→
+   637→      {loading ? (
+   638→        <div className="space-y-2">
+   639→          <Skeleton className="h-10 w-full" />
+   640→          <Skeleton className="h-10 w-full" />
+   641→          <Skeleton className="h-10 w-full" />
+   642→        </div>
+   643→      ) : error ? (
+   644→        <div className="flex flex-col items-center text-center gap-3 py-8">
+   645→          <AlertTriangle className="h-5 w-5 text-[var(--risk-high)]" />
+   646→          <p className="text-sm text-muted-foreground">{error}</p>
+   647→          <Button variant="outline" size="sm" onClick={() => void load()}>
+   648→            <RefreshCw className="h-4 w-4" />
+   649→            Tentar novamente
+   650→          </Button>
+   651→        </div>
+   652→      ) : !departments || departments.length === 0 ? (
+   653→        <div className="border border-dashed border-border rounded-lg py-12 flex flex-col items-center text-center gap-3">
+   654→          <div className="h-11 w-11 rounded-full bg-[var(--surface)] flex items-center justify-center">
+   655→            <Layers className="h-5 w-5 text-muted-foreground" />
+   656→          </div>
+   657→          <div>
+   658→            <p className="font-display text-lg">Nenhum departamento cadastrado</p>
+   659→            <p className="text-sm text-muted-foreground mt-1">
+   660→              Cadastre um GHE para iniciar uma avaliação psicossocial.
+   661→            </p>
+   662→          </div>
+   663→          <Button onClick={openCreate}>
+   664→            <Plus className="h-4 w-4" />
+   665→            Adicionar departamento
+   666→          </Button>
+   667→        </div>
+   668→      ) : (
+   669→        <div className="overflow-x-auto scroll-area">
+   670→          <Table>
+   671→            <caption className="sr-only">
+   672→              Lista de departamentos (GHEs) da empresa {company.name}
+   673→            </caption>
+   674→            <TableHeader>
+   675→              <TableRow className="border-b border-border hover:bg-transparent">
+   676→                <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Nome</TableHead>
+   677→                <TableHead className="w-32 text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Trabalhadores</TableHead>
+   678→                <TableHead className="w-28 text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Status</TableHead>
+   679→                <TableHead className="w-32 text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Ações</TableHead>
+   680→              </TableRow>
+   681→            </TableHeader>
+   682→            <TableBody>
+   683→              {departments.map((d) => (
+   684→                <TableRow key={d.id} className="border-b border-border">
+   685→                  <TableCell className="py-3">
+   686→                    <div className="font-medium">{d.name}</div>
+   687→                    {d.description && (
+   688→                      <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+   689→                        {d.description}
+   690→                      </div>
+   691→                    )}
+   692→                  </TableCell>
+   693→                  <TableCell className="py-3 text-right font-mono-numeric">
+   694→                    {d.workerCount.toLocaleString("pt-BR")}
+   695→                  </TableCell>
+   696→                  <TableCell className="py-3">
+   697→                    {d.isActive ? (
+   698→                      <Badge className="risk-low-bg border-transparent">Ativo</Badge>
+   699→                    ) : (
+   700→                      <Badge variant="outline" className="text-muted-foreground">
+   701→                        Inativo
+   702→                      </Badge>
+   703→                    )}
+   704→                  </TableCell>
+   705→                  <TableCell className="py-3 text-right">
+   706→                    <div className="flex items-center justify-end gap-1">
+   707→                      <Button
+   708→                        variant="ghost"
+   709→                        size="icon"
+   710→                        className="h-8 w-8 text-muted-foreground hover:text-[var(--brand)]"
+   711→                        onClick={() => openEdit(d)}
+   712→                        aria-label={`Editar departamento ${d.name}`}
+   713→                      >
+   714→                        <Pencil className="h-3.5 w-3.5" />
+   715→                      </Button>
+   716→                      <Button
+   717→                        variant="ghost"
+   718→                        size="icon"
+   719→                        className="h-8 w-8 text-muted-foreground hover:text-[var(--risk-high)]"
+   720→                        onClick={() => setConfirmDelete(d)}
+   721→                        aria-label={`Desativar departamento ${d.name}`}
+   722→                        disabled={!d.isActive}
+   723→                      >
+   724→                        <Trash2 className="h-3.5 w-3.5" />
+   725→                      </Button>
+   726→                    </div>
+   727→                  </TableCell>
+   728→                </TableRow>
+   729→              ))}
+   730→            </TableBody>
+   731→          </Table>
+   732→        </div>
+   733→      )}
+   734→
+   735→      {/* Form dialog */}
+   736→      <DepartmentFormDialog
+   737→        open={formOpen}
+   738→        onOpenChange={setFormOpen}
+   739→        companyId={company.id}
+   740→        editing={editing}
+   741→        onSaved={onSaved}
+   742→      />
+   743→
+   744→      {/* Delete confirm */}
+   745→      <AlertDialog
+   746→        open={!!confirmDelete}
+   747→        onOpenChange={(v) => !v && setConfirmDelete(null)}
+   748→      >
+   749→        <AlertDialogContent>
+   750→          <AlertDialogHeader>
+   751→            <AlertDialogTitle className="font-display">Desativar departamento</AlertDialogTitle>
+   752→            <AlertDialogDescription>
+   753→              Tem certeza que deseja desativar{" "}
+   754→              <span className="font-medium text-foreground">
+   755→                {confirmDelete?.name}
+   756→              </span>
+   757→              ? Esta ação é reversível apenas recriando o departamento.
+   758→              Departamentos com avaliação ativa não podem ser desativados.
+   759→            </AlertDialogDescription>
+   760→          </AlertDialogHeader>
+   761→          <AlertDialogFooter>
+   762→            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+   763→            <AlertDialogAction
+   764→              onClick={(e) => {
+   765→                e.preventDefault();
+   766→                void onConfirmDelete();
+   767→              }}
+   768→              disabled={deleting}
+   769→              className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+   770→            >
+   771→              {deleting ? (
+   772→                <>
+   773→                  <Loader2 className="h-4 w-4 animate-spin" />
+   774→                  Desativando…
+   775→                </>
+   776→              ) : (
+   777→                <>
+   778→                  <Trash2 className="h-4 w-4" />
+   779→                  Desativar
+   780→                </>
+   781→              )}
+   782→            </AlertDialogAction>
+   783→          </AlertDialogFooter>
+   784→        </AlertDialogContent>
+   785→      </AlertDialog>
+   786→    </section>
+   787→  );
+   788→}
+   789→
+   790→// ─── Department form dialog ──────────────────────────────────────────────────
+   791→
+   792→interface DeptFormState {
+   793→  name: string;
+   794→  description: string;
+   795→  workerCount: string;
+   796→}
+   797→
+   798→function DepartmentFormDialog({
+   799→  open,
+   800→  onOpenChange,
+   801→  companyId,
+   802→  editing,
+   803→  onSaved,
+   804→}: {
+   805→  open: boolean;
+   806→  onOpenChange: (v: boolean) => void;
+   807→  companyId: string;
+   808→  editing: Department | null;
+   809→  onSaved: () => void;
+   810→}) {
+   811→  const [form, setForm] = useState<DeptFormState>({
+   812→    name: "",
+   813→    description: "",
+   814→    workerCount: "",
+   815→  });
+   816→  const [submitting, setSubmitting] = useState(false);
+   817→  const [nameError, setNameError] = useState<string | null>(null);
+   818→
+   819→  useEffect(() => {
+   820→    if (!open) return;
+   821→    if (editing) {
+   822→      setForm({
+   823→        name: editing.name,
+   824→        description: editing.description ?? "",
+   825→        workerCount: String(editing.workerCount),
+   826→      });
+   827→    } else {
+   828→      setForm({ name: "", description: "", workerCount: "" });
+   829→    }
+   830→    setNameError(null);
+   831→  }, [open, editing]);
+   832→
+   833→  const onSubmit = async (e: React.FormEvent) => {
+   834→    e.preventDefault();
+   835→    if (!form.name.trim()) {
+   836→      toast.error("Informe o nome do departamento.");
+   837→      return;
+   838→    }
+   839→    const wc = Number(form.workerCount);
+   840→    if (!form.workerCount || !Number.isFinite(wc) || wc < 1) {
+   841→      toast.error("Informe o número de trabalhadores (≥ 1).");
+   842→      return;
+   843→    }
+   844→    setSubmitting(true);
+   845→    try {
+   846→      const body = {
+   847→        name: form.name.trim(),
+   848→        description: form.description.trim() || null,
+   849→        workerCount: wc,
+   850→      };
+   851→      if (editing) {
+   852→        await api.departments.update(companyId, editing.id, body);
+   853→        toast.success("Departamento atualizado.");
+   854→      } else {
+   855→        await api.departments.create(companyId, {
+   856→          name: body.name,
+   857→          description: body.description ?? undefined,
+   858→          workerCount: body.workerCount,
+   859→        });
+   860→        toast.success("Departamento cadastrado.");
+   861→      }
+   862→      onSaved();
+   863→    } catch (err) {
+   864→      if (err instanceof ApiError) {
+   865→        if (err.code === "DEPARTMENT_NAME_DUPLICATE") {
+   866→          setNameError("Já existe um departamento com este nome.");
+   867→        } else {
+   868→          toast.error(err.message);
+   869→        }
+   870→      } else {
+   871→        toast.error("Falha ao salvar departamento.");
+   872→      }
+   873→    } finally {
+   874→      setSubmitting(false);
+   875→    }
+   876→  };
+   877→
+   878→  return (
+   879→    <Dialog open={open} onOpenChange={onOpenChange}>
+   880→      <DialogContent className="sm:max-w-lg">
+   881→        <DialogHeader>
+   882→          <DialogTitle className="font-display text-xl">
+   883→            {editing ? "Editar departamento" : "Novo departamento"}
+   884→          </DialogTitle>
+   885→          <DialogDescription className="sr-only">
+   886→            {editing
+   887→              ? "Atualize os dados do GHE."
+   888→              : "Cadastre um novo Grupo Homogêneo de Exposição."}
+   889→          </DialogDescription>
+   890→        </DialogHeader>
+   891→        <form onSubmit={onSubmit} className="space-y-4">
+   892→          <fieldset className="space-y-4" disabled={submitting}>
+   893→            <div className="space-y-1.5">
+   894→              <Label htmlFor="dept-name">
+   895→                Nome <span className="text-[var(--risk-high)]">*</span>
+   896→              </Label>
+   897→              <Input
+   898→                id="dept-name"
+   899→                value={form.name}
+   900→                onChange={(e) => {
+   901→                  setForm({ ...form, name: e.target.value });
+   902→                  setNameError(null);
+   903→                }}
+   904→                autoFocus
+   905→                aria-invalid={!!nameError}
+   906→                aria-describedby={nameError ? "dept-name-err" : undefined}
+   907→              />
+   908→              {nameError && (
+   909→                <p id="dept-name-err" className="text-xs text-[var(--risk-high)]">
+   910→                  {nameError}
+   911→                </p>
+   912→              )}
+   913→            </div>
+   914→            <div className="space-y-1.5">
+   915→              <Label htmlFor="dept-desc">Descrição</Label>
+   916→              <Textarea
+   917→                id="dept-desc"
+   918→                rows={3}
+   919→                value={form.description}
+   920→                onChange={(e) =>
+   921→                  setForm({ ...form, description: e.target.value })
+   922→                }
+   923→                placeholder="Setor, turno, características do grupo…"
+   924→              />
+   925→            </div>
+   926→            <div className="space-y-1.5">
+   927→              <Label htmlFor="dept-wc">
+   928→                Nº de trabalhadores <span className="text-[var(--risk-high)]">*</span>
+   929→              </Label>
+   930→              <Input
+   931→                id="dept-wc"
+   932→                type="number"
+   933→                min={1}
+   934→                inputMode="numeric"
+   935→                value={form.workerCount}
+   936→                onChange={(e) =>
+   937→                  setForm({
+   938→                    ...form,
+   939→                    workerCount: e.target.value.replace(/[^\d]/g, ""),
+   940→                  })
+   941→                }
+   942→                className="font-mono-numeric"
+   943→                required
+   944→              />
+   945→            </div>
+   946→          </fieldset>
+   947→          <DialogFooter className="gap-2 pt-2">
+   948→            <Button
+   949→              type="button"
+   950→              variant="outline"
+   951→              onClick={() => onOpenChange(false)}
+   952→              disabled={submitting}
+   953→            >
+   954→              Cancelar
+   955→            </Button>
+   956→            <Button type="submit" disabled={submitting}>
+   957→              {submitting ? (
+   958→                <>
+   959→                  <Loader2 className="h-4 w-4 animate-spin" />
+   960→                  Salvando…
+   961→                </>
+   962→              ) : editing ? (
+   963→                <>
+   964→                  <Check className="h-4 w-4" />
+   965→                  Salvar alterações
+   966→                </>
+   967→              ) : (
+   968→                <>
+   969→                  <Plus className="h-4 w-4" />
+   970→                  Cadastrar
+   971→                </>
+   972→              )}
+   973→            </Button>
+   974→          </DialogFooter>
+   975→        </form>
+   976→      </DialogContent>
+   977→    </Dialog>
+   978→  );
+   979→}
+   980→
+   981→// ─── Avaliações tab ──────────────────────────────────────────────────────────
+   982→
+   983→function AssessmentsTab({
+   984→  company,
+   985→  onAssessmentCreated,
+   986→  onRefresh,
+   987→}: {
+   988→  company: CompanySummary;
+   989→  onAssessmentCreated: (a: Assessment) => void;
+   990→  onRefresh: () => void;
+   991→}) {
+   992→  const go = useView((s) => s.go);
+   993→  const [assessments, setAssessments] = useState<Assessment[] | null>(null);
+   994→  const [loading, setLoading] = useState(true);
+   995→  const [error, setError] = useState<string | null>(null);
+   996→  const [createOpen, setCreateOpen] = useState(false);
+   997→
+   998→  const load = useCallback(async () => {
+   999→    setLoading(true);
+  1000→    setError(null);
+  1001→    try {
+  1002→      const res = await api.assessments.listByCompany(company.id);
+  1003→      setAssessments(res.data);
+  1004→    } catch (e) {
+  1005→      if (e instanceof ApiError) {
+  1006→        setError(e.message);
+  1007→      } else {
+  1008→        setError("Não foi possível carregar as avaliações.");
+  1009→      }
+  1010→    } finally {
+  1011→      setLoading(false);
+  1012→    }
+  1013→  }, [company.id]);
+  1014→
+  1015→  useEffect(() => {
+  1016→    void load();
+  1017→  }, [load]);
+  1018→
+  1019→  return (
+  1020→    <section aria-label="Ciclos de avaliação" className="space-y-4">
+  1021→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  1022→        <div>
+  1023→          <h2 className="font-display text-xl">Ciclos de avaliação</h2>
+  1024→          <p className="text-sm text-muted-foreground mt-0.5">
+  1025→            Histórico de aplicações do COPSOQ II-BR na empresa.
+  1026→          </p>
+  1027→        </div>
+  1028→        <Button onClick={() => setCreateOpen(true)}>
+  1029→          <Plus className="h-4 w-4" />
+  1030→          Nova Avaliação
+  1031→        </Button>
+  1032→      </div>
+  1033→
+  1034→      {loading ? (
+  1035→        <div className="space-y-2">
+  1036→          <Skeleton className="h-14 w-full" />
+  1037→          <Skeleton className="h-14 w-full" />
+  1038→          <Skeleton className="h-14 w-full" />
+  1039→        </div>
+  1040→      ) : error ? (
+  1041→        <div className="flex flex-col items-center text-center gap-3 py-8">
+  1042→          <AlertTriangle className="h-5 w-5 text-[var(--risk-high)]" />
+  1043→          <p className="text-sm text-muted-foreground">{error}</p>
+  1044→          <Button variant="outline" size="sm" onClick={() => void load()}>
+  1045→            <RefreshCw className="h-4 w-4" />
+  1046→            Tentar novamente
+  1047→          </Button>
+  1048→        </div>
+  1049→      ) : !assessments || assessments.length === 0 ? (
+  1050→        <div className="border border-dashed border-border rounded-lg py-12 flex flex-col items-center text-center gap-3">
+  1051→          <div className="h-11 w-11 rounded-full bg-[var(--surface)] flex items-center justify-center">
+  1052→            <ClipboardList className="h-5 w-5 text-muted-foreground" />
+  1053→          </div>
+  1054→          <div>
+  1055→            <p className="font-display text-lg">Nenhuma avaliação cadastrada</p>
+  1056→            <p className="text-sm text-muted-foreground mt-1">
+  1057→              Inicie o primeiro ciclo de avaliação COPSOQ II-BR para esta
+  1058→              empresa.
+  1059→            </p>
+  1060→          </div>
+  1061→          <Button onClick={() => setCreateOpen(true)}>
+  1062→            <Plus className="h-4 w-4" />
+  1063→            Nova Avaliação
+  1064→          </Button>
+  1065→        </div>
+  1066→      ) : (
+  1067→        <div className="max-h-96 overflow-y-auto scroll-area border-t border-border">
+  1068→          <ul>
+  1069→            {assessments.map((a) => (
+  1070→              <AssessmentRow
+  1071→                key={a.id}
+  1072→                assessment={a}
+  1073→                onOpen={() =>
+  1074→                  go("avaliacao", {
+  1075→                    assessmentId: a.id,
+  1076→                    companyId: a.companyId,
+  1077→                  })
+  1078→                }
+  1079→              />
+  1080→            ))}
+  1081→          </ul>
+  1082→        </div>
+  1083→      )}
+  1084→
+  1085→      <CreateAssessmentDialog
+  1086→        open={createOpen}
+  1087→        onOpenChange={setCreateOpen}
+  1088→        companyId={company.id}
+  1089→        onCreated={(a) => {
+  1090→          setCreateOpen(false);
+  1091→          onRefresh();
+  1092→          void load();
+  1093→          onAssessmentCreated(a);
+  1094→        }}
+  1095→      />
+  1096→    </section>
+  1097→  );
+  1098→}
+  1099→
+  1100→function AssessmentRow({
+  1101→  assessment,
+  1102→  onOpen,
+  1103→}: {
+  1104→  assessment: Assessment;
+  1105→  onOpen: () => void;
+  1106→}) {
+  1107→  const status = assessment.status;
+  1108→  const label = ASSESSMENT_STATUS_LABELS[status] ?? status;
+  1109→  const isCollecting = status === "collecting";
+  1110→
+  1111→  // Adesão preview (only if collecting — full data on detail view).
+  1112→  const [adesao, setAdesao] = useState<number | null>(null);
+  1113→  useEffect(() => {
+  1114→    if (!isCollecting) return;
+  1115→    let cancelled = false;
+  1116→    api.assessments
+  1117→      .progress(assessment.id)
+  1118→      .then((p) => {
+  1119→        if (!cancelled) setAdesao(p.globalAdesao);
+  1120→      })
+  1121→      .catch(() => {
+  1122→        if (!cancelled) setAdesao(null);
+  1123→      });
+  1124→    return () => {
+  1125→      cancelled = true;
+  1126→    };
+  1127→  }, [assessment.id, isCollecting]);
+  1128→
+  1129→  const statusTone = useMemo(() => {
+  1130→    switch (status) {
+  1131→      case "collecting":
+  1132→        return "bg-[var(--sidebar-accent)] text-[var(--brand)] border-transparent";
+  1133→      case "processing":
+  1134→        return "bg-[var(--sidebar-accent)] text-[var(--brand)] border-transparent";
+  1135→      case "completed":
+  1136→        return "risk-low-bg border-transparent";
+  1137→      case "archived":
+  1138→        return "bg-muted text-muted-foreground border-transparent";
+  1139→      case "draft":
+  1140→      default:
+  1141→        return "bg-muted text-muted-foreground border-transparent";
+  1142→    }
+  1143→  }, [status]);
+  1144→
+  1145→  return (
+  1146→    <li className="surface-hover border-b border-border px-1 py-4">
+  1147→      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+  1148→        <div className="min-w-0 flex-1">
+  1149→          <div className="flex items-center gap-2 flex-wrap">
+  1150→            <button
+  1151→              type="button"
+  1152→              onClick={onOpen}
+  1153→              className="font-display font-medium text-base text-foreground text-left hover:text-[var(--brand-light)] transition-colors truncate"
+  1154→              aria-label={`Acessar avaliação ${assessment.title}`}
+  1155→            >
+  1156→              {assessment.title}
+  1157→            </button>
+  1158→            <Badge className={statusTone}>{label}</Badge>
+  1159→          </div>
+  1160→          <div className="text-xs text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+  1161→            <span className="inline-flex items-center gap-1">
+  1162→              <Calendar className="h-3 w-3" />
+  1163→              <span className="font-mono-numeric">{fmtPeriod(assessment.startDate, assessment.endDate)}</span>
+  1164→            </span>
+  1165→            {isCollecting && adesao != null && (
+  1166→              <span className="inline-flex items-center gap-1">
+  1167→                <Users className="h-3 w-3" />
+  1168→                Adesão:{" "}
+  1169→                <span className="font-mono-numeric">
+  1170→                  {(adesao * 100).toFixed(1).replace(".", ",")}%
+  1171→                </span>
+  1172→              </span>
+  1173→            )}
+  1174→            {assessment.completedAt && (
+  1175→              <span className="inline-flex items-center gap-1">
+  1176→                <Check className="h-3 w-3" />
+  1177→                Concluída em {fmtDate(assessment.completedAt)}
+  1178→              </span>
+  1179→            )}
+  1180→          </div>
+  1181→        </div>
+  1182→        <Button
+  1183→          variant="ghost"
+  1184→          size="sm"
+  1185→          onClick={onOpen}
+  1186→          className="shrink-0 text-[var(--brand)] hover:text-[var(--brand-light)]"
+  1187→        >
+  1188→          Acessar
+  1189→          <ArrowRight className="h-3.5 w-3.5" />
+  1190→        </Button>
+  1191→      </div>
+  1192→    </li>
+  1193→  );
+  1194→}
+  1195→
+  1196→// ─── Create assessment dialog (simple step-free form) ────────────────────────
+  1197→
+  1198→function CreateAssessmentDialog({
+  1199→  open,
+  1200→  onOpenChange,
+  1201→  companyId,
+  1202→  onCreated,
+  1203→}: {
+  1204→  open: boolean;
+  1205→  onOpenChange: (v: boolean) => void;
+  1206→  companyId: string;
+  1207→  onCreated: (a: Assessment) => void;
+  1208→}) {
+  1209→  const [departments, setDepartments] = useState<Department[]>([]);
+  1210→  const [loadingDepts, setLoadingDepts] = useState(false);
+  1211→  const [deptsError, setDeptsError] = useState<string | null>(null);
+  1212→
+  1213→  const [title, setTitle] = useState("");
+  1214→  const [startDate, setStartDate] = useState(
+  1215→    format(new Date(), "yyyy-MM-dd")
+  1216→  );
+  1217→  const [endDate, setEndDate] = useState("");
+  1218→  const [selected, setSelected] = useState<Record<string, number>>({});
+  1219→  const [submitting, setSubmitting] = useState(false);
+  1220→  const [dateError, setDateError] = useState<string | null>(null);
+  1221→
+  1222→  // Load active departments when dialog opens.
+  1223→  useEffect(() => {
+  1224→    if (!open) return;
+  1225→    let cancelled = false;
+  1226→    setLoadingDepts(true);
+  1227→    setDeptsError(null);
+  1228→    api.departments
+  1229→      .list(companyId)
+  1230→      .then((res) => {
+  1231→        if (cancelled) return;
+  1232→        const active = res.data.filter((d) => d.isActive);
+  1233→        setDepartments(active);
+  1234→        // Pre-select all with default expected = workerCount.
+  1235→        const init: Record<string, number> = {};
+  1236→        for (const d of active) init[d.id] = d.workerCount;
+  1237→        setSelected(init);
+  1238→      })
+  1239→      .catch((e) => {
+  1240→        if (cancelled) return;
+  1241→        if (e instanceof ApiError) setDeptsError(e.message);
+  1242→        else setDeptsError("Não foi possível carregar os departamentos.");
+  1243→      })
+  1244→      .finally(() => {
+  1245→        if (!cancelled) setLoadingDepts(false);
+  1246→      });
+  1247→    return () => {
+  1248→      cancelled = true;
+  1249→    };
+  1250→  }, [open, companyId]);
+  1251→
+  1252→  // Reset form on close.
+  1253→  useEffect(() => {
+  1254→    if (open) return;
+  1255→    setTitle("");
+  1256→    setStartDate(format(new Date(), "yyyy-MM-dd"));
+  1257→    setEndDate("");
+  1258→    setSelected({});
+  1259→    setDateError(null);
+  1260→  }, [open]);
+  1261→
+  1262→  const toggleDept = (id: string, workerCount: number) => {
+  1263→    setSelected((s) => {
+  1264→      if (id in s) {
+  1265→        const next = { ...s };
+  1266→        delete next[id];
+  1267→        return next;
+  1268→      }
+  1269→      return { ...s, [id]: workerCount };
+  1270→    });
+  1271→  };
+  1272→
+  1273→  const setExpected = (id: string, value: string) => {
+  1274→    const n = value.replace(/[^\d]/g, "");
+  1275→    setSelected((s) => ({ ...s, [id]: n ? Math.max(0, Number(n)) : 0 }));
+  1276→  };
+  1277→
+  1278→  const selectedCount = Object.keys(selected).length;
+  1279→  const dateValid =
+  1280→    startDate && endDate && new Date(endDate) > new Date(startDate);
+  1281→
+  1282→  const onSubmit = async (e: React.FormEvent) => {
+  1283→    e.preventDefault();
+  1284→    if (!title.trim()) {
+  1285→      toast.error("Informe o título da avaliação.");
+  1286→      return;
+  1287→    }
+  1288→    if (!startDate || !endDate) {
+  1289→      setDateError("Informe as datas de início e fim.");
+  1290→      return;
+  1291→    }
+  1292→    if (new Date(endDate) <= new Date(startDate)) {
+  1293→      setDateError("A data final deve ser posterior à data de início.");
+  1294→      return;
+  1295→    }
+  1296→    const depts = Object.entries(selected)
+  1297→      .filter(([, v]) => v >= 1)
+  1298→      .map(([departmentId, expectedResponses]) => ({
+  1299→        departmentId,
+  1300→        expectedResponses,
+  1301→      }));
+  1302→    if (depts.length === 0) {
+  1303→      toast.error("Selecione ao menos um departamento com 1+ respostas esperadas.");
+  1304→      return;
+  1305→    }
+  1306→
+  1307→    setSubmitting(true);
+  1308→    setDateError(null);
+  1309→    try {
+  1310→      const created = await api.assessments.create(companyId, {
+  1311→        title: title.trim(),
+  1312→        startDate: startDate || undefined,
+  1313→        endDate,
+  1314→        departments: depts,
+  1315→      });
+  1316→      toast.success(`Avaliação "${created.title}" criada.`);
+  1317→      onCreated(created);
+  1318→    } catch (err) {
+  1319→      if (err instanceof ApiError) {
+  1320→        toast.error(err.message);
+  1321→      } else {
+  1322→        toast.error("Falha ao criar avaliação.");
+  1323→      }
+  1324→    } finally {
+  1325→      setSubmitting(false);
+  1326→    }
+  1327→  };
+  1328→
+  1329→  return (
+  1330→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1331→      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto scroll-area">
+  1332→        <DialogHeader>
+  1333→          <DialogTitle className="font-display text-xl">Nova avaliação</DialogTitle>
+  1334→          <DialogDescription>
+  1335→            Configure o ciclo COPSOQ II-BR e os departamentos participantes.
+  1336→            O instrumento, datas e adesão por GHE poderão ser ajustados na
+  1337→            próxima etapa.
+  1338→          </DialogDescription>
+  1339→        </DialogHeader>
+  1340→
+  1341→        <form onSubmit={onSubmit} className="space-y-5">
+  1342→          <fieldset className="space-y-4" disabled={submitting}>
+  1343→            <div className="space-y-1.5">
+  1344→              <Label htmlFor="asmt-title">
+  1345→                Título <span className="text-[var(--risk-high)]">*</span>
+  1346→              </Label>
+  1347→              <Input
+  1348→                id="asmt-title"
+  1349→                value={title}
+  1350→                onChange={(e) => setTitle(e.target.value)}
+  1351→                placeholder="Ex.: Ciclo 2025 — 1º semestre"
+  1352→                autoFocus
+  1353→              />
+  1354→            </div>
+  1355→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  1356→              <div className="space-y-1.5">
+  1357→                <Label htmlFor="asmt-start">Início</Label>
+  1358→                <Input
+  1359→                  id="asmt-start"
+  1360→                  type="date"
+  1361→                  value={startDate}
+  1362→                  onChange={(e) => {
+  1363→                    setStartDate(e.target.value);
+  1364→                    setDateError(null);
+  1365→                  }}
+  1366→                  className="font-mono-numeric"
+  1367→                />
+  1368→              </div>
+  1369→              <div className="space-y-1.5">
+  1370→                <Label htmlFor="asmt-end">
+  1371→                  Fim <span className="text-[var(--risk-high)]">*</span>
+  1372→                </Label>
+  1373→                <Input
+  1374→                  id="asmt-end"
+  1375→                  type="date"
+  1376→                  value={endDate}
+  1377→                  onChange={(e) => {
+  1378→                    setEndDate(e.target.value);
+  1379→                    setDateError(null);
+  1380→                  }}
+  1381→                  className="font-mono-numeric"
+  1382→                  aria-invalid={!!dateError}
+  1383→                  aria-describedby={dateError ? "asmt-date-err" : undefined}
+  1384→                />
+  1385→              </div>
+  1386→            </div>
+  1387→            {dateError && (
+  1388→              <p
+  1389→                id="asmt-date-err"
+  1390→                className="text-xs text-[var(--risk-high)] flex items-center gap-1"
+  1391→              >
+  1392→                <X className="h-3 w-3" />
+  1393→                {dateError}
+  1394→              </p>
+  1395→            )}
+  1396→
+  1397→            <div className="space-y-2">
+  1398→              <div className="flex items-center justify-between gap-2">
+  1399→                <Label>Departamentos participantes</Label>
+  1400→                <span className="text-xs text-muted-foreground">
+  1401→                  <span className="font-mono-numeric">{selectedCount}</span>{" "}
+  1402→                  selecionado{selectedCount !== 1 ? "s" : ""}
+  1403→                </span>
+  1404→              </div>
+  1405→              {loadingDepts ? (
+  1406→                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+  1407→                  <Loader2 className="h-4 w-4 animate-spin" />
+  1408→                  Carregando departamentos…
+  1409→                </div>
+  1410→              ) : deptsError ? (
+  1411→                <p className="text-sm text-[var(--risk-high)] py-2">{deptsError}</p>
+  1412→              ) : departments.length === 0 ? (
+  1413→                <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground text-center">
+  1414→                  Nenhum departamento ativo. Cadastre GHEs na aba
+  1415→                  &ldquo;Departamentos&rdquo; antes de iniciar uma avaliação.
+  1416→                </div>
+  1417→              ) : (
+  1418→                <div className="rounded-md border border-border divide-y divide-border max-h-72 overflow-y-auto scroll-area">
+  1419→                  {departments.map((d) => {
+  1420→                    const checked = d.id in selected;
+  1421→                    return (
+  1422→                      <label
+  1423→                        key={d.id}
+  1424→                        htmlFor={`asmt-dept-${d.id}`}
+  1425→                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--surface)] cursor-pointer"
+  1426→                      >
+  1427→                        <Checkbox
+  1428→                          id={`asmt-dept-${d.id}`}
+  1429→                          checked={checked}
+  1430→                          onCheckedChange={() =>
+  1431→                            toggleDept(d.id, d.workerCount)
+  1432→                          }
+  1433→                        />
+  1434→                        <div className="min-w-0 flex-1">
+  1435→                          <div className="text-sm font-medium truncate">
+  1436→                            {d.name}
+  1437→                          </div>
+  1438→                          <div className="text-xs text-muted-foreground">
+  1439→                            <span className="font-mono-numeric">
+  1440→                              {d.workerCount.toLocaleString("pt-BR")}
+  1441→                            </span>{" "}
+  1442→                            trabalhador{d.workerCount !== 1 ? "es" : ""}
+  1443→                          </div>
+  1444→                        </div>
+  1445→                        <div
+  1446→                          className="flex items-center gap-1.5"
+  1447→                          onClick={(e) => e.preventDefault()}
+  1448→                        >
+  1449→                          <Label
+  1450→                            htmlFor={`asmt-exp-${d.id}`}
+  1451→                            className="sr-only"
+  1452→                          >
+  1453→                            Respostas esperadas para {d.name}
+  1454→                          </Label>
+  1455→                          <Input
+  1456→                            id={`asmt-exp-${d.id}`}
+  1457→                            type="number"
+  1458→                            min={0}
+  1459→                            inputMode="numeric"
+  1460→                            value={selected[d.id] ?? 0}
+  1461→                            onChange={(e) => setExpected(d.id, e.target.value)}
+  1462→                            disabled={!checked || submitting}
+  1463→                            className="h-8 w-20 font-mono-numeric text-right"
+  1464→                            aria-label={`Respostas esperadas para ${d.name}`}
+  1465→                          />
+  1466→                        </div>
+  1467→                      </label>
+  1468→                    );
+  1469→                  })}
+  1470→                </div>
+  1471→              )}
+  1472→              <p className="text-xs text-muted-foreground">
+  1473→                O número de respostas esperadas define a meta de adesão por GHE
+  1474→                (mínimo 5 para elegibilidade).
+  1475→              </p>
+  1476→            </div>
+  1477→          </fieldset>
+  1478→
+  1479→          {/* Validation feedback — warm tokens (restyled to surface + risk-medium) */}
+  1480→          {(!dateValid || selectedCount === 0) && !submitting && (
+  1481→            <div
+  1482→              className="rounded-md border border-[var(--risk-medium)]/40 bg-[var(--surface)] p-3.5 space-y-1.5"
+  1483→              role="status"
+  1484→              aria-live="polite"
+  1485→            >
+  1486→              <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+  1487→                <AlertCircle className="h-3.5 w-3.5 text-[var(--risk-medium)]" />
+  1488→                Pendências para criar a avaliação:
+  1489→              </p>
+  1490→              <ul className="text-xs text-muted-foreground space-y-0.5 ml-5 list-disc">
+  1491→                {!title.trim() && (
+  1492→                  <li>Informe o título da avaliação</li>
+  1493→                )}
+  1494→                {!endDate && (
+  1495→                  <li>Selecione a data final da coleta</li>
+  1496→                )}
+  1497→                {endDate && startDate && new Date(endDate) <= new Date(startDate) && (
+  1498→                  <li>A data final deve ser posterior à data de início</li>
+  1499→                )}
+  1500→                {selectedCount === 0 && (
+  1501→                  <li>Selecione ao menos um departamento participante</li>
+  1502→                )}
+  1503→              </ul>
+  1504→            </div>
+  1505→          )}
+  1506→
+  1507→          <DialogFooter className="gap-2 pt-2">
+  1508→            <Button
+  1509→              type="button"
+  1510→              variant="outline"
+  1511→              onClick={() => onOpenChange(false)}
+  1512→              disabled={submitting}
+  1513→            >
+  1514→              Cancelar
+  1515→            </Button>
+  1516→            <Button
+  1517→              type="submit"
+  1518→              disabled={
+  1519→                submitting ||
+  1520→                loadingDepts ||
+  1521→                !!deptsError ||
+  1522→                !dateValid ||
+  1523→                selectedCount === 0
+  1524→              }
+  1525→            >
+  1526→              {submitting ? (
+  1527→                <>
+  1528→                  <Loader2 className="h-4 w-4 animate-spin" />
+  1529→                  Criando…
+  1530→                </>
+  1531→              ) : (
+  1532→                <>
+  1533→                  <FileText className="h-4 w-4" />
+  1534→                  Criar avaliação
+  1535→                </>
+  1536→              )}
+  1537→            </Button>
+  1538→          </DialogFooter>
+  1539→        </form>
+  1540→      </DialogContent>
+  1541→    </Dialog>
+  1542→  );
+  1543→}
+  1544→
+  1545→// ─── Skeleton ────────────────────────────────────────────────────────────────
+  1546→
+  1547→function DetailSkeleton() {
+  1548→  return (
+  1549→    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6">
+  1550→      <Skeleton className="h-5 w-32" />
+  1551→      <Skeleton className="h-24 w-full rounded-lg" />
+  1552→      <Skeleton className="h-10 w-full sm:w-80" />
+  1553→      <Skeleton className="h-20 w-full" />
+  1554→      <Skeleton className="h-20 w-full" />
+  1555→      <Skeleton className="h-20 w-full" />
+  1556→    </div>
+  1557→  );
+  1558→}
+  1559→

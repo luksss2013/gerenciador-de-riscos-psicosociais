@@ -34,6 +34,12 @@ import {
 } from "@/lib/copsoq-data";
 import { classifyInventoryRisk } from "@/lib/scoring";
 import { RISK_LEVEL_LABELS } from "@/lib/errors";
+import {
+  FIELD_ERROR_CLASS,
+  FieldError,
+  maskNumber,
+  validateRequired,
+} from "@/lib/form-utils";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -220,7 +226,7 @@ function EditableTextCell({
         setEditingCell({ itemId: item.id, field });
         setDraft(value ?? "");
       }}
-      className="group w-full text-left text-xs rounded-sm px-2 py-1.5 -mx-2 -my-1 hover:bg-[var(--surface)] transition-colors min-h-[36px] flex items-start gap-1.5"
+      className="group w-full text-left text-xs rounded-sm px-2 py-1.5 -mx-2 -my-1 hover:bg-[var(--surface)] cursor-pointer transition-colors min-h-[36px] flex items-start gap-1.5"
       aria-label={ariaLabel}
     >
       {value && value.trim().length > 0 ? (
@@ -317,7 +323,7 @@ function EditableSelectCell({
     <button
       type="button"
       onClick={() => setEditingCell({ itemId: item.id, field })}
-      className="group w-full inline-flex items-center justify-between gap-1 text-xs rounded-sm px-2 py-1 -mx-2 -my-1 hover:bg-[var(--surface)] transition-colors min-h-[28px]"
+      className="group w-full inline-flex items-center justify-between gap-1 text-xs rounded-sm px-2 py-1 -mx-2 -my-1 hover:bg-[var(--surface)] cursor-pointer transition-colors min-h-[28px]"
       aria-label={ariaLabel}
     >
       <span className="font-mono-numeric font-medium">{currentLabel}</span>
@@ -362,6 +368,16 @@ function InventoryTable({
 }: InventoryTableProps) {
   const [editingCell, setEditingCell] = useState<CellEdit | null>(null);
   const [draft, setDraft] = useState<string>("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (itemId: string) => {
+    setDeletingId(itemId);
+    try {
+      await onDelete(itemId);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const sorted = useMemo(() => {
     return [...items].sort((a, b) => {
@@ -617,7 +633,7 @@ function InventoryTable({
                         <button
                           type="button"
                           onClick={() => onCreateAction(item)}
-                          className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:text-[var(--brand-light)] hover:underline self-start font-medium"
+                          className="inline-flex items-center gap-1 text-xs text-[var(--brand)] hover:text-[var(--brand-light)] hover:underline self-start font-medium cursor-pointer"
                           aria-label={`Criar ação a partir das medidas propostas do item ${item.id}`}
                         >
                           <ArrowRight className="h-3 w-3" />
@@ -650,13 +666,20 @@ function InventoryTable({
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogCancel disabled={deletingId === item.id}>
+                              Cancelar
+                            </AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => {
-                                void onDelete(item.id);
+                              onClick={(e) => {
+                                e.preventDefault();
+                                void handleDelete(item.id);
                               }}
+                              disabled={deletingId === item.id}
                               className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
                             >
+                              {deletingId === item.id && (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              )}
                               Excluir
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -769,9 +792,9 @@ function ManualRiskFormContents({
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!mteFactorCode) errs.mteFactorCode = "Selecione um fator FRPRT MTE.";
-    if (hazardDescription.trim().length < 3)
+    if (!validateRequired(hazardDescription, 3))
       errs.hazardDescription = "Mínimo de 3 caracteres.";
-    if (possibleHarms.trim().length < 3)
+    if (!validateRequired(possibleHarms, 3))
       errs.possibleHarms = "Mínimo de 3 caracteres.";
     if (!probability) errs.probability = "Selecione a probabilidade.";
     if (!severity) errs.severity = "Selecione a severidade.";
@@ -801,7 +824,10 @@ function ManualRiskFormContents({
       let msg = "Erro ao adicionar risco manual.";
       if (e instanceof ApiError) {
         if (e.code === "VALIDATION_ERROR") {
+          // Backend validation error → map to form-level FieldError display
+          // with the SAME shared styling used by the front-side onBlur errors.
           msg = e.message || "Dados inválidos. Verifique os campos.";
+          setErrors({ form: msg });
         } else if (e.code === "ASSESSMENT_NOT_COMPLETED") {
           msg = "A avaliação precisa estar concluída para incluir itens no inventário.";
         } else if (e.code === "ASSESSMENT_DEPT_NOT_FOUND") {
@@ -815,11 +841,39 @@ function ManualRiskFormContents({
     }
   };
 
+  // Per-field onBlur validators — same shared FieldError styling as submit.
+  const validateOnBlur = (field: "hazardDescription" | "possibleHarms") => {
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (field === "hazardDescription") {
+        next.hazardDescription = validateRequired(hazardDescription, 3)
+          ? undefined
+          : "Mínimo de 3 caracteres.";
+      } else if (field === "possibleHarms") {
+        next.possibleHarms = validateRequired(possibleHarms, 3)
+          ? undefined
+          : "Mínimo de 3 caracteres.";
+      }
+      return next;
+    });
+  };
+
   const probNum = Number(probability) || 2;
   const sevNum = Number(severity) || 2;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+      {/* Backend VALIDATION_ERROR → render with the SAME shared FieldError
+          styling used by front-side onBlur errors. */}
+      {errors.form ? (
+        <div
+          role="alert"
+          className="rounded-md border border-[var(--risk-high)]/40 bg-[var(--surface)] p-3"
+        >
+          <FieldError message={errors.form} />
+        </div>
+      ) : null}
+
       <div className="space-y-1.5">
         <Label htmlFor="manual-ghe">GHE</Label>
         <Select
@@ -853,9 +907,12 @@ function ManualRiskFormContents({
         <Select value={mteFactorCode} onValueChange={setMteFactorCode}>
           <SelectTrigger
             id="manual-mte"
-            className="w-full"
+            className={`w-full ${errors.mteFactorCode ? FIELD_ERROR_CLASS : ""}`}
             aria-label="Selecionar fator FRPRT MTE"
             aria-invalid={!!errors.mteFactorCode}
+            aria-describedby={
+              errors.mteFactorCode ? "manual-mte-err" : undefined
+            }
           >
             <SelectValue placeholder="Selecionar fator" />
           </SelectTrigger>
@@ -868,7 +925,7 @@ function ManualRiskFormContents({
           </SelectContent>
         </Select>
         {errors.mteFactorCode ? (
-          <p className="text-xs text-[var(--risk-high)]">{errors.mteFactorCode}</p>
+          <FieldError id="manual-mte-err" message={errors.mteFactorCode} />
         ) : null}
       </div>
 
@@ -899,13 +956,25 @@ function ManualRiskFormContents({
         <Textarea
           id="manual-hazard"
           value={hazardDescription}
-          onChange={(e) => setHazardDescription(e.target.value)}
+          onChange={(e) => {
+            setHazardDescription(e.target.value);
+            if (errors.hazardDescription)
+              setErrors((p) => ({ ...p, hazardDescription: undefined }));
+          }}
+          onBlur={() => validateOnBlur("hazardDescription")}
           placeholder="Descreva o perigo identificado (mínimo 3 caracteres)…"
           rows={2}
           aria-invalid={!!errors.hazardDescription}
+          aria-describedby={
+            errors.hazardDescription ? "manual-hazard-err" : undefined
+          }
+          className={errors.hazardDescription ? FIELD_ERROR_CLASS : ""}
         />
         {errors.hazardDescription ? (
-          <p className="text-xs text-[var(--risk-high)]">{errors.hazardDescription}</p>
+          <FieldError
+            id="manual-hazard-err"
+            message={errors.hazardDescription}
+          />
         ) : null}
       </div>
 
@@ -916,13 +985,22 @@ function ManualRiskFormContents({
         <Textarea
           id="manual-harms"
           value={possibleHarms}
-          onChange={(e) => setPossibleHarms(e.target.value)}
+          onChange={(e) => {
+            setPossibleHarms(e.target.value);
+            if (errors.possibleHarms)
+              setErrors((p) => ({ ...p, possibleHarms: undefined }));
+          }}
+          onBlur={() => validateOnBlur("possibleHarms")}
           placeholder="Descreva os possíveis danos (mínimo 3 caracteres)…"
           rows={2}
           aria-invalid={!!errors.possibleHarms}
+          aria-describedby={
+            errors.possibleHarms ? "manual-harms-err" : undefined
+          }
+          className={errors.possibleHarms ? FIELD_ERROR_CLASS : ""}
         />
         {errors.possibleHarms ? (
-          <p className="text-xs text-[var(--risk-high)]">{errors.possibleHarms}</p>
+          <FieldError id="manual-harms-err" message={errors.possibleHarms} />
         ) : null}
       </div>
 
@@ -931,11 +1009,23 @@ function ManualRiskFormContents({
           <Label htmlFor="manual-prob">
             Probabilidade <span className="text-[var(--risk-high)]">*</span>
           </Label>
-          <Select value={probability} onValueChange={setProbability}>
+          <Select
+            value={probability}
+            onValueChange={(v) =>
+              // maskNumber defensively clamps to [1,3] — the Select options
+              // already constrain to this, but the mask guards against any
+              // future programmatic value.
+              setProbability(maskNumber(v, { min: 1, max: 3 }))
+            }
+          >
             <SelectTrigger
               id="manual-prob"
-              className="w-full"
+              className={`w-full ${errors.probability ? FIELD_ERROR_CLASS : ""}`}
               aria-label="Selecionar probabilidade"
+              aria-invalid={!!errors.probability}
+              aria-describedby={
+                errors.probability ? "manual-prob-err" : undefined
+              }
             >
               <SelectValue />
             </SelectTrigger>
@@ -947,16 +1037,28 @@ function ManualRiskFormContents({
               ))}
             </SelectContent>
           </Select>
+          {errors.probability ? (
+            <FieldError id="manual-prob-err" message={errors.probability} />
+          ) : null}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="manual-sev">
             Severidade <span className="text-[var(--risk-high)]">*</span>
           </Label>
-          <Select value={severity} onValueChange={setSeverity}>
+          <Select
+            value={severity}
+            onValueChange={(v) =>
+              setSeverity(maskNumber(v, { min: 1, max: 3 }))
+            }
+          >
             <SelectTrigger
               id="manual-sev"
-              className="w-full"
+              className={`w-full ${errors.severity ? FIELD_ERROR_CLASS : ""}`}
               aria-label="Selecionar severidade"
+              aria-invalid={!!errors.severity}
+              aria-describedby={
+                errors.severity ? "manual-sev-err" : undefined
+              }
             >
               <SelectValue />
             </SelectTrigger>
@@ -968,6 +1070,9 @@ function ManualRiskFormContents({
               ))}
             </SelectContent>
           </Select>
+          {errors.severity ? (
+            <FieldError id="manual-sev-err" message={errors.severity} />
+          ) : null}
         </div>
       </div>
 
@@ -1042,7 +1147,7 @@ function UncoveredFactorsSection({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="group w-full text-left pt-5 pb-4 flex items-start justify-between gap-3 hover:bg-[var(--surface)] transition-colors -mx-2 px-2 rounded-sm"
+            className="group w-full text-left pt-5 pb-4 flex items-start justify-between gap-3 hover:bg-[var(--surface)] cursor-pointer transition-colors -mx-2 px-2 rounded-sm"
             aria-label="Alternar fatores MTE não cobertos"
           >
             <div className="flex items-start gap-2.5 min-w-0">
@@ -1113,15 +1218,54 @@ function UncoveredFactorsSection({
 
 function InventarioSkeleton() {
   return (
-    <div className="space-y-8" aria-hidden="true">
+    <div className="space-y-10" aria-hidden="true">
+      {/* Filter chips skeleton */}
       <div className="flex flex-wrap gap-2">
-        <Skeleton className="h-6 w-32" />
-        <Skeleton className="h-6 w-28" />
-        <Skeleton className="h-6 w-32" />
+        <Skeleton className="h-7 w-28 rounded-full" />
+        <Skeleton className="h-7 w-24 rounded-full" />
+        <Skeleton className="h-7 w-32 rounded-full" />
+        <Skeleton className="h-7 w-28 rounded-full" />
       </div>
-      <Skeleton className="h-12" />
-      <Skeleton className="h-96" />
-      <Skeleton className="h-32" />
+
+      {/* Inventory table skeleton — header + 6 rows with cell-shaped blocks */}
+      <div className="rounded-md border border-border overflow-hidden">
+        {/* Header row — surface-tinted background, ~12 small cell blocks */}
+        <div className="flex items-center gap-2 border-b border-border bg-[var(--surface)] px-3 py-3">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <Skeleton
+              key={i}
+              className={`h-3 ${i === 0 ? "w-12" : i === 1 ? "w-20" : i === 2 ? "w-32" : i === 3 ? "w-28" : i === 4 ? "w-24" : i === 5 ? "w-20" : i === 6 ? "w-16" : i === 7 ? "w-20" : "w-24"}`}
+            />
+          ))}
+        </div>
+        {/* Body rows */}
+        {Array.from({ length: 6 }).map((_, r) => (
+          <div
+            key={r}
+            className="flex items-center gap-2 border-b border-border last:border-b-0 px-3 py-3"
+          >
+            <Skeleton className="h-4 w-12" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-5 w-28 rounded-full" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-7 w-24 rounded-md" />
+          </div>
+        ))}
+      </div>
+
+      {/* Uncovered factors section skeleton */}
+      <div className="space-y-3">
+        <Skeleton className="h-5 w-48" />
+        <div className="rounded-md border border-border p-5 space-y-3">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-7 w-40 rounded-md mt-2" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -1234,7 +1378,8 @@ export function InventarioView() {
           cur && cur.itemId === itemId && cur.field === field ? null : cur
         );
       }, 1500);
-      toast.success("Alteração salva.");
+      // No success toast — the inline savedCell indicator confirms the save.
+      // Errors still surface via toast below.
     } catch (e) {
       setSavingCell(null);
       const msg =
@@ -1434,7 +1579,7 @@ export function InventarioView() {
             </Button>
           </section>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-10 animate-in fade-in duration-300">
             <InventoryTable
               items={allItems}
               onPatch={handlePatch}

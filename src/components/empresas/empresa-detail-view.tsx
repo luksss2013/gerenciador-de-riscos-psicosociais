@@ -24,7 +24,6 @@ import {
   Trash2,
   User,
   Users,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,6 +38,13 @@ import { formatCnpj } from "@/lib/cnpj";
 import {
   ASSESSMENT_STATUS_LABELS,
 } from "@/lib/errors";
+import {
+  FIELD_ERROR_CLASS,
+  FieldError,
+  DateRangeField,
+  maskNumber,
+  validateRequired,
+} from "@/lib/form-utils";
 import { NrStatusBadge, type NrStatus } from "@/components/shell/nr-status-badge";
 import { CompanyFormDialog } from "@/components/empresas/company-form-dialog";
 
@@ -814,7 +820,10 @@ function DepartmentFormDialog({
     workerCount: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  // Per-field inline errors — same shared `FieldError` component + styling
+  // for front-side onBlur validation AND backend DEPARTMENT_NAME_DUPLICATE.
   const [nameError, setNameError] = useState<string | null>(null);
+  const [wcError, setWcError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -828,17 +837,23 @@ function DepartmentFormDialog({
       setForm({ name: "", description: "", workerCount: "" });
     }
     setNameError(null);
+    setWcError(null);
   }, [open, editing]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) {
-      toast.error("Informe o nome do departamento.");
-      return;
+    let hasErr = false;
+    if (!validateRequired(form.name, 2)) {
+      setNameError("Informe o nome do departamento (mínimo 2 caracteres).");
+      hasErr = true;
     }
     const wc = Number(form.workerCount);
     if (!form.workerCount || !Number.isFinite(wc) || wc < 1) {
-      toast.error("Informe o número de trabalhadores (≥ 1).");
+      setWcError("Informe o número de trabalhadores (≥ 1).");
+      hasErr = true;
+    }
+    if (hasErr) {
+      toast.error("Verifique os campos destacados.");
       return;
     }
     setSubmitting(true);
@@ -863,6 +878,7 @@ function DepartmentFormDialog({
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === "DEPARTMENT_NAME_DUPLICATE") {
+          // Backend error → mapped to the name field with identical styling.
           setNameError("Já existe um departamento com este nome.");
         } else {
           toast.error(err.message);
@@ -901,14 +917,20 @@ function DepartmentFormDialog({
                   setForm({ ...form, name: e.target.value });
                   setNameError(null);
                 }}
+                onBlur={() => {
+                  if (!validateRequired(form.name, 2)) {
+                    setNameError(
+                      "Informe o nome do departamento (mínimo 2 caracteres)."
+                    );
+                  }
+                }}
                 autoFocus
                 aria-invalid={!!nameError}
                 aria-describedby={nameError ? "dept-name-err" : undefined}
+                className={nameError ? FIELD_ERROR_CLASS : ""}
               />
               {nameError && (
-                <p id="dept-name-err" className="text-xs text-[var(--risk-high)]">
-                  {nameError}
-                </p>
+                <FieldError id="dept-name-err" message={nameError} />
               )}
             </div>
             <div className="space-y-1.5">
@@ -933,15 +955,19 @@ function DepartmentFormDialog({
                 min={1}
                 inputMode="numeric"
                 value={form.workerCount}
-                onChange={(e) =>
+                onChange={(e) => {
                   setForm({
                     ...form,
-                    workerCount: e.target.value.replace(/[^\d]/g, ""),
-                  })
-                }
-                className="font-mono-numeric"
+                    workerCount: maskNumber(e.target.value, { min: 1 }),
+                  });
+                  setWcError(null);
+                }}
+                className={`font-mono-numeric ${wcError ? FIELD_ERROR_CLASS : ""}`}
                 required
+                aria-invalid={!!wcError}
+                aria-describedby={wcError ? "dept-wc-err" : undefined}
               />
+              {wcError && <FieldError id="dept-wc-err" message={wcError} />}
             </div>
           </fieldset>
           <DialogFooter className="gap-2 pt-2">
@@ -1150,7 +1176,7 @@ function AssessmentRow({
             <button
               type="button"
               onClick={onOpen}
-              className="font-display font-medium text-base text-foreground text-left hover:text-[var(--brand-light)] transition-colors truncate"
+              className="font-display font-medium text-base text-foreground text-left hover:text-[var(--brand-light)] cursor-pointer transition-colors truncate"
               aria-label={`Acessar avaliação ${assessment.title}`}
             >
               {assessment.title}
@@ -1352,47 +1378,21 @@ function CreateAssessmentDialog({
                 autoFocus
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="asmt-start">Início</Label>
-                <Input
-                  id="asmt-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    setDateError(null);
-                  }}
-                  className="font-mono-numeric"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="asmt-end">
-                  Fim <span className="text-[var(--risk-high)]">*</span>
-                </Label>
-                <Input
-                  id="asmt-end"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value);
-                    setDateError(null);
-                  }}
-                  className="font-mono-numeric"
-                  aria-invalid={!!dateError}
-                  aria-describedby={dateError ? "asmt-date-err" : undefined}
-                />
-              </div>
-            </div>
-            {dateError && (
-              <p
-                id="asmt-date-err"
-                className="text-xs text-[var(--risk-high)] flex items-center gap-1"
-              >
-                <X className="h-3 w-3" />
-                {dateError}
-              </p>
-            )}
+            <DateRangeField
+              startId="asmt-start"
+              endId="asmt-end"
+              startLabel="Início"
+              endLabel="Fim"
+              groupLabel="Período da coleta"
+              startValue={startDate}
+              endValue={endDate}
+              onStartChange={setStartDate}
+              onEndChange={setEndDate}
+              error={dateError}
+              onErrorChange={setDateError}
+              required
+              disabled={submitting}
+            />
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -1546,7 +1546,7 @@ function CreateAssessmentDialog({
 
 function DetailSkeleton() {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-8">
       <Skeleton className="h-5 w-32" />
       <Skeleton className="h-24 w-full rounded-lg" />
       <Skeleton className="h-10 w-full sm:w-80" />

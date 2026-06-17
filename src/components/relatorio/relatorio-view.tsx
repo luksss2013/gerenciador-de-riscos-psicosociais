@@ -593,7 +593,7 @@ function ReportOutline() {
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="group w-full text-left pt-5 pb-4 flex items-start justify-between gap-3 hover:bg-[var(--surface)] transition-colors -mx-2 px-2 rounded-sm"
+            className="group w-full text-left pt-5 pb-4 flex items-start justify-between gap-3 hover:bg-[var(--surface)] cursor-pointer transition-colors -mx-2 px-2 rounded-sm"
             aria-label="Alternar estrutura do documento"
           >
             <div className="flex items-start gap-2 min-w-0">

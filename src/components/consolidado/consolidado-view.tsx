@@ -145,24 +145,24 @@ function SummaryKpis({ data }: { data: CompanyBreakdown[] }) {
   return (
     <section
       aria-label="Indicadores-chave"
-      className="bg-[var(--surface)] rounded-lg p-5"
+      className="bg-[var(--surface)] rounded-lg px-4 sm:px-5 py-3 sm:py-4"
     >
-      <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-border">
+      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border">
         {stats.map((s, i) => (
           <div
             key={i}
-            className={`px-4 sm:px-6 py-1 ${i === 0 ? "pl-0" : ""}`}
+            className={`px-3 sm:px-5 py-1 ${i === 0 ? "pl-0" : ""}`}
             role="group"
             aria-label={s.ariaLabel}
           >
-            <div className="font-mono-numeric text-2xl leading-none text-foreground">
+            <div className="font-mono-numeric text-xl sm:text-2xl leading-none text-foreground">
               {s.value}
             </div>
-            <div className="text-xs text-muted-foreground mt-2">
+            <div className="text-xs text-muted-foreground mt-1.5">
               {s.label}
             </div>
             {s.secondary && (
-              <div className="text-[11px] text-muted-foreground/80 mt-1">
+              <div className="text-[11px] text-muted-foreground/80 mt-0.5">
                 {s.secondary}
               </div>
             )}
@@ -699,13 +699,70 @@ function CompanyDetailCards({ data }: { data: CompanyBreakdown[] }) {
 
 function LoadingState() {
   return (
-    <div className="space-y-8">
-      <Skeleton className="h-20 w-full rounded-lg" />
-      <Skeleton className="h-96 w-full rounded-md" />
-      <Skeleton className="h-72 w-full rounded-md" />
-      <div className="space-y-2">
+    <div className="space-y-8" aria-hidden="true">
+      {/* Stat strip skeleton — compact surface-backed bar with 4 divided cells */}
+      <div className="bg-[var(--surface)] rounded-lg px-4 sm:px-5 py-3 sm:py-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`px-3 sm:px-5 py-1 ${i === 0 ? "pl-0" : ""}`}>
+              <Skeleton className="h-6 w-12" />
+              <Skeleton className="h-3 w-20 mt-3" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Heatmap table skeleton — header + 6 rows of cells */}
+      <div>
+        <div className="flex items-baseline justify-between mb-4">
+          <Skeleton className="h-6 w-64" />
+          <Skeleton className="h-4 w-4" />
+        </div>
+        <Skeleton className="h-4 w-full mb-4" />
+        <div className="rounded-md border border-border overflow-hidden">
+          {/* Header row */}
+          <div className="flex border-b border-border bg-[var(--surface)]">
+            <Skeleton className="h-9 flex-1 m-2" />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-12 m-2" />
+            ))}
+          </div>
+          {/* Body rows */}
+          {Array.from({ length: 6 }).map((_, r) => (
+            <div key={r} className="flex border-b border-border last:border-b-0">
+              <div className="flex-1 flex items-center gap-2 p-2">
+                <Skeleton className="h-2 w-2 rounded-full" />
+                <Skeleton className="h-3.5 w-32" />
+              </div>
+              {Array.from({ length: 6 }).map((_, c) => (
+                <Skeleton key={c} className="h-7 w-12 m-2 rounded-sm" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Risk distribution chart skeleton */}
+      <div>
+        <Skeleton className="h-6 w-48 mb-4" />
+        <Skeleton className="h-64 w-full rounded-md" />
+      </div>
+
+      {/* Company detail cards skeleton — 3 stacked cards */}
+      <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-32 w-full rounded-md" />
+          <div key={i} className="rounded-md border border-border p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-3.5 w-20" />
+            </div>
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+            <div className="flex gap-2 pt-2">
+              <Skeleton className="h-7 w-20 rounded-sm" />
+              <Skeleton className="h-7 w-20 rounded-sm" />
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -831,7 +888,7 @@ export function ConsolidadoView() {
       <TooltipProvider delayDuration={200}>
         <Header onRefresh={() => load(true)} refreshing={refreshing} />
 
-        <div className="space-y-10">
+        <div className="space-y-8">
           {loading ? (
             <LoadingState />
           ) : error ? (
@@ -839,12 +896,12 @@ export function ConsolidadoView() {
           ) : !data || data.length === 0 ? (
             <EmptyState />
           ) : (
-            <>
+            <div className="animate-in fade-in duration-300 space-y-8">
               <SummaryKpis data={data} />
               <HeatmapTable data={data} />
               <RiskDistributionChart data={data} />
               <CompanyDetailCards data={data} />
-            </>
+            </div>
           )}
         </div>
       </TooltipProvider>

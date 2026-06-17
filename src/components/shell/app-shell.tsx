@@ -18,6 +18,16 @@ import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import { useAuth, useView, type ViewName } from "@/lib/store";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -37,6 +47,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PainelView } from "@/components/painel/painel-view";
 import { ConfiguracoesView } from "@/components/configuracoes/configuracoes-view";
+import { BreadcrumbBar } from "@/components/shell/breadcrumb-bar";
 
 // ─── View router ────────────────────────────────────────────────────────────
 
@@ -46,12 +57,44 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { view: "painel", label: "Painel", icon: LayoutDashboard },
-  { view: "consolidado", label: "Consolidado", icon: BarChart3 },
-  { view: "empresas", label: "Empresas", icon: Building2 },
-  { view: "configuracoes", label: "Configurações", icon: Settings },
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Visão geral",
+    items: [
+      { view: "painel", label: "Início", icon: LayoutDashboard },
+      { view: "consolidado", label: "Análise consolidada", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [{ view: "empresas", label: "Empresas", icon: Building2 }],
+  },
+  {
+    label: "Conta",
+    items: [{ view: "configuracoes", label: "Configurações", icon: Settings }],
+  },
 ];
+
+// Sensible display label for every view (including detail views not in the
+// sidebar) — drives the mobile topbar title.
+const VIEW_LABELS: Record<ViewName, string> = {
+  painel: "Início",
+  consolidado: "Análise consolidada",
+  empresas: "Empresas",
+  empresa: "Empresa",
+  avaliacao: "Avaliação",
+  resultados: "Resultados",
+  inventario: "Inventário",
+  plano: "Plano de ação",
+  relatorio: "Relatório",
+  configuracoes: "Configurações",
+  worker: "Portal do trabalhador",
+};
 
 type AnyViewComponent = React.ComponentType<Record<string, never>>;
 
@@ -180,6 +223,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
   const { view, go } = useView();
   const { professional } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -194,6 +238,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
       useAuth.getState().set(null);
       toast.success("Sessão encerrada.");
       setSigningOut(false);
+      setSignOutOpen(false);
     }
   };
 
@@ -220,32 +265,46 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4" aria-label="Navegação principal">
-        <ul className="space-y-0.5">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = view === item.view;
-            return (
-              <li key={item.view}>
-                <button
-                  onClick={() => {
-                    go(item.view);
-                    onNavigate?.();
-                  }}
-                  className={`w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors border-l-2 ${
-                    active
-                      ? "border-[var(--brand)] bg-sidebar-accent text-[var(--brand)]"
-                      : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                  }`}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+      <nav
+        className="flex-1 px-3 pt-2 pb-4 overflow-y-auto scroll-area"
+        aria-label="Navegação principal"
+      >
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.label}>
+            <div
+              className={`text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground px-3 ${
+                gi === 0 ? "pt-2" : "pt-4"
+              } pb-1`}
+            >
+              {group.label}
+            </div>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = view === item.view;
+                return (
+                  <li key={item.view}>
+                    <button
+                      onClick={() => {
+                        go(item.view);
+                        onNavigate?.();
+                      }}
+                      className={`w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium cursor-pointer transition-colors border-l-2 ${
+                        active
+                          ? "border-[var(--brand)] bg-sidebar-accent text-[var(--brand)]"
+                          : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                      }`}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       {/* User */}
@@ -253,7 +312,7 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
         <div className="flex items-center gap-1.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex-1 flex items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent/60 transition-colors text-left">
+              <button className="flex-1 flex items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent/60 cursor-pointer transition-colors text-left">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-[var(--sidebar-accent)] text-[var(--brand)] text-xs">
                     {initials}
@@ -293,7 +352,10 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
-                onClick={handleSignOut}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setSignOutOpen(true);
+                }}
                 disabled={signingOut}
               >
                 {signingOut ? (
@@ -307,6 +369,35 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Logout confirmation */}
+      <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-xl">
+              Encerrar sessão?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Você sairá da plataforma e precisará informar suas credenciais
+              novamente para acessar. A sessão atual será encerrada em todos os
+              dispositivos apenas se você confirmar esta ação.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={signingOut}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={signingOut}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleSignOut();
+              }}
+            >
+              {signingOut && <Loader2 className="h-4 w-4 animate-spin" />}
+              Sair
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -317,8 +408,7 @@ function MobileTopbar() {
   const { view } = useView();
   const [open, setOpen] = useState(false);
 
-  const currentLabel =
-    NAV_ITEMS.find((n) => n.view === view)?.label ?? "NR-1 Copsoq";
+  const currentLabel = VIEW_LABELS[view] ?? "NR-1 Copsoq";
 
   return (
     <header className="lg:hidden sticky top-0 z-30 flex items-center gap-3 h-14 px-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -398,6 +488,7 @@ export function AppShell() {
 
         <div className="flex flex-col flex-1 min-w-0">
           <MobileTopbar />
+          <BreadcrumbBar />
           <main className="flex-1 min-w-0">
             <React.Suspense fallback={<ViewLoader />}>
               {renderView(view)}

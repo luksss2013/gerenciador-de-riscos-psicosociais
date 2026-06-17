@@ -1,0 +1,1977 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { useCallback, useEffect, useRef, useState } from "react";
+     5→import { differenceInDays, format, isValid, parseISO } from "date-fns";
+     6→import { ptBR } from "date-fns/locale";
+     7→import {
+     8→  AlertTriangle,
+     9→  BarChart3,
+    10→  Calendar,
+    11→  CheckCircle2,
+    12→  ChevronLeft,
+    13→  ClipboardList,
+    14→  Clock,
+    15→  Copy,
+    16→  CopyPlus,
+    17→  FileText,
+    18→  FlaskConical,
+    19→  ListChecks,
+    20→  Loader2,
+    21→  Lock,
+    22→  MessageCircle,
+    23→  Pencil,
+    24→  RefreshCw,
+    25→  Rocket,
+    26→  Users,
+    27→} from "lucide-react";
+    28→import { toast } from "sonner";
+    29→
+    30→import { api, ApiError } from "@/lib/api";
+    31→import { useView } from "@/lib/store";
+    32→import type {
+    33→  Assessment,
+    34→  AssessmentDepartment,
+    35→  AssessmentProgress,
+    36→  AssessmentStatus,
+    37→} from "@/lib/types";
+    38→import { ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
+    39→
+    40→import { Button } from "@/components/ui/button";
+    41→import { Badge } from "@/components/ui/badge";
+    42→import { Skeleton } from "@/components/ui/skeleton";
+    43→import { Progress } from "@/components/ui/progress";
+    44→import { Textarea } from "@/components/ui/textarea";
+    45→import { Label } from "@/components/ui/label";
+    46→import { Input } from "@/components/ui/input";
+    47→import { Alert, AlertDescription } from "@/components/ui/alert";
+    48→import {
+    49→  Select,
+    50→  SelectContent,
+    51→  SelectItem,
+    52→  SelectTrigger,
+    53→  SelectValue,
+    54→} from "@/components/ui/select";
+    55→import {
+    56→  Dialog,
+    57→  DialogContent,
+    58→  DialogDescription,
+    59→  DialogFooter,
+    60→  DialogHeader,
+    61→  DialogTitle,
+    62→} from "@/components/ui/dialog";
+    63→import {
+    64→  AlertDialog,
+    65→  AlertDialogAction,
+    66→  AlertDialogCancel,
+    67→  AlertDialogContent,
+    68→  AlertDialogDescription,
+    69→  AlertDialogFooter,
+    70→  AlertDialogHeader,
+    71→  AlertDialogTitle,
+    72→  AlertDialogTrigger,
+    73→} from "@/components/ui/alert-dialog";
+    74→import {
+    75→  Tooltip,
+    76→  TooltipContent,
+    77→  TooltipProvider,
+    78→  TooltipTrigger,
+    79→} from "@/components/ui/tooltip";
+    80→
+    81→// ─── Helpers ─────────────────────────────────────────────────────────────────
+    82→
+    83→function fmtDate(iso: string | null, fallback = "—"): string {
+    84→  if (!iso) return fallback;
+    85→  try {
+    86→    const d = parseISO(iso);
+    87→    if (!isValid(d)) return fallback;
+    88→    return format(d, "dd/MM/yyyy", { locale: ptBR });
+    89→  } catch {
+    90→    return fallback;
+    91→  }
+    92→}
+    93→
+    94→function fmtPeriod(start: string | null, end: string | null): string {
+    95→  const s = start ? fmtDate(start) : "—";
+    96→  const e = end ? fmtDate(end) : "—";
+    97→  return `${s} → ${e}`;
+    98→}
+    99→
+   100→function statusBadgeClass(status: AssessmentStatus): string {
+   101→  switch (status) {
+   102→    case "collecting":
+   103→    case "processing":
+   104→      return "bg-[var(--sidebar-accent)] text-[var(--brand)] border-transparent";
+   105→    case "completed":
+   106→      return "risk-low-bg border-transparent";
+   107→    case "draft":
+   108→    case "archived":
+   109→    default:
+   110→      return "bg-muted text-muted-foreground border-transparent";
+   111→  }
+   112→}
+   113→
+   114→function safePct(pct: number): number {
+   115→  if (!Number.isFinite(pct)) return 0;
+   116→  return Math.max(0, Math.min(100, Math.round(pct)));
+   117→}
+   118→
+   119→function adesaoColorClass(pct: number): string {
+   120→  if (pct < 30) return "text-[var(--muted-foreground)]";
+   121→  if (pct < 70) return "text-[var(--risk-medium)]";
+   122→  return "text-[var(--risk-low)]";
+   123→}
+   124→
+   125→function adesaoStroke(pct: number): string {
+   126→  if (pct < 30) return "var(--muted-foreground)";
+   127→  if (pct < 70) return "var(--risk-medium)";
+   128→  return "var(--risk-low)";
+   129→}
+   130→
+   131→// ─── AdesaoRing ──────────────────────────────────────────────────────────────
+   132→
+   133→function AdesaoRing({ pct }: { pct: number }) {
+   134→  const value = safePct(pct);
+   135→  const R = 36;
+   136→  const C = 2 * Math.PI * R;
+   137→  const offset = C - (value / 100) * C;
+   138→  const stroke = adesaoStroke(value);
+   139→  return (
+   140→    <svg
+   141→      viewBox="0 0 100 100"
+   142→      className="h-24 w-24 sm:h-28 sm:w-28"
+   143→      role="img"
+   144→      aria-label={`Adesão global: ${value} por cento`}
+   145→    >
+   146→      <circle
+   147→        cx="50"
+   148→        cy="50"
+   149→        r={R}
+   150→        fill="none"
+   151→        stroke="var(--muted)"
+   152→        strokeWidth="8"
+   153→      />
+   154→      <circle
+   155→        cx="50"
+   156→        cy="50"
+   157→        r={R}
+   158→        fill="none"
+   159→        stroke={stroke}
+   160→        strokeWidth="8"
+   161→        strokeLinecap="round"
+   162→        strokeDasharray={C}
+   163→        strokeDashoffset={offset}
+   164→        transform="rotate(-90 50 50)"
+   165→        className="ring-progress"
+   166→        style={
+   167→          {
+   168→            "--ring-circumference": C,
+   169→            "--ring-offset": offset,
+   170→          } as React.CSSProperties
+   171→        }
+   172→      />
+   173→      <text
+   174→        x="50"
+   175→        y="50"
+   176→        textAnchor="middle"
+   177→        dominantBaseline="central"
+   178→        className="fill-foreground font-mono-numeric"
+   179→        fontSize="18"
+   180→        fontWeight="700"
+   181→      >
+   182→        {value}%
+   183→      </text>
+   184→    </svg>
+   185→  );
+   186→}
+   187→
+   188→// ─── StatusBadge ─────────────────────────────────────────────────────────────
+   189→
+   190→function StatusBadge({ status }: { status: AssessmentStatus }) {
+   191→  const label = ASSESSMENT_STATUS_LABELS[status] ?? status;
+   192→  return (
+   193→    <Badge className={statusBadgeClass(status)} aria-label={`Status: ${label}`}>
+   194→      {label}
+   195→    </Badge>
+   196→  );
+   197→}
+   198→
+   199→// ─── EligibilityBadge ────────────────────────────────────────────────────────
+   200→
+   201→function EligibilityBadge({ isEligible }: { isEligible: boolean }) {
+   202→  if (isEligible) {
+   203→    return (
+   204→      <Badge className="risk-low-bg border-transparent">Elegível</Badge>
+   205→    );
+   206→  }
+   207→  return (
+   208→    <TooltipProvider delayDuration={150}>
+   209→      <Tooltip>
+   210→        <TooltipTrigger asChild>
+   211→          <span
+   212→            tabIndex={0}
+   213→            className="inline-flex outline-none"
+   214→            aria-label="Inelegível — menos de 5 respostas registradas"
+   215→          >
+   216→            <Badge
+   217→              variant="outline"
+   218→              className="text-muted-foreground cursor-help"
+   219→            >
+   220→              Inelegível
+   221→            </Badge>
+   222→          </span>
+   223→        </TooltipTrigger>
+   224→        <TooltipContent>Menos de 5 respostas registradas.</TooltipContent>
+   225→      </Tooltip>
+   226→    </TooltipProvider>
+   227→  );
+   228→}
+   229→
+   230→// ─── AssessmentHeader ────────────────────────────────────────────────────────
+   231→
+   232→function AssessmentHeader({
+   233→  assessment,
+   234→  progress,
+   235→  onEdit,
+   236→  onDuplicate,
+   237→  duplicating,
+   238→}: {
+   239→  assessment: Assessment;
+   240→  progress: AssessmentProgress | null;
+   241→  onEdit: () => void;
+   242→  onDuplicate: () => void;
+   243→  duplicating: boolean;
+   244→}) {
+   245→  const showRing =
+   246→    (assessment.status === "collecting" ||
+   247→      assessment.status === "completed") &&
+   248→    progress != null;
+   249→  const canEdit =
+   250→    assessment.status === "draft" || assessment.status === "collecting";
+   251→  return (
+   252→    <header className="border-b border-border pb-6">
+   253→      <div className="flex flex-col lg:flex-row gap-5 lg:items-start lg:justify-between">
+   254→        <div className="min-w-0 flex-1">
+   255→          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-2.5">
+   256→            <ClipboardList className="h-3.5 w-3.5" />
+   257→            <span>Avaliação psicossocial</span>
+   258→            <Badge
+   259→              variant="outline"
+   260→              className="font-mono-numeric text-[10px] px-1.5 py-0"
+   261→            >
+   262→              COPSOQ II-BR · 40 itens
+   263→            </Badge>
+   264→          </div>
+   265→          <h1 className="font-display text-2xl sm:text-3xl leading-tight tracking-tight text-foreground">
+   266→            {assessment.title}
+   267→          </h1>
+   268→          <p className="flex items-center gap-1.5 mt-2 text-sm text-muted-foreground font-mono-numeric">
+   269→            <Calendar className="h-3.5 w-3.5" />
+   270→            {fmtPeriod(assessment.startDate, assessment.endDate)}
+   271→          </p>
+   272→        </div>
+   273→        <div className="flex items-center gap-3 shrink-0">
+   274→          <StatusBadge status={assessment.status} />
+   275→          {showRing && <AdesaoRing pct={progress!.globalAdesao} />}
+   276→          <Button
+   277→            variant="ghost"
+   278→            size="sm"
+   279→            onClick={onDuplicate}
+   280→            disabled={duplicating}
+   281→            aria-label="Duplicar avaliação"
+   282→            className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+   283→          >
+   284→            {duplicating ? (
+   285→              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   286→            ) : (
+   287→              <CopyPlus className="h-3.5 w-3.5" />
+   288→            )}
+   289→            <span className="hidden sm:inline">Duplicar</span>
+   290→          </Button>
+   291→          {canEdit && (
+   292→            <Button
+   293→              variant="ghost"
+   294→              size="sm"
+   295→              onClick={onEdit}
+   296→              className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+   297→            >
+   298→              <Pencil className="h-3.5 w-3.5" />
+   299→              <span className="hidden sm:inline">Editar</span>
+   300→            </Button>
+   301→          )}
+   302→        </div>
+   303→      </div>
+   304→    </header>
+   305→  );
+   306→}
+   307→
+   308→// ─── GheProgressRows ─────────────────────────────────────────────────────────
+   309→
+   310→function GheProgressRows({
+   311→  byDept,
+   312→  status,
+   313→  onSimulate,
+   314→  simulatingId,
+   315→}: {
+   316→  byDept: AssessmentProgress["byDept"];
+   317→  status: AssessmentStatus;
+   318→  onSimulate: (ad: { id: string; name: string }) => void;
+   319→  simulatingId: string | null;
+   320→}) {
+   321→  if (byDept.length === 0) {
+   322→    return (
+   323→      <div className="border border-dashed border-border rounded-lg py-10 flex flex-col items-center text-center gap-2">
+   324→        <Users className="h-5 w-5 text-muted-foreground" />
+   325→        <p className="text-sm text-muted-foreground">
+   326→          Nenhum GHE vinculado a esta avaliação.
+   327→        </p>
+   328→      </div>
+   329→    );
+   330→  }
+   331→
+   332→  return (
+   333→    <div className="max-h-96 overflow-y-auto scroll-area border-t border-border">
+   334→      <ul className="divide-y divide-border">
+   335→        {byDept.map((d) => {
+   336→          const pct = safePct(d.pct);
+   337→          return (
+   338→            <li
+   339→              key={d.id}
+   340→              className="surface-hover px-1 py-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
+   341→            >
+   342→              <div className="min-w-0 lg:flex-1 lg:max-w-[40%]">
+   343→                <div
+   344→                  className="font-display font-medium text-base truncate"
+   345→                  title={d.name}
+   346→                >
+   347→                  {d.name}
+   348→                </div>
+   349→                <div className="text-xs text-muted-foreground mt-0.5">
+   350→                  GHE
+   351→                </div>
+   352→              </div>
+   353→
+   354→              <div className="flex items-center gap-6 lg:gap-8">
+   355→                <div>
+   356→                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+   357→                    Esperados
+   358→                  </div>
+   359→                  <div className="font-mono-numeric font-semibold text-foreground">
+   360→                    {d.expected.toLocaleString("pt-BR")}
+   361→                  </div>
+   362→                </div>
+   363→                <div>
+   364→                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+   365→                    Respondidos
+   366→                  </div>
+   367→                  <div className="font-mono-numeric font-semibold text-foreground">
+   368→                    {d.responded.toLocaleString("pt-BR")}
+   369→                  </div>
+   370→                </div>
+   371→              </div>
+   372→
+   373→              <div className="flex items-center gap-3 lg:ml-auto">
+   374→                <EligibilityBadge isEligible={d.isEligible} />
+   375→                <div className="w-32 lg:w-40">
+   376→                  <div className="flex items-center justify-between text-xs mb-1">
+   377→                    <span className="text-muted-foreground">Adesão</span>
+   378→                    <span
+   379→                      className={`font-mono-numeric font-semibold ${adesaoColorClass(pct)}`}
+   380→                    >
+   381→                      {pct}%
+   382→                    </span>
+   383→                  </div>
+   384→                  <Progress
+   385→                    value={pct}
+   386→                    className="h-1.5"
+   387→                    aria-label={`Adesão do GHE ${d.name}: ${pct} por cento`}
+   388→                  />
+   389→                </div>
+   390→                {status === "collecting" && (
+   391→                  <Button
+   392→                    variant="ghost"
+   393→                    size="sm"
+   394→                    onClick={() => onSimulate({ id: d.id, name: d.name })}
+   395→                    disabled={simulatingId === d.id}
+   396→                    aria-label={`Simular respostas do GHE ${d.name}`}
+   397→                    className="text-[var(--brand)] hover:text-[var(--brand-light)] shrink-0"
+   398→                  >
+   399→                    {simulatingId === d.id ? (
+   400→                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   401→                    ) : (
+   402→                      <FlaskConical className="h-3.5 w-3.5" />
+   403→                    )}
+   404→                    <span className="hidden sm:inline">Simular</span>
+   405→                  </Button>
+   406→                )}
+   407→              </div>
+   408→            </li>
+   409→          );
+   410→        })}
+   411→      </ul>
+   412→    </div>
+   413→  );
+   414→}
+   415→
+   416→// ─── ParticipationField ──────────────────────────────────────────────────────
+   417→
+   418→function ParticipationField({
+   419→  assessmentId,
+   420→  initial,
+   421→  disabled,
+   422→}: {
+   423→  assessmentId: string;
+   424→  initial: string;
+   425→  disabled: boolean;
+   426→}) {
+   427→  // Local draft mirrors the last server value when the field becomes editable.
+   428→  // When the field is read-only (disabled), the displayed value comes directly
+   429→  // from `initial` so server truth is always shown without clobbering in-flight
+   430→  // edits via a setState-in-effect.
+   431→  const [draft, setDraft] = useState(initial);
+   432→  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+   433→  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   434→  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   435→
+   436→  const value = disabled ? initial : draft;
+   437→
+   438→  const save = useCallback(
+   439→    async (text: string) => {
+   440→      setStatus("saving");
+   441→      try {
+   442→        await api.assessments.update(assessmentId, {
+   443→          participationRegistration: text,
+   444→        });
+   445→        setStatus("saved");
+   446→        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+   447→        savedTimerRef.current = setTimeout(() => setStatus("idle"), 1800);
+   448→      } catch (e) {
+   449→        if (e instanceof ApiError) {
+   450→          toast.error(e.message);
+   451→        } else {
+   452→          toast.error("Falha ao salvar o registro de participação.");
+   453→        }
+   454→        setStatus("idle");
+   455→      }
+   456→    },
+   457→    [assessmentId]
+   458→  );
+   459→
+   460→  const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+   461→    if (disabled) return;
+   462→    const text = e.target.value;
+   463→    setDraft(text);
+   464→    if (debounceRef.current) clearTimeout(debounceRef.current);
+   465→    debounceRef.current = setTimeout(() => void save(text), 1000);
+   466→  };
+   467→
+   468→  useEffect(() => {
+   469→    return () => {
+   470→      if (debounceRef.current) clearTimeout(debounceRef.current);
+   471→      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+   472→    };
+   473→  }, []);
+   474→
+   475→  return (
+   476→    <section className="border-b border-border pb-8">
+   477→      <div className="flex items-start justify-between gap-3 mb-3">
+   478→        <div className="min-w-0">
+   479→          <h2 className="font-display text-base text-foreground">
+   480→            Registro de participação
+   481→          </h2>
+   482→          <p className="text-sm text-muted-foreground mt-0.5">
+   483→            Registre como os trabalhadores foram comunicados. Esta evidência é
+   484→            exigida para a geração do relatório NR-1.
+   485→          </p>
+   486→        </div>
+   487→        {status === "saving" && (
+   488→          <span
+   489→            className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0"
+   490→            role="status"
+   491→            aria-live="polite"
+   492→          >
+   493→            <Loader2 className="h-3 w-3 animate-spin" />
+   494→            Salvando…
+   495→          </span>
+   496→        )}
+   497→        {status === "saved" && (
+   498→          <span
+   499→            className="inline-flex items-center gap-1 text-xs text-[var(--risk-low)] shrink-0"
+   500→            role="status"
+   501→            aria-live="polite"
+   502→          >
+   503→            <CheckCircle2 className="h-3 w-3" />
+   504→            Salvo
+   505→          </span>
+   506→        )}
+   507→      </div>
+   508→      <Label htmlFor="participation-registration" className="sr-only">
+   509→        Registre como os trabalhadores foram comunicados.
+   510→      </Label>
+   511→      <Textarea
+   512→        id="participation-registration"
+   513→        value={value}
+   514→        onChange={onChange}
+   515→        disabled={disabled}
+   516→        rows={5}
+   517→        placeholder="Ex.: Reuniões de segurança em cada turno nos dias 12 e 13 de março; cartazes afixados nos murais; panfletos distribuídos nos vestiários; comunicado via e-mail corporativo."
+   518→        className="resize-y bg-[var(--surface)]"
+   519→      />
+   520→      <p className="text-xs text-muted-foreground mt-2">
+   521→        {disabled
+   522→          ? "Campo somente leitura — a avaliação não está em rascunho ou coleta."
+   523→          : "Salvamento automático 1 segundo após você parar de digitar."}
+   524→      </p>
+   525→    </section>
+   526→  );
+   527→}
+   528→
+   529→// ─── CollectionLinks ─────────────────────────────────────────────────────────
+   530→
+   531→function CollectionLinks({
+   532→  departments,
+   533→  assessmentId,
+   534→}: {
+   535→  departments: AssessmentDepartment[];
+   536→  assessmentId: string;
+   537→}) {
+   538→  const tokenCacheRef = useRef<Map<string, string>>(new Map());
+   539→  const [tokens, setTokens] = useState<Record<string, string>>({});
+   540→  const [loading, setLoading] = useState(true);
+   541→  const [error, setError] = useState<string | null>(null);
+   542→  const [copied, setCopied] = useState<string | null>(null);
+   543→
+   544→  const buildLink = useCallback((token: string) => {
+   545→    if (typeof window === "undefined") return `/?worker=${token}`;
+   546→    return `${window.location.origin}/?worker=${token}`;
+   547→  }, []);
+   548→
+   549→  const flashCopied = useCallback((deptId: string) => {
+   550→    setCopied(deptId);
+   551→    setTimeout(
+   552→      () => setCopied((c) => (c === deptId ? null : c)),
+   553→      1500
+   554→    );
+   555→  }, []);
+   556→
+   557→  const copyLink = useCallback(
+   558→    async (token: string, deptId: string) => {
+   559→      try {
+   560→        await navigator.clipboard.writeText(buildLink(token));
+   561→        toast.success("Link copiado para a área de transferência.");
+   562→        flashCopied(deptId);
+   563→      } catch {
+   564→        toast.error("Não foi possível copiar o link.");
+   565→      }
+   566→    },
+   567→    [buildLink, flashCopied]
+   568→  );
+   569→
+   570→  const copyWhatsApp = useCallback(
+   571→    async (token: string, deptId: string) => {
+   572→      const link = buildLink(token);
+   573→      const msg =
+   574→        "Olá! Sua empresa está realizando uma pesquisa sobre condições de trabalho. " +
+   575→        "Sua participação é anônima e voluntária. Acesse: " +
+   576→        link;
+   577→      try {
+   578→        await navigator.clipboard.writeText(msg);
+   579→        toast.success("Mensagem de WhatsApp copiada.");
+   580→        flashCopied(deptId);
+   581→      } catch {
+   582→        toast.error("Não foi possível copiar a mensagem.");
+   583→      }
+   584→    },
+   585→    [buildLink, flashCopied]
+   586→  );
+   587→
+   588→  // Pre-mint one demo token per dept so the link can be displayed and copied.
+   589→  // Tokens are cached by dept id so subsequent re-renders (e.g. parent polling)
+   590→  // don't mint new single-use tokens needlessly.
+   591→  useEffect(() => {
+   592→    let cancelled = false;
+   593→    const mint = async () => {
+   594→      const cache = tokenCacheRef.current;
+   595→      const next: Record<string, string> = {};
+   596→      let allFailed = true;
+   597→      for (const ad of departments) {
+   598→        const cached = cache.get(ad.id);
+   599→        if (cached) {
+   600→          next[ad.id] = cached;
+   601→          allFailed = false;
+   602→          continue;
+   603→        }
+   604→        try {
+   605→          const r = await api.worker.enterDept(ad.id);
+   606→          cache.set(ad.id, r.token);
+   607→          next[ad.id] = r.token;
+   608→          allFailed = false;
+   609→        } catch {
+   610→          // Skip — link will display "Indisponível".
+   611→        }
+   612→        if (cancelled) return;
+   613→      }
+   614→      if (cancelled) return;
+   615→      setTokens(next);
+   616→      setError(
+   617→        allFailed && Object.keys(next).length === 0
+   618→          ? "Não foi possível gerar os links de coleta."
+   619→          : null
+   620→      );
+   621→      setLoading(false);
+   622→    };
+   623→    void mint();
+   624→    return () => {
+   625→      cancelled = true;
+   626→    };
+   627→  }, [departments, assessmentId]);
+   628→
+   629→  if (departments.length === 0) return null;
+   630→
+   631→  return (
+   632→    <section className="border-b border-border pb-8">
+   633→      <div className="mb-3">
+   634→        <h2 className="font-display text-base text-foreground">
+   635→          Links de coleta
+   636→        </h2>
+   637→        <p className="text-sm text-muted-foreground mt-0.5">
+   638→          Distribua um link exclusivo por GHE. Cada link abre o portal do
+   639→          trabalhador e aceita uma única resposta anônima.
+   640→        </p>
+   641→      </div>
+   642→      <div className="border-t border-border">
+   643→        <ul className="divide-y divide-border">
+   644→          {departments.map((ad) => {
+   645→            const token = tokens[ad.id] ?? null;
+   646→            const link = token ? buildLink(token) : null;
+   647→            return (
+   648→              <li
+   649→                key={ad.id}
+   650→                className="surface-hover py-4 flex flex-col gap-2"
+   651→              >
+   652→                <div className="flex items-center justify-between gap-3">
+   653→                  <div className="min-w-0">
+   654→                    <div
+   655→                      className="font-display font-medium truncate"
+   656→                      title={ad.name}
+   657→                    >
+   658→                      {ad.name}
+   659→                    </div>
+   660→                    <div className="text-xs text-muted-foreground font-mono-numeric">
+   661→                      GHE · {ad.expected} esperados · {ad.responded} respondidos
+   662→                    </div>
+   663→                  </div>
+   664→                  <EligibilityBadge isEligible={ad.isEligible} />
+   665→                </div>
+   666→                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+   667→                  <code
+   668→                    className="flex-1 min-w-0 truncate rounded-md bg-[var(--surface)] px-2 py-1.5 text-xs font-mono-numeric text-muted-foreground"
+   669→                    aria-label={
+   670→                      link
+   671→                        ? `Link do GHE ${ad.name}`
+   672→                        : `Link do GHE ${ad.name} indisponível`
+   673→                    }
+   674→                  >
+   675→                    {loading ? "Gerando link…" : link ?? "Indisponível"}
+   676→                  </code>
+   677→                  <div className="flex gap-2 shrink-0">
+   678→                    <Button
+   679→                      variant="ghost"
+   680→                      size="sm"
+   681→                      onClick={() =>
+   682→                        token && void copyLink(token, ad.id)
+   683→                      }
+   684→                      disabled={!token}
+   685→                      aria-label={`Copiar link do GHE ${ad.name}`}
+   686→                      className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+   687→                    >
+   688→                      <Copy className="h-3.5 w-3.5" />
+   689→                      Copiar link
+   690→                    </Button>
+   691→                    <Button
+   692→                      variant="ghost"
+   693→                      size="sm"
+   694→                      onClick={() =>
+   695→                        token && void copyWhatsApp(token, ad.id)
+   696→                      }
+   697→                      disabled={!token}
+   698→                      aria-label={`Copiar mensagem de WhatsApp do GHE ${ad.name}`}
+   699→                      className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+   700→                    >
+   701→                      <MessageCircle className="h-3.5 w-3.5" />
+   702→                      WhatsApp
+   703→                    </Button>
+   704→                  </div>
+   705→                </div>
+   706→                {copied === ad.id && (
+   707→                  <p
+   708→                    className="text-xs text-[var(--risk-low)] inline-flex items-center gap-1"
+   709→                    role="status"
+   710→                    aria-live="polite"
+   711→                  >
+   712→                    <CheckCircle2 className="h-3 w-3" />
+   713→                    Copiado.
+   714→                  </p>
+   715→                )}
+   716→              </li>
+   717→            );
+   718→          })}
+   719→        </ul>
+   720→      </div>
+   721→      {error && (
+   722→        <div
+   723→          className="mt-3 text-xs text-[var(--risk-high)]"
+   724→          role="alert"
+   725→        >
+   726→          {error}
+   727→        </div>
+   728→      )}
+   729→    </section>
+   730→  );
+   731→}
+   732→
+   733→// ─── StatusActions ───────────────────────────────────────────────────────────
+   734→
+   735→type ResultView = "resultados" | "inventario" | "plano" | "relatorio";
+   736→
+   737→function StatusActions({
+   738→  status,
+   739→  launching,
+   740→  closing,
+   741→  simulating,
+   742→  onLaunch,
+   743→  onClose,
+   744→  onSimulate,
+   745→  onNavigate,
+   746→}: {
+   747→  status: AssessmentStatus;
+   748→  launching: boolean;
+   749→  closing: boolean;
+   750→  simulating: boolean;
+   751→  onLaunch: () => void;
+   752→  onClose: () => void;
+   753→  onSimulate: () => void;
+   754→  onNavigate: (view: ResultView) => void;
+   755→}) {
+   756→  if (status === "draft") {
+   757→    return (
+   758→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-5">
+   759→        <div className="flex items-start gap-3 min-w-0">
+   760→          <div className="h-9 w-9 rounded-md bg-[var(--sidebar-accent)] flex items-center justify-center shrink-0">
+   761→            <Rocket className="h-4 w-4 text-[var(--brand)]" />
+   762→          </div>
+   763→          <div className="min-w-0">
+   764→            <p className="font-display font-medium text-foreground">
+   765→              Avaliação pronta para lançar
+   766→            </p>
+   767→            <p className="text-sm text-muted-foreground">
+   768→              Ao lançar, os links de coleta serão gerados e o status mudará
+   769→              para &quot;Coletando respostas&quot;.
+   770→            </p>
+   771→          </div>
+   772→        </div>
+   773→        <AlertDialog>
+   774→          <AlertDialogTrigger asChild>
+   775→            <Button
+   776→              disabled={launching}
+   777→              className="shrink-0"
+   778→            >
+   779→              {launching ? (
+   780→                <Loader2 className="h-4 w-4 animate-spin" />
+   781→              ) : (
+   782→                <Rocket className="h-4 w-4" />
+   783→              )}
+   784→              Lançar Avaliação
+   785→            </Button>
+   786→          </AlertDialogTrigger>
+   787→          <AlertDialogContent>
+   788→            <AlertDialogHeader>
+   789→              <AlertDialogTitle className="font-display text-xl">
+   790→                Lançar avaliação
+   791→              </AlertDialogTitle>
+   792→              <AlertDialogDescription>
+   793→                Os links de coleta serão gerados e a avaliação mudará para
+   794→                &quot;Coletando respostas&quot;. Esta ação não pode ser
+   795→                desfeita.
+   796→              </AlertDialogDescription>
+   797→            </AlertDialogHeader>
+   798→            <AlertDialogFooter>
+   799→              <AlertDialogCancel disabled={launching}>
+   800→                Cancelar
+   801→              </AlertDialogCancel>
+   802→              <AlertDialogAction
+   803→                disabled={launching}
+   804→                onClick={(e) => {
+   805→                  e.preventDefault();
+   806→                  onLaunch();
+   807→                }}
+   808→              >
+   809→                {launching && <Loader2 className="h-4 w-4 animate-spin" />}
+   810→                Lançar
+   811→              </AlertDialogAction>
+   812→            </AlertDialogFooter>
+   813→          </AlertDialogContent>
+   814→        </AlertDialog>
+   815→      </div>
+   816→    );
+   817→  }
+   818→
+   819→  if (status === "collecting") {
+   820→    return (
+   821→      <div className="flex flex-col gap-4 py-5">
+   822→        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   823→          <div className="flex items-start gap-3 min-w-0">
+   824→            <div className="h-9 w-9 rounded-md bg-[var(--surface)] flex items-center justify-center shrink-0">
+   825→              <Lock className="h-4 w-4 text-[var(--risk-medium)]" />
+   826→            </div>
+   827→            <div className="min-w-0">
+   828→              <p className="font-display font-medium text-foreground">
+   829→                Coleta em andamento
+   830→              </p>
+   831→              <p className="text-sm text-muted-foreground">
+   832→                Encerre a coleta para calcular os escores. Esta ação é
+   833→                irreversível e bloqueará novas respostas.
+   834→              </p>
+   835→            </div>
+   836→          </div>
+   837→          <AlertDialog>
+   838→            <AlertDialogTrigger asChild>
+   839→              <Button
+   840→                className="shrink-0 bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+   841→              >
+   842→                <Lock className="h-4 w-4" />
+   843→                Encerrar Coleta
+   844→              </Button>
+   845→            </AlertDialogTrigger>
+   846→            <AlertDialogContent>
+   847→              <AlertDialogHeader>
+   848→                <AlertDialogTitle className="font-display text-xl">
+   849→                  Encerrar coleta?
+   850→                </AlertDialogTitle>
+   851→                <AlertDialogDescription>
+   852→                  Esta ação é <strong>irreversível</strong>. Após o
+   853→                  encerramento, novos respondentes não poderão participar, os
+   854→                  escores serão calculados e o status mudará para
+   855→                  &quot;Concluída&quot;. GHEs com menos de 5 respostas serão
+   856→                  marcados como inelegíveis.
+   857→                </AlertDialogDescription>
+   858→              </AlertDialogHeader>
+   859→              <AlertDialogFooter>
+   860→                <AlertDialogCancel disabled={closing}>
+   861→                  Cancelar
+   862→                </AlertDialogCancel>
+   863→                <AlertDialogAction
+   864→                  disabled={closing}
+   865→                  onClick={(e) => {
+   866→                    e.preventDefault();
+   867→                    onClose();
+   868→                  }}
+   869→                  className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+   870→                >
+   871→                  {closing && <Loader2 className="h-4 w-4 animate-spin" />}
+   872→                  Encerrar e calcular
+   873→                </AlertDialogAction>
+   874→              </AlertDialogFooter>
+   875→            </AlertDialogContent>
+   876→          </AlertDialog>
+   877→        </div>
+   878→        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-border pt-4">
+   879→          <div className="flex items-start gap-3 min-w-0">
+   880→            <div className="h-9 w-9 rounded-md bg-[var(--surface)] flex items-center justify-center shrink-0">
+   881→              <FlaskConical className="h-4 w-4 text-[var(--risk-medium)]" />
+   882→            </div>
+   883→            <div className="min-w-0">
+   884→              <p className="font-display font-medium text-foreground">
+   885→                Simular respostas (demo)
+   886→              </p>
+   887→              <p className="text-sm text-muted-foreground">
+   888→                Gere respostas fictícias em massa para demonstração e testes.
+   889→                Use apenas em ambientes de demonstração.
+   890→              </p>
+   891→            </div>
+   892→          </div>
+   893→          <Button
+   894→            variant="outline"
+   895→            onClick={onSimulate}
+   896→            disabled={simulating}
+   897→            className="shrink-0"
+   898→            aria-label="Simular respostas em todos os GHEs"
+   899→          >
+   900→            {simulating ? (
+   901→              <Loader2 className="h-4 w-4 animate-spin" />
+   902→            ) : (
+   903→              <FlaskConical className="h-4 w-4" />
+   904→            )}
+   905→            Simular respostas
+   906→          </Button>
+   907→        </div>
+   908→      </div>
+   909→    );
+   910→  }
+   911→
+   912→  if (status === "completed") {
+   913→    return (
+   914→      <div className="py-5">
+   915→        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+   916→          <div className="flex items-start gap-3 min-w-0">
+   917→            <div className="h-9 w-9 rounded-md bg-[var(--surface)] flex items-center justify-center shrink-0">
+   918→              <CheckCircle2 className="h-4 w-4 text-[var(--risk-low)]" />
+   919→            </div>
+   920→            <div className="min-w-0">
+   921→              <p className="font-display font-medium text-foreground">
+   922→                Avaliação concluída
+   923→              </p>
+   924→              <p className="text-sm text-muted-foreground">
+   925→                Acesse os resultados e dê continuidade ao ciclo.
+   926→              </p>
+   927→            </div>
+   928→          </div>
+   929→        </div>
+   930→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+   931→          <Button
+   932→            onClick={() => onNavigate("resultados")}
+   933→            className="w-full"
+   934→          >
+   935→            <BarChart3 className="h-4 w-4" />
+   936→            Ver Resultados
+   937→          </Button>
+   938→          <Button
+   939→            variant="outline"
+   940→            onClick={() => onNavigate("inventario")}
+   941→            className="w-full"
+   942→          >
+   943→            <ListChecks className="h-4 w-4" />
+   944→            Inventário de Riscos
+   945→          </Button>
+   946→          <Button
+   947→            variant="outline"
+   948→            onClick={() => onNavigate("plano")}
+   949→            className="w-full"
+   950→          >
+   951→            <ClipboardList className="h-4 w-4" />
+   952→            Plano de Ação
+   953→          </Button>
+   954→          <Button
+   955→            variant="outline"
+   956→            onClick={() => onNavigate("relatorio")}
+   957→            className="w-full"
+   958→          >
+   959→            <FileText className="h-4 w-4" />
+   960→            Relatório
+   961→          </Button>
+   962→        </div>
+   963→      </div>
+   964→    );
+   965→  }
+   966→
+   967→  if (status === "processing") {
+   968→    return (
+   969→      <div className="py-5 flex items-center gap-3">
+   970→        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+   971→        <p className="text-sm text-muted-foreground">
+   972→          Processando resultados…
+   973→        </p>
+   974→      </div>
+   975→    );
+   976→  }
+   977→
+   978→  // archived or unknown
+   979→  return (
+   980→    <div className="py-5 flex items-center gap-3">
+   981→      <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+   982→      <p className="text-sm text-muted-foreground">
+   983→        Esta avaliação foi arquivada.
+   984→      </p>
+   985→    </div>
+   986→  );
+   987→}
+   988→
+   989→// ─── DuplicateAssessmentDialog ──────────────────────────────────────────────
+   990→
+   991→function DuplicateAssessmentDialog({
+   992→  open,
+   993→  onOpenChange,
+   994→  assessment,
+   995→  onSuccess,
+   996→  onSavingChange,
+   997→}: {
+   998→  open: boolean;
+   999→  onOpenChange: (v: boolean) => void;
+  1000→  assessment: Assessment;
+  1001→  onSuccess: (a: Assessment) => void;
+  1002→  onSavingChange: (v: boolean) => void;
+  1003→}) {
+  1004→  return (
+  1005→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1006→      <DialogContent>
+  1007→        <DialogHeader>
+  1008→          <DialogTitle className="font-display text-xl">
+  1009→            Duplicar avaliação
+  1010→          </DialogTitle>
+  1011→          <DialogDescription>
+  1012→            Será criada uma nova avaliação em rascunho com os mesmos GHEs e
+  1013→            respostas esperadas. As respostas anteriores não serão copiadas.
+  1014→          </DialogDescription>
+  1015→        </DialogHeader>
+  1016→        {open && (
+  1017→          <DuplicateAssessmentForm
+  1018→            key={assessment.id}
+  1019→            assessment={assessment}
+  1020→            onSavingChange={onSavingChange}
+  1021→            onSuccess={(a) => {
+  1022→              onSuccess(a);
+  1023→              onOpenChange(false);
+  1024→            }}
+  1025→            onCancel={() => onOpenChange(false)}
+  1026→          />
+  1027→        )}
+  1028→      </DialogContent>
+  1029→    </Dialog>
+  1030→  );
+  1031→}
+  1032→
+  1033→function DuplicateAssessmentForm({
+  1034→  assessment,
+  1035→  onSuccess,
+  1036→  onCancel,
+  1037→  onSavingChange,
+  1038→}: {
+  1039→  assessment: Assessment;
+  1040→  onSuccess: (a: Assessment) => void;
+  1041→  onCancel: () => void;
+  1042→  onSavingChange: (v: boolean) => void;
+  1043→}) {
+  1044→  const [title, setTitle] = useState(`${assessment.title} (cópia)`);
+  1045→  const [saving, setSaving] = useState(false);
+  1046→  const [err, setErr] = useState<string | null>(null);
+  1047→
+  1048→  const onSubmit = async (e: React.FormEvent) => {
+  1049→    e.preventDefault();
+  1050→    setErr(null);
+  1051→    if (!title.trim() || title.trim().length < 2) {
+  1052→      setErr("Título deve ter ao menos 2 caracteres.");
+  1053→      return;
+  1054→    }
+  1055→    setSaving(true);
+  1056→    onSavingChange(true);
+  1057→    try {
+  1058→      const created = await api.assessments.duplicate(assessment.id, {
+  1059→        title: title.trim(),
+  1060→      });
+  1061→      toast.success("Avaliação duplicada com sucesso.");
+  1062→      onSuccess(created);
+  1063→    } catch (e2) {
+  1064→      const msg =
+  1065→        e2 instanceof ApiError
+  1066→          ? e2.message
+  1067→          : "Falha ao duplicar a avaliação.";
+  1068→      setErr(msg);
+  1069→      toast.error(msg);
+  1070→    } finally {
+  1071→      setSaving(false);
+  1072→      onSavingChange(false);
+  1073→    }
+  1074→  };
+  1075→
+  1076→  return (
+  1077→    <form onSubmit={onSubmit} className="space-y-4">
+  1078→      <div className="space-y-2">
+  1079→        <Label htmlFor="duplicate-title">Título da nova avaliação</Label>
+  1080→        <Input
+  1081→          id="duplicate-title"
+  1082→          value={title}
+  1083→          onChange={(e) => setTitle(e.target.value)}
+  1084→          maxLength={120}
+  1085→          autoFocus
+  1086→        />
+  1087→      </div>
+  1088→      {err && (
+  1089→        <p className="text-sm text-[var(--risk-high)]" role="alert">
+  1090→          {err}
+  1091→        </p>
+  1092→      )}
+  1093→      <DialogFooter>
+  1094→        <Button
+  1095→          type="button"
+  1096→          variant="ghost"
+  1097→          onClick={onCancel}
+  1098→          disabled={saving}
+  1099→        >
+  1100→          Cancelar
+  1101→        </Button>
+  1102→        <Button type="submit" disabled={saving}>
+  1103→          {saving ? (
+  1104→            <Loader2 className="h-4 w-4 animate-spin" />
+  1105→          ) : (
+  1106→            <Copy className="h-4 w-4" />
+  1107→          )}
+  1108→          Duplicar
+  1109→        </Button>
+  1110→      </DialogFooter>
+  1111→    </form>
+  1112→  );
+  1113→}
+  1114→
+  1115→// ─── EditAssessmentDialog ────────────────────────────────────────────────────
+  1116→
+  1117→function EditAssessmentDialog({
+  1118→  open,
+  1119→  onOpenChange,
+  1120→  assessment,
+  1121→  onSaved,
+  1122→}: {
+  1123→  open: boolean;
+  1124→  onOpenChange: (v: boolean) => void;
+  1125→  assessment: Assessment;
+  1126→  onSaved: (a: Assessment) => void;
+  1127→}) {
+  1128→  return (
+  1129→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1130→      <DialogContent>
+  1131→        <DialogHeader>
+  1132→          <DialogTitle className="font-display text-xl">
+  1133→            Editar avaliação
+  1134→          </DialogTitle>
+  1135→          <DialogDescription>
+  1136→            Ajuste os dados do ciclo. Disponível apenas em rascunho ou durante
+  1137→            a coleta.
+  1138→          </DialogDescription>
+  1139→        </DialogHeader>
+  1140→        {open && (
+  1141→          <EditAssessmentForm
+  1142→            key={assessment.id}
+  1143→            assessment={assessment}
+  1144→            onSaved={(a) => {
+  1145→              onSaved(a);
+  1146→              onOpenChange(false);
+  1147→            }}
+  1148→            onCancel={() => onOpenChange(false)}
+  1149→          />
+  1150→        )}
+  1151→      </DialogContent>
+  1152→    </Dialog>
+  1153→  );
+  1154→}
+  1155→
+  1156→function EditAssessmentForm({
+  1157→  assessment,
+  1158→  onSaved,
+  1159→  onCancel,
+  1160→}: {
+  1161→  assessment: Assessment;
+  1162→  onSaved: (a: Assessment) => void;
+  1163→  onCancel: () => void;
+  1164→}) {
+  1165→  const [title, setTitle] = useState(assessment.title);
+  1166→  const [startDate, setStartDate] = useState(assessment.startDate ?? "");
+  1167→  const [endDate, setEndDate] = useState(assessment.endDate ?? "");
+  1168→  const [participation, setParticipation] = useState(
+  1169→    assessment.participationRegistration ?? ""
+  1170→  );
+  1171→  const [saving, setSaving] = useState(false);
+  1172→  const [err, setErr] = useState<string | null>(null);
+  1173→
+  1174→  const onSubmit = async (e: React.FormEvent) => {
+  1175→    e.preventDefault();
+  1176→    setErr(null);
+  1177→    if (!title.trim()) {
+  1178→      setErr("Título é obrigatório.");
+  1179→      return;
+  1180→    }
+  1181→    if (!endDate) {
+  1182→      setErr("Data final é obrigatória.");
+  1183→      return;
+  1184→    }
+  1185→    if (startDate && endDate < startDate) {
+  1186→      setErr("Data final deve ser posterior à data inicial.");
+  1187→      return;
+  1188→    }
+  1189→    setSaving(true);
+  1190→    try {
+  1191→      const updated = await api.assessments.update(assessment.id, {
+  1192→        title: title.trim(),
+  1193→        startDate: startDate || undefined,
+  1194→        endDate,
+  1195→        participationRegistration: participation,
+  1196→      });
+  1197→      toast.success("Avaliação atualizada.");
+  1198→      onSaved(updated);
+  1199→    } catch (e2) {
+  1200→      if (e2 instanceof ApiError) {
+  1201→        setErr(e2.message);
+  1202→      } else {
+  1203→        setErr("Falha ao atualizar a avaliação.");
+  1204→      }
+  1205→    } finally {
+  1206→      setSaving(false);
+  1207→    }
+  1208→  };
+  1209→
+  1210→  return (
+  1211→    <form onSubmit={onSubmit} className="space-y-4">
+  1212→      <div className="space-y-2">
+  1213→        <Label htmlFor="edit-title">Título</Label>
+  1214→        <Input
+  1215→          id="edit-title"
+  1216→          value={title}
+  1217→          onChange={(e) => setTitle(e.target.value)}
+  1218→          maxLength={120}
+  1219→        />
+  1220→      </div>
+  1221→      <div className="grid grid-cols-2 gap-3">
+  1222→        <div className="space-y-2">
+  1223→          <Label htmlFor="edit-start">Início</Label>
+  1224→          <Input
+  1225→            id="edit-start"
+  1226→            type="date"
+  1227→            value={startDate}
+  1228→            onChange={(e) => setStartDate(e.target.value)}
+  1229→          />
+  1230→        </div>
+  1231→        <div className="space-y-2">
+  1232→          <Label htmlFor="edit-end">Fim</Label>
+  1233→          <Input
+  1234→            id="edit-end"
+  1235→            type="date"
+  1236→            value={endDate}
+  1237→            onChange={(e) => setEndDate(e.target.value)}
+  1238→            required
+  1239→          />
+  1240→        </div>
+  1241→      </div>
+  1242→      <div className="space-y-2">
+  1243→        <Label htmlFor="edit-participation">Registro de participação</Label>
+  1244→        <Textarea
+  1245→          id="edit-participation"
+  1246→          rows={4}
+  1247→          value={participation}
+  1248→          onChange={(e) => setParticipation(e.target.value)}
+  1249→          placeholder="Como os trabalhadores foram comunicados."
+  1250→          className="bg-[var(--surface)]"
+  1251→        />
+  1252→      </div>
+  1253→      {err && (
+  1254→        <p className="text-sm text-[var(--risk-high)]" role="alert">
+  1255→          {err}
+  1256→        </p>
+  1257→      )}
+  1258→      <DialogFooter>
+  1259→        <Button
+  1260→          type="button"
+  1261→          variant="outline"
+  1262→          onClick={onCancel}
+  1263→          disabled={saving}
+  1264→        >
+  1265→          Cancelar
+  1266→        </Button>
+  1267→        <Button type="submit" disabled={saving}>
+  1268→          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+  1269→          Salvar alterações
+  1270→        </Button>
+  1271→      </DialogFooter>
+  1272→    </form>
+  1273→  );
+  1274→}
+  1275→
+  1276→// ─── SimulateResponsesDialog ─────────────────────────────────────────────────
+  1277→
+  1278→type SimulateBias = "low" | "medium" | "high";
+  1279→
+  1280→const BIAS_OPTIONS: Array<{ value: SimulateBias; label: string }> = [
+  1281→  { value: "low", label: "Favorável" },
+  1282→  { value: "medium", label: "Intermediário" },
+  1283→  { value: "high", label: "Desfavorável" },
+  1284→];
+  1285→
+  1286→function SimulateResponsesDialog({
+  1287→  open,
+  1288→  onOpenChange,
+  1289→  assessment,
+  1290→  departments,
+  1291→  initialAssessmentDeptId,
+  1292→  onSavingChange,
+  1293→  onSuccess,
+  1294→}: {
+  1295→  open: boolean;
+  1296→  onOpenChange: (v: boolean) => void;
+  1297→  assessment: Assessment;
+  1298→  departments: AssessmentDepartment[];
+  1299→  initialAssessmentDeptId: string | null;
+  1300→  onSavingChange: (v: boolean) => void;
+  1301→  onSuccess: (simulated: number) => void;
+  1302→}) {
+  1303→  return (
+  1304→    <Dialog open={open} onOpenChange={onOpenChange}>
+  1305→      <DialogContent>
+  1306→        <DialogHeader>
+  1307→          <DialogTitle className="font-display text-xl">
+  1308→            Simular respostas (demo)
+  1309→          </DialogTitle>
+  1310→          <DialogDescription>
+  1311→            Gera respostas simuladas para demonstração e testes. Os dados são
+  1312→            fictícios e não representam trabalhadores reais. Use apenas em
+  1313→            ambientes de demonstração.
+  1314→          </DialogDescription>
+  1315→        </DialogHeader>
+  1316→        {open && (
+  1317→          <SimulateResponsesForm
+  1318→            key={`${assessment.id}:${initialAssessmentDeptId ?? "all"}`}
+  1319→            assessment={assessment}
+  1320→            departments={departments}
+  1321→            initialAssessmentDeptId={initialAssessmentDeptId}
+  1322→            onSavingChange={onSavingChange}
+  1323→            onSuccess={(simulated) => {
+  1324→              onSuccess(simulated);
+  1325→              onOpenChange(false);
+  1326→            }}
+  1327→            onCancel={() => onOpenChange(false)}
+  1328→          />
+  1329→        )}
+  1330→      </DialogContent>
+  1331→    </Dialog>
+  1332→  );
+  1333→}
+  1334→
+  1335→function SimulateResponsesForm({
+  1336→  assessment,
+  1337→  departments,
+  1338→  initialAssessmentDeptId,
+  1339→  onSavingChange,
+  1340→  onSuccess,
+  1341→  onCancel,
+  1342→}: {
+  1343→  assessment: Assessment;
+  1344→  departments: AssessmentDepartment[];
+  1345→  initialAssessmentDeptId: string | null;
+  1346→  onSavingChange: (v: boolean) => void;
+  1347→  onSuccess: (simulated: number) => void;
+  1348→  onCancel: () => void;
+  1349→}) {
+  1350→  // initialAssessmentDeptId === null means "Todos os GHEs" pre-selected.
+  1351→  const [assessmentDeptId, setAssessmentDeptId] = useState<string>(
+  1352→    initialAssessmentDeptId ?? "__all__",
+  1353→  );
+  1354→  const [countStr, setCountStr] = useState<string>("5");
+  1355→  const [bias, setBias] = useState<SimulateBias>("medium");
+  1356→  const [saving, setSaving] = useState(false);
+  1357→  const [err, setErr] = useState<string | null>(null);
+  1358→
+  1359→  const countNum = Number.parseInt(countStr, 10);
+  1360→  const countValid =
+  1361→    Number.isFinite(countNum) && Number.isInteger(countNum) && countNum >= 1 && countNum <= 50;
+  1362→
+  1363→  const onSubmit = async (e: React.FormEvent) => {
+  1364→    e.preventDefault();
+  1365→    setErr(null);
+  1366→    if (!countValid) {
+  1367→      setErr("Número de respostas deve ser um inteiro entre 1 e 50.");
+  1368→      return;
+  1369→    }
+  1370→    setSaving(true);
+  1371→    onSavingChange(true);
+  1372→    try {
+  1373→      const targetDeptId =
+  1374→        assessmentDeptId === "__all__" ? undefined : assessmentDeptId;
+  1375→      const r = await api.assessments.simulate(assessment.id, {
+  1376→        count: countNum,
+  1377→        assessmentDeptId: targetDeptId,
+  1378→        bias,
+  1379→      });
+  1380→      toast.success(`${r.simulated} respostas simuladas com sucesso.`);
+  1381→      onSuccess(r.simulated);
+  1382→    } catch (e2) {
+  1383→      const msg =
+  1384→        e2 instanceof ApiError
+  1385→          ? e2.message
+  1386→          : "Falha ao simular respostas.";
+  1387→      setErr(msg);
+  1388→      toast.error(msg);
+  1389→    } finally {
+  1390→      setSaving(false);
+  1391→      onSavingChange(false);
+  1392→    }
+  1393→  };
+  1394→
+  1395→  return (
+  1396→    <form onSubmit={onSubmit} className="space-y-4">
+  1397→      <div className="space-y-2">
+  1398→        <Label htmlFor="simulate-dept">GHE</Label>
+  1399→        <Select
+  1400→          value={assessmentDeptId}
+  1401→          onValueChange={(v) => setAssessmentDeptId(v)}
+  1402→        >
+  1403→          <SelectTrigger id="simulate-dept" className="w-full">
+  1404→            <SelectValue placeholder="Selecione o GHE" />
+  1405→          </SelectTrigger>
+  1406→          <SelectContent>
+  1407→            <SelectItem value="__all__">Todos os GHEs</SelectItem>
+  1408→            {departments.map((ad) => (
+  1409→              <SelectItem key={ad.id} value={ad.id}>
+  1410→                {ad.name}
+  1411→              </SelectItem>
+  1412→            ))}
+  1413→          </SelectContent>
+  1414→        </Select>
+  1415→      </div>
+  1416→
+  1417→      <div className="space-y-2">
+  1418→        <Label htmlFor="simulate-count">Respostas por GHE</Label>
+  1419→        <Input
+  1420→          id="simulate-count"
+  1421→          type="number"
+  1422→          min={1}
+  1423→          max={50}
+  1424→          step={1}
+  1425→          value={countStr}
+  1426→          onChange={(e) => setCountStr(e.target.value)}
+  1427→          inputMode="numeric"
+  1428→          aria-describedby="simulate-count-help"
+  1429→        />
+  1430→        <p id="simulate-count-help" className="text-xs text-muted-foreground">
+  1431→          Entre 1 e 50 respostas serão geradas por GHE selecionado.
+  1432→        </p>
+  1433→      </div>
+  1434→
+  1435→      <div className="space-y-2">
+  1436→        <Label htmlFor="simulate-bias">Perfil de risco</Label>
+  1437→        <Select
+  1438→          value={bias}
+  1439→          onValueChange={(v) => setBias(v as SimulateBias)}
+  1440→        >
+  1441→          <SelectTrigger id="simulate-bias" className="w-full">
+  1442→            <SelectValue placeholder="Selecione o perfil" />
+  1443→          </SelectTrigger>
+  1444→          <SelectContent>
+  1445→            {BIAS_OPTIONS.map((o) => (
+  1446→              <SelectItem key={o.value} value={o.value}>
+  1447→                {o.label}
+  1448→              </SelectItem>
+  1449→            ))}
+  1450→          </SelectContent>
+  1451→        </Select>
+  1452→        <p className="text-xs text-muted-foreground">
+  1453→          Controla a tendência das respostas simuladas (Favorável = baixo risco,
+  1454→          Desfavorável = alto risco).
+  1455→        </p>
+  1456→      </div>
+  1457→
+  1458→      <Alert className="border-[var(--risk-medium)]/40 bg-[var(--surface)] text-[var(--risk-medium)]">
+  1459→        <AlertTriangle className="h-4 w-4 text-[var(--risk-medium)]" />
+  1460→        <AlertDescription className="text-[var(--risk-medium)]">
+  1461→          As respostas simuladas não podem ser removidas individualmente. Se
+  1462→          necessário, encerre e duplique a avaliação para recomeçar.
+  1463→        </AlertDescription>
+  1464→      </Alert>
+  1465→
+  1466→      {err && (
+  1467→        <p className="text-sm text-[var(--risk-high)]" role="alert">
+  1468→          {err}
+  1469→        </p>
+  1470→      )}
+  1471→
+  1472→      <DialogFooter>
+  1473→        <Button
+  1474→          type="button"
+  1475→          variant="ghost"
+  1476→          onClick={onCancel}
+  1477→          disabled={saving}
+  1478→        >
+  1479→          Cancelar
+  1480→        </Button>
+  1481→        <Button type="submit" disabled={saving || !countValid}>
+  1482→          {saving ? (
+  1483→            <Loader2 className="h-4 w-4 animate-spin" />
+  1484→          ) : (
+  1485→            <FlaskConical className="h-4 w-4" />
+  1486→          )}
+  1487→          Simular
+  1488→        </Button>
+  1489→      </DialogFooter>
+  1490→    </form>
+  1491→  );
+  1492→}
+  1493→
+  1494→// ─── Skeleton ────────────────────────────────────────────────────────────────
+  1495→
+  1496→function DetailSkeleton() {
+  1497→  return (
+  1498→    <div
+  1499→      className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6"
+  1500→      aria-hidden="true"
+  1501→    >
+  1502→      {/* Top nav skeleton */}
+  1503→      <div className="flex items-center justify-between">
+  1504→        <Skeleton className="h-7 w-32 rounded-md" />
+  1505→        <Skeleton className="h-7 w-7 rounded-md" />
+  1506→      </div>
+  1507→
+  1508→      {/* Header skeleton — breadcrumb chips, title, period, status badges */}
+  1509→      <div className="border-b border-border pb-6">
+  1510→        <div className="flex flex-col lg:flex-row gap-5 lg:items-start lg:justify-between">
+  1511→          <div className="min-w-0 flex-1 space-y-3">
+  1512→            <div className="flex items-center gap-2">
+  1513→              <Skeleton className="h-3.5 w-3.5" />
+  1514→              <Skeleton className="h-3 w-32" />
+  1515→              <Skeleton className="h-3 w-28 rounded-full" />
+  1516→            </div>
+  1517→            <Skeleton className="h-8 w-2/3" />
+  1518→            <Skeleton className="h-4 w-48" />
+  1519→          </div>
+  1520→          <div className="flex items-center gap-3 shrink-0">
+  1521→            <Skeleton className="h-6 w-24 rounded-full" />
+  1522→            <Skeleton className="h-8 w-20 rounded-md" />
+  1523→            <Skeleton className="h-8 w-20 rounded-md" />
+  1524→          </div>
+  1525→        </div>
+  1526→      </div>
+  1527→
+  1528→      {/* Status actions skeleton — icon block + label + button */}
+  1529→      <div className="border-b border-border py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  1530→        <div className="flex items-start gap-3 min-w-0">
+  1531→          <Skeleton className="h-9 w-9 rounded-md shrink-0" />
+  1532→          <div className="space-y-2">
+  1533→            <Skeleton className="h-4 w-48" />
+  1534→            <Skeleton className="h-3 w-72" />
+  1535→          </div>
+  1536→        </div>
+  1537→        <Skeleton className="h-9 w-40 rounded-md shrink-0" />
+  1538→      </div>
+  1539→
+  1540→      {/* GHE progress rows skeleton — section title + 3 list rows */}
+  1541→      <div>
+  1542→        <Skeleton className="h-6 w-40 mb-3" />
+  1543→        <div className="border-t border-border divide-y divide-border">
+  1544→          {Array.from({ length: 3 }).map((_, i) => (
+  1545→            <div
+  1546→              key={i}
+  1547→              className="py-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
+  1548→            >
+  1549→              <div className="lg:flex-1 lg:max-w-[40%] space-y-2">
+  1550→                <Skeleton className="h-4 w-32" />
+  1551→                <Skeleton className="h-3 w-12" />
+  1552→              </div>
+  1553→              <div className="flex items-center gap-6 lg:gap-8">
+  1554→                <div className="space-y-1.5">
+  1555→                  <Skeleton className="h-2.5 w-12" />
+  1556→                  <Skeleton className="h-4 w-8" />
+  1557→                </div>
+  1558→                <div className="space-y-1.5">
+  1559→                  <Skeleton className="h-2.5 w-16" />
+  1560→                  <Skeleton className="h-4 w-8" />
+  1561→                </div>
+  1562→              </div>
+  1563→              <div className="flex items-center gap-3 lg:ml-auto">
+  1564→                <Skeleton className="h-5 w-20 rounded-full" />
+  1565→                <div className="w-32 lg:w-40 space-y-1.5">
+  1566→                  <div className="flex justify-between">
+  1567→                    <Skeleton className="h-2.5 w-10" />
+  1568→                    <Skeleton className="h-2.5 w-8" />
+  1569→                  </div>
+  1570→                  <Skeleton className="h-1.5 w-full rounded-full" />
+  1571→                </div>
+  1572→              </div>
+  1573→            </div>
+  1574→          ))}
+  1575→        </div>
+  1576→      </div>
+  1577→
+  1578→      {/* Participation field skeleton */}
+  1579→      <div className="space-y-2">
+  1580→        <Skeleton className="h-4 w-44" />
+  1581→        <Skeleton className="h-9 w-full rounded-md" />
+  1582→        <Skeleton className="h-3 w-56" />
+  1583→      </div>
+  1584→    </div>
+  1585→  );
+  1586→}
+  1587→
+  1588→// ─── Main view ───────────────────────────────────────────────────────────────
+  1589→
+  1590→export function AvaliacaoDetailView() {
+  1591→  const assessmentId = useView((s) => s.assessmentId);
+  1592→  const companyId = useView((s) => s.companyId);
+  1593→  const go = useView((s) => s.go);
+  1594→
+  1595→  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  1596→  const [progress, setProgress] = useState<AssessmentProgress | null>(null);
+  1597→  const [loading, setLoading] = useState(true);
+  1598→  const [error, setError] = useState<string | null>(null);
+  1599→  const [refreshKey, setRefreshKey] = useState(0);
+  1600→
+  1601→  const [editOpen, setEditOpen] = useState(false);
+  1602→  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  1603→  const [duplicating, setDuplicating] = useState(false);
+  1604→  const [launching, setLaunching] = useState(false);
+  1605→  const [closing, setClosing] = useState(false);
+  1606→  // Simulate-responses dialog state.
+  1607→  const [simulateOpen, setSimulateOpen] = useState(false);
+  1608→  const [simulateInitialDeptId, setSimulateInitialDeptId] = useState<
+  1609→    string | null
+  1610→  >(null);
+  1611→  const [simulating, setSimulating] = useState(false);
+  1612→
+  1613→  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  1614→
+  1615→  const load = useCallback(async () => {
+  1616→    if (!assessmentId) {
+  1617→      setError("Nenhuma avaliação selecionada.");
+  1618→      setLoading(false);
+  1619→      return;
+  1620→    }
+  1621→    setLoading(true);
+  1622→    setError(null);
+  1623→    try {
+  1624→      const a = await api.assessments.get(assessmentId);
+  1625→      setAssessment(a);
+  1626→      if (a.status === "collecting" || a.status === "completed") {
+  1627→        try {
+  1628→          const p = await api.assessments.progress(assessmentId);
+  1629→          setProgress(p);
+  1630→        } catch {
+  1631→          setProgress(null);
+  1632→        }
+  1633→      } else {
+  1634→        setProgress(null);
+  1635→      }
+  1636→    } catch (e) {
+  1637→      if (e instanceof ApiError) {
+  1638→        setError(e.message);
+  1639→      } else {
+  1640→        setError("Não foi possível carregar a avaliação.");
+  1641→      }
+  1642→    } finally {
+  1643→      setLoading(false);
+  1644→    }
+  1645→  }, [assessmentId]);
+  1646→
+  1647→  useEffect(() => {
+  1648→    void load();
+  1649→  }, [load, refreshKey]);
+  1650→
+  1651→  // Polling — every 30s while collecting. Pauses automatically when status
+  1652→  // changes (the effect re-runs and returns early).
+  1653→  const isCollecting = assessment?.status === "collecting";
+  1654→  useEffect(() => {
+  1655→    if (!assessmentId || !isCollecting) return;
+  1656→    const id = setInterval(() => {
+  1657→      void (async () => {
+  1658→        try {
+  1659→          const [a, p] = await Promise.all([
+  1660→            api.assessments.get(assessmentId),
+  1661→            api.assessments.progress(assessmentId),
+  1662→          ]);
+  1663→          setAssessment(a);
+  1664→          setProgress(p);
+  1665→        } catch {
+  1666→          // Silent — next tick will retry.
+  1667→        }
+  1668→      })();
+  1669→    }, 30000);
+  1670→    return () => clearInterval(id);
+  1671→  }, [assessmentId, isCollecting]);
+  1672→
+  1673→  // Actions ──────────────────────────────────────────────────────────────────
+  1674→
+  1675→  const onLaunch = useCallback(async () => {
+  1676→    if (!assessment) return;
+  1677→    setLaunching(true);
+  1678→    try {
+  1679→      await api.assessments.launch(assessment.id);
+  1680→      toast.success("Avaliação lançada. Links de coleta disponíveis.");
+  1681→      void load();
+  1682→    } catch (e) {
+  1683→      if (e instanceof ApiError) {
+  1684→        toast.error(e.message);
+  1685→      } else {
+  1686→        toast.error("Falha ao lançar a avaliação.");
+  1687→      }
+  1688→    } finally {
+  1689→      setLaunching(false);
+  1690→    }
+  1691→  }, [assessment, load]);
+  1692→
+  1693→  const onClose = useCallback(async () => {
+  1694→    if (!assessment) return;
+  1695→    setClosing(true);
+  1696→    try {
+  1697→      const r = await api.assessments.close(assessment.id);
+  1698→      toast.success(
+  1699→        `Avaliação concluída. ${r.eligibleDepts} GHE(s) elegível(is), ${r.totalDimensions} dimensão(ões) processadas.`
+  1700→      );
+  1701→      go("resultados", { assessmentId: assessment.id });
+  1702→    } catch (e) {
+  1703→      if (e instanceof ApiError) {
+  1704→        toast.error(e.message);
+  1705→      } else {
+  1706→        toast.error("Falha ao encerrar a coleta.");
+  1707→      }
+  1708→    } finally {
+  1709→      setClosing(false);
+  1710→    }
+  1711→  }, [assessment, go]);
+  1712→
+  1713→  // Per-GHE simulate button: opens the dialog with that GHE pre-selected.
+  1714→  const onSimulatePerGhe = useCallback((ad: { id: string; name: string }) => {
+  1715→    setSimulateInitialDeptId(ad.id);
+  1716→    setSimulateOpen(true);
+  1717→  }, []);
+  1718→
+  1719→  // Global simulate button (status=collecting only): opens the dialog with
+  1720→  // "Todos os GHEs" pre-selected.
+  1721→  const onSimulateAll = useCallback(() => {
+  1722→    setSimulateInitialDeptId(null);
+  1723→    setSimulateOpen(true);
+  1724→  }, []);
+  1725→
+  1726→  const onNavigate = useCallback(
+  1727→    (view: ResultView) => {
+  1728→      if (!assessment) return;
+  1729→      go(view, { assessmentId: assessment.id });
+  1730→    },
+  1731→    [assessment, go]
+  1732→  );
+  1733→
+  1734→  // ─── Render ───────────────────────────────────────────────────────────────
+  1735→
+  1736→  if (!assessmentId) {
+  1737→    return (
+  1738→      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-3xl mx-auto w-full">
+  1739→        <div className="border border-dashed border-border rounded-lg py-12 flex flex-col items-center text-center gap-3">
+  1740→          <div className="h-11 w-11 rounded-full bg-[var(--surface)] flex items-center justify-center">
+  1741→            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+  1742→          </div>
+  1743→          <div>
+  1744→            <p className="font-display text-lg text-foreground">
+  1745→              Nenhuma avaliação selecionada
+  1746→            </p>
+  1747→            <p className="text-sm text-muted-foreground mt-1">
+  1748→              Volte para a empresa e selecione uma avaliação para visualizar
+  1749→              seus detalhes.
+  1750→            </p>
+  1751→          </div>
+  1752→          <Button onClick={() => go("painel")}>Voltar ao painel</Button>
+  1753→        </div>
+  1754→      </div>
+  1755→    );
+  1756→  }
+  1757→
+  1758→  if (loading) return <DetailSkeleton />;
+  1759→
+  1760→  if (error || !assessment) {
+  1761→    return (
+  1762→      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-3xl mx-auto w-full">
+  1763→        <div className="border border-dashed border-border rounded-lg py-10 flex flex-col items-center text-center gap-3">
+  1764→          <div className="h-11 w-11 rounded-full risk-high-bg flex items-center justify-center">
+  1765→            <AlertTriangle className="h-5 w-5" />
+  1766→          </div>
+  1767→          <div>
+  1768→            <p className="font-display text-lg text-foreground">
+  1769→              Falha ao carregar a avaliação
+  1770→            </p>
+  1771→            <p className="text-sm text-muted-foreground mt-1">
+  1772→              {error ?? "Tente novamente."}
+  1773→            </p>
+  1774→          </div>
+  1775→          <div className="flex gap-2">
+  1776→            <Button variant="outline" onClick={() => go("painel")}>
+  1777→              Voltar ao painel
+  1778→            </Button>
+  1779→            <Button variant="outline" onClick={() => void load()}>
+  1780→              <RefreshCw className="h-4 w-4" />
+  1781→              Tentar novamente
+  1782→            </Button>
+  1783→          </div>
+  1784→        </div>
+  1785→      </div>
+  1786→    );
+  1787→  }
+  1788→
+  1789→  const status = assessment.status;
+  1790→  const isDraft = status === "draft";
+  1791→  const canEdit = isDraft || isCollecting;
+  1792→
+  1793→  // "Dias restantes" hint while collecting.
+  1794→  let daysHint: string | null = null;
+  1795→  if (isCollecting && assessment.endDate) {
+  1796→    try {
+  1797→      const end = parseISO(assessment.endDate);
+  1798→      if (isValid(end)) {
+  1799→        const diff = differenceInDays(end, new Date());
+  1800→        if (diff > 0)
+  1801→          daysHint = `Encerra em ${diff} dia${diff === 1 ? "" : "s"}.`;
+  1802→        else if (diff === 0) daysHint = "Encerra hoje.";
+  1803→        else
+  1804→          daysHint = `Prazo encerrado há ${Math.abs(
+  1805→            diff
+  1806→          )} dia(s) — encerre a coleta para prosseguir.`;
+  1807→      }
+  1808→    } catch {
+  1809→      daysHint = null;
+  1810→    }
+  1811→  }
+  1812→
+  1813→  return (
+  1814→    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full animate-in fade-in duration-300">
+  1815→      {/* Top bar: back + refresh */}
+  1816→      <nav
+  1817→        className="mb-4 flex items-center justify-between gap-3"
+  1818→        aria-label="Navegação"
+  1819→      >
+  1820→        <Button
+  1821→          variant="ghost"
+  1822→          size="sm"
+  1823→          onClick={() =>
+  1824→            companyId ? go("empresa", { companyId }) : go("painel")
+  1825→          }
+  1826→          className="-ml-2 text-muted-foreground hover:text-foreground"
+  1827→        >
+  1828→          <ChevronLeft className="h-4 w-4" />
+  1829→          Voltar à empresa
+  1830→        </Button>
+  1831→        <Button
+  1832→          variant="ghost"
+  1833→          size="sm"
+  1834→          onClick={refresh}
+  1835→          aria-label="Atualizar avaliação"
+  1836→        >
+  1837→          <RefreshCw className="h-3.5 w-3.5" />
+  1838→          <span className="sr-only">Atualizar</span>
+  1839→        </Button>
+  1840→      </nav>
+  1841→
+  1842→      <AssessmentHeader
+  1843→        assessment={assessment}
+  1844→        progress={progress}
+  1845→        onEdit={() => setEditOpen(true)}
+  1846→        onDuplicate={() => setDuplicateOpen(true)}
+  1847→        duplicating={duplicating}
+  1848→      />
+  1849→
+  1850→      {/* Duplicate dialog */}
+  1851→      <DuplicateAssessmentDialog
+  1852→        open={duplicateOpen}
+  1853→        onOpenChange={(v) => {
+  1854→          setDuplicateOpen(v);
+  1855→          if (!v) setDuplicating(false);
+  1856→        }}
+  1857→        assessment={assessment}
+  1858→        onSavingChange={setDuplicating}
+  1859→        onSuccess={(newA) => {
+  1860→          setDuplicating(false);
+  1861→          setDuplicateOpen(false);
+  1862→          go("avaliacao", {
+  1863→            assessmentId: newA.id,
+  1864→            companyId: newA.companyId,
+  1865→          });
+  1866→        }}
+  1867→      />
+  1868→
+  1869→      {isCollecting && (
+  1870→        <div
+  1871→          className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+  1872→          aria-live="polite"
+  1873→        >
+  1874→          <Clock className="h-3.5 w-3.5" />
+  1875→          <span role="status">Atualizando a cada 30s.</span>
+  1876→          {daysHint && (
+  1877→            <>
+  1878→              <span aria-hidden>·</span>
+  1879→              <span>{daysHint}</span>
+  1880→            </>
+  1881→          )}
+  1882→        </div>
+  1883→      )}
+  1884→
+  1885→      {/* Status action buttons */}
+  1886→      <section className="mt-4 border-b border-border" aria-label="Ações da avaliação">
+  1887→        <StatusActions
+  1888→          status={status}
+  1889→          launching={launching}
+  1890→          closing={closing}
+  1891→          simulating={simulating}
+  1892→          onLaunch={() => void onLaunch()}
+  1893→          onClose={() => void onClose()}
+  1894→          onSimulate={() => onSimulateAll()}
+  1895→          onNavigate={onNavigate}
+  1896→        />
+  1897→      </section>
+  1898→
+  1899→      {/* GHE progress rows */}
+  1900→      <section className="mt-6" aria-label="Progresso por GHE">
+  1901→        <h2 className="font-display text-xl text-foreground mb-3">
+  1902→          Progresso por GHE
+  1903→        </h2>
+  1904→        {progress ? (
+  1905→          <GheProgressRows
+  1906→            byDept={progress.byDept}
+  1907→            status={status}
+  1908→            onSimulate={(d) => onSimulatePerGhe(d)}
+  1909→            simulatingId={simulating ? "__global__" : null}
+  1910→          />
+  1911→        ) : (
+  1912→          <div className="border border-dashed border-border rounded-lg py-8 flex flex-col items-center text-center gap-2">
+  1913→            <Users className="h-5 w-5 text-muted-foreground" />
+  1914→            <p className="text-sm text-muted-foreground">
+  1915→              {isDraft
+  1916→                ? "Lance a avaliação para começar a acompanhar o progresso de coleta."
+  1917→                : "Sem dados de progresso disponíveis."}
+  1918→            </p>
+  1919→          </div>
+  1920→        )}
+  1921→      </section>
+  1922→
+  1923→      {/* Participation field */}
+  1924→      <section className="mt-8" aria-label="Registro de participação">
+  1925→        <ParticipationField
+  1926→          assessmentId={assessment.id}
+  1927→          initial={assessment.participationRegistration ?? ""}
+  1928→          disabled={!canEdit}
+  1929→        />
+  1930→      </section>
+  1931→
+  1932→      {/* Collection links — only while collecting */}
+  1933→      {isCollecting &&
+  1934→        assessment.departments &&
+  1935→        assessment.departments.length > 0 && (
+  1936→          <section className="mt-8" aria-label="Links de coleta">
+  1937→            <CollectionLinks
+  1938→              departments={assessment.departments}
+  1939→              assessmentId={assessment.id}
+  1940→            />
+  1941→          </section>
+  1942→        )}
+  1943→
+  1944→      {/* Simulate responses dialog (demo) */}
+  1945→      <SimulateResponsesDialog
+  1946→        open={simulateOpen}
+  1947→        onOpenChange={(v) => {
+  1948→          setSimulateOpen(v);
+  1949→          if (!v) setSimulating(false);
+  1950→        }}
+  1951→        assessment={assessment}
+  1952→        departments={assessment.departments ?? []}
+  1953→        initialAssessmentDeptId={simulateInitialDeptId}
+  1954→        onSavingChange={setSimulating}
+  1955→        onSuccess={() => {
+  1956→          setSimulating(false);
+  1957→          setSimulateOpen(false);
+  1958→          // Refresh the assessment + progress so the new response counts
+  1959→          // and eligibility badges are reflected immediately.
+  1960→          void load();
+  1961→        }}
+  1962→      />
+  1963→
+  1964→      {/* Edit dialog */}
+  1965→      <EditAssessmentDialog
+  1966→        open={editOpen}
+  1967→        onOpenChange={setEditOpen}
+  1968→        assessment={assessment}
+  1969→        onSaved={(a) => {
+  1970→          setAssessment(a);
+  1971→          refresh();
+  1972→        }}
+  1973→      />
+  1974→    </div>
+  1975→  );
+  1976→}
+  1977→

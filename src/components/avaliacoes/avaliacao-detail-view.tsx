@@ -770,18 +770,48 @@ function StatusActions({
             </p>
           </div>
         </div>
-        <Button
-          onClick={onLaunch}
-          disabled={launching}
-          className="shrink-0"
-        >
-          {launching ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Rocket className="h-4 w-4" />
-          )}
-          Lançar Avaliação
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              disabled={launching}
+              className="shrink-0"
+            >
+              {launching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Rocket className="h-4 w-4" />
+              )}
+              Lançar Avaliação
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-display text-xl">
+                Lançar avaliação
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Os links de coleta serão gerados e a avaliação mudará para
+                &quot;Coletando respostas&quot;. Esta ação não pode ser
+                desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={launching}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={launching}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onLaunch();
+                }}
+              >
+                {launching && <Loader2 className="h-4 w-4 animate-spin" />}
+                Lançar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -892,7 +922,7 @@ function StatusActions({
                 Avaliação concluída
               </p>
               <p className="text-sm text-muted-foreground">
-                Acesse os resultados e dê continuidade ao ciclo NR-1.
+                Acesse os resultados e dê continuidade ao ciclo.
               </p>
             </div>
           </div>
@@ -1465,16 +1495,92 @@ function SimulateResponsesForm({
 
 function DetailSkeleton() {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6">
-      <Skeleton className="h-8 w-40" />
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-32 w-full" />
-      <div className="border-t border-border">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
+    <div
+      className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-6"
+      aria-hidden="true"
+    >
+      {/* Top nav skeleton */}
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-7 w-32 rounded-md" />
+        <Skeleton className="h-7 w-7 rounded-md" />
       </div>
-      <Skeleton className="h-40 w-full" />
+
+      {/* Header skeleton — breadcrumb chips, title, period, status badges */}
+      <div className="border-b border-border pb-6">
+        <div className="flex flex-col lg:flex-row gap-5 lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-3.5 w-3.5" />
+              <Skeleton className="h-3 w-32" />
+              <Skeleton className="h-3 w-28 rounded-full" />
+            </div>
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <Skeleton className="h-6 w-24 rounded-full" />
+            <Skeleton className="h-8 w-20 rounded-md" />
+            <Skeleton className="h-8 w-20 rounded-md" />
+          </div>
+        </div>
+      </div>
+
+      {/* Status actions skeleton — icon block + label + button */}
+      <div className="border-b border-border py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <Skeleton className="h-9 w-9 rounded-md shrink-0" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-48" />
+            <Skeleton className="h-3 w-72" />
+          </div>
+        </div>
+        <Skeleton className="h-9 w-40 rounded-md shrink-0" />
+      </div>
+
+      {/* GHE progress rows skeleton — section title + 3 list rows */}
+      <div>
+        <Skeleton className="h-6 w-40 mb-3" />
+        <div className="border-t border-border divide-y divide-border">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="py-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
+            >
+              <div className="lg:flex-1 lg:max-w-[40%] space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-12" />
+              </div>
+              <div className="flex items-center gap-6 lg:gap-8">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-2.5 w-12" />
+                  <Skeleton className="h-4 w-8" />
+                </div>
+                <div className="space-y-1.5">
+                  <Skeleton className="h-2.5 w-16" />
+                  <Skeleton className="h-4 w-8" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 lg:ml-auto">
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <div className="w-32 lg:w-40 space-y-1.5">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-2.5 w-10" />
+                    <Skeleton className="h-2.5 w-8" />
+                  </div>
+                  <Skeleton className="h-1.5 w-full rounded-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Participation field skeleton */}
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-44" />
+        <Skeleton className="h-9 w-full rounded-md" />
+        <Skeleton className="h-3 w-56" />
+      </div>
     </div>
   );
 }
@@ -1705,7 +1811,7 @@ export function AvaliacaoDetailView() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full animate-in fade-in duration-300">
       {/* Top bar: back + refresh */}
       <nav
         className="mb-4 flex items-center justify-between gap-3"

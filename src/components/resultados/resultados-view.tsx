@@ -1398,11 +1398,82 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
 function ResultadosSkeleton() {
   return (
     <div className="space-y-8" aria-hidden="true">
-      <Skeleton className="h-24 w-full rounded-lg" />
-      <Skeleton className="h-96 w-full" />
-      <Skeleton className="h-80 w-full" />
-      <Skeleton className="h-96 w-full" />
-      <Skeleton className="h-72 w-full" />
+      {/* KPI stat strip skeleton — 5 divided cells */}
+      <div className="bg-[var(--surface)] rounded-lg p-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="px-3 first:pl-0 last:pr-0">
+              <Skeleton className="h-2.5 w-20" />
+              <Skeleton className="h-7 w-10 mt-2" />
+              <Skeleton className="h-2.5 w-24 mt-1.5" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Heatmap table skeleton — title + header + 5 rows of cells */}
+      <div>
+        <div className="flex items-baseline justify-between mb-3">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-3.5 w-40" />
+        </div>
+        <div className="rounded-md border border-border overflow-hidden">
+          <div className="flex border-b border-border bg-[var(--surface)]">
+            <Skeleton className="h-9 flex-1 m-2" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-9 w-14 m-2" />
+            ))}
+          </div>
+          {Array.from({ length: 5 }).map((_, r) => (
+            <div key={r} className="flex border-b border-border last:border-b-0">
+              <div className="flex-1 flex items-center gap-2 p-2">
+                <Skeleton className="h-2 w-2 rounded-full" />
+                <Skeleton className="h-3.5 w-24" />
+              </div>
+              {Array.from({ length: 5 }).map((_, c) => (
+                <Skeleton key={c} className="h-8 w-14 m-2 rounded-sm" />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Critical dimensions table skeleton — title + 3 rows */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Skeleton className="h-5 w-5" />
+          <Skeleton className="h-6 w-44" />
+        </div>
+        <div className="rounded-md border border-border divide-y divide-border">
+          {Array.from({ length: 3 }).map((_, r) => (
+            <div key={r} className="flex items-center gap-4 p-4">
+              <Skeleton className="h-3 w-10" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-72" />
+              </div>
+              <Skeleton className="h-6 w-16 rounded-full" />
+              <Skeleton className="h-7 w-20 rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dimension detail rows skeleton — 3 stacked expandable rows */}
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-md border border-border p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-3 w-10" />
+                <Skeleton className="h-5 w-40" />
+              </div>
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-32 w-full rounded-md" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1610,7 +1681,7 @@ export function ResultadosView() {
         ) : loading ? (
           <ResultadosSkeleton />
         ) : dashboard ? (
-          <div className="space-y-8">
+          <div className="space-y-8 animate-in fade-in duration-300">
             <DashboardKpis kpis={dashboard.kpis} />
             <HeatMap heatmap={dashboard.heatmap} />
             <CompanyAvgBars companyAvg={dashboard.companyAvg} />

@@ -193,10 +193,41 @@
   animation: ring-fill 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+/* Skeleton shimmer — warm-stone gradient sweep, no flat gray */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 25%,
+    color-mix(in srgb, var(--muted-foreground) 18%, var(--surface)) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
 /* Focus ring polish */
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* Reduced-motion accessibility (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ring-progress {
+    animation: none !important;
+  }
 }
 
 /* Print-friendly report preview */

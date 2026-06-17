@@ -33,6 +33,13 @@ import type {
 } from "@/lib/types";
 import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
 import { ACTION_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
+import {
+  FIELD_ERROR_CLASS,
+  FieldError,
+  maskCurrency,
+  parseCurrencyBRL,
+  validateRequired,
+} from "@/lib/form-utils";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -475,6 +482,17 @@ function ActionItemsTable({
   onEdit,
   pendingItemId,
 }: ActionItemsTableProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (itemId: string) => {
+    setDeletingId(itemId);
+    try {
+      await onDelete(itemId);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const sorted = useMemo(() => {
     return [...items].sort((a, b) => {
       const so = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -672,13 +690,20 @@ function ActionItemsTable({
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogCancel disabled={deletingId === item.id}>
+                                Cancelar
+                              </AlertDialogCancel>
                               <AlertDialogAction
-                                onClick={() => {
-                                  void onDelete(item.id);
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  void handleDelete(item.id);
                                 }}
+                                disabled={deletingId === item.id}
                                 className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
                               >
+                                {deletingId === item.id && (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                )}
                                 Excluir
                               </AlertDialogAction>
                             </AlertDialogFooter>
@@ -799,7 +824,13 @@ function ActionItemFormContents({
   );
   const [how, setHow] = useState<string>(initialItem?.how ?? "");
   const [estimatedCost, setEstimatedCost] = useState<string>(
-    initialItem?.estimatedCost != null ? String(initialItem.estimatedCost) : ""
+    initialItem?.estimatedCost != null
+      ? maskCurrency(
+          // Re-render the stored number as a BRL-formatted string. Multiply
+          // by 100 because maskCurrency expects cents-as-digits.
+          String(Math.round(initialItem.estimatedCost * 100))
+        )
+      : ""
   );
   const [departmentId, setDepartmentId] = useState<string>(
     initialItem?.departmentId ?? prefill?.departmentId ?? ""
@@ -817,22 +848,30 @@ function ActionItemFormContents({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (what.trim().length < 2) errs.what = "Mínimo de 2 caracteres.";
-    if (why.trim().length < 2) errs.why = "Mínimo de 2 caracteres.";
-    if (who.trim().length < 2) errs.who = "Mínimo de 2 caracteres.";
-    if (whereVal.trim().length < 2) errs.where = "Mínimo de 2 caracteres.";
-    if (how.trim().length < 2) errs.how = "Mínimo de 2 caracteres.";
+    if (!validateRequired(what, 2)) errs.what = "Mínimo de 2 caracteres.";
+    if (!validateRequired(why, 2)) errs.why = "Mínimo de 2 caracteres.";
+    if (!validateRequired(who, 2)) errs.who = "Mínimo de 2 caracteres.";
+    if (!validateRequired(whereVal, 2)) errs.where = "Mínimo de 2 caracteres.";
+    if (!validateRequired(how, 2)) errs.how = "Mínimo de 2 caracteres.";
     if (!whenDate) {
       errs.whenDate = "Informe a data prevista.";
     } else {
-      const d = new Date(whenDate);
+      const d = new Date(whenDate + "T00:00:00");
       if (Number.isNaN(d.getTime())) {
         errs.whenDate = "Data inválida (use AAAA-MM-DD).";
+      } else {
+        // Future-or-today check (NR-1 action plan: prazo deve estar no
+        // futuro ou hoje).
+        const today = startOfDay(new Date());
+        const dDay = startOfDay(d);
+        if (isBefore(dDay, today)) {
+          errs.whenDate = "A data prevista deve ser hoje ou no futuro.";
+        }
       }
     }
     if (estimatedCost.trim() !== "") {
-      const n = Number(estimatedCost.replace(",", "."));
-      if (Number.isNaN(n) || n < 0) errs.estimatedCost = "Valor inválido.";
+      const n = parseCurrencyBRL(estimatedCost);
+      if (!Number.isFinite(n) || n < 0) errs.estimatedCost = "Valor inválido.";
     }
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
@@ -855,24 +894,72 @@ function ActionItemFormContents({
       if (dimensionCode) body.dimensionCode = dimensionCode;
       if (riskLevelTrigger) body.riskLevelTrigger = riskLevelTrigger;
       if (estimatedCost.trim() !== "") {
-        const n = Number(estimatedCost.replace(",", "."));
-        body.estimatedCost = n;
+        body.estimatedCost = parseCurrencyBRL(estimatedCost);
       }
       await onSubmit(body);
     } catch (e) {
-      let msg = "Erro ao salvar ação.";
       if (e instanceof ApiError) {
         if (e.code === "VALIDATION_ERROR") {
-          msg = "Dados inválidos. Verifique os campos.";
+          // Backend validation error → map to the relevant field with the
+          // SAME shared FieldError + FIELD_ERROR_CLASS styling used by the
+          // front-side onBlur errors.
+          const msg = e.message || "Dados inválidos. Verifique os campos.";
+          setErrors({ form: msg });
+          toast.error(msg);
         } else if (e.code === "ASSESSMENT_NOT_COMPLETED") {
-          msg = "A avaliação precisa estar concluída para cadastrar ações.";
+          toast.error(
+            "A avaliação precisa estar concluída para cadastrar ações."
+          );
         } else {
-          msg = e.message;
+          toast.error(e.message);
         }
+      } else {
+        toast.error("Erro ao salvar ação.");
       }
-      toast.error(msg);
       setSubmitting(false);
     }
+  };
+
+  // Per-field onBlur validators — keep the same shared FieldError styling
+  // for front-side validation as the submit-time validation uses.
+  const validateOnBlur = (field: keyof typeof errors) => {
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (field === "what") {
+        next.what = validateRequired(what, 2) ? undefined : "Mínimo de 2 caracteres.";
+      } else if (field === "why") {
+        next.why = validateRequired(why, 2) ? undefined : "Mínimo de 2 caracteres.";
+      } else if (field === "who") {
+        next.who = validateRequired(who, 2) ? undefined : "Mínimo de 2 caracteres.";
+      } else if (field === "where") {
+        next.where = validateRequired(whereVal, 2) ? undefined : "Mínimo de 2 caracteres.";
+      } else if (field === "how") {
+        next.how = validateRequired(how, 2) ? undefined : "Mínimo de 2 caracteres.";
+      } else if (field === "whenDate") {
+        if (!whenDate) next.whenDate = "Informe a data prevista.";
+        else {
+          const d = new Date(whenDate + "T00:00:00");
+          if (Number.isNaN(d.getTime())) {
+            next.whenDate = "Data inválida (use AAAA-MM-DD).";
+          } else {
+            const today = startOfDay(new Date());
+            const dDay = startOfDay(d);
+            next.whenDate = isBefore(dDay, today)
+              ? "A data prevista deve ser hoje ou no futuro."
+              : undefined;
+          }
+        }
+      } else if (field === "estimatedCost") {
+        if (estimatedCost.trim() !== "") {
+          const n = parseCurrencyBRL(estimatedCost);
+          next.estimatedCost =
+            !Number.isFinite(n) || n < 0 ? "Valor inválido." : undefined;
+        } else {
+          next.estimatedCost = undefined;
+        }
+      }
+      return next;
+    });
   };
 
   return (
@@ -887,6 +974,19 @@ function ActionItemFormContents({
         </AlertDescription>
       </Alert>
 
+      {/* Backend VALIDATION_ERROR → render with the SAME shared FieldError
+          styling used by front-side onBlur errors. The backend doesn't tell
+          us which specific field failed, so we surface it as a form-level
+          banner above the field grid. */}
+      {errors.form ? (
+        <div
+          role="alert"
+          className="rounded-md border border-[var(--risk-high)]/40 bg-[var(--surface)] p-3"
+        >
+          <FieldError message={errors.form} />
+        </div>
+      ) : null}
+
       {/* O Quê */}
       <div className="space-y-1.5">
         <Label htmlFor="ai-what">
@@ -895,13 +995,20 @@ function ActionItemFormContents({
         <Textarea
           id="ai-what"
           value={what}
-          onChange={(e) => setWhat(e.target.value)}
+          onChange={(e) => {
+            setWhat(e.target.value);
+            if (errors.what)
+              setErrors((p) => ({ ...p, what: undefined }));
+          }}
+          onBlur={() => validateOnBlur("what")}
           placeholder="Descreva a ação a ser executada…"
           rows={2}
           aria-invalid={!!errors.what}
+          aria-describedby={errors.what ? "ai-what-err" : undefined}
+          className={errors.what ? FIELD_ERROR_CLASS : ""}
         />
         {errors.what ? (
-          <p className="text-xs text-[var(--risk-high)]">{errors.what}</p>
+          <FieldError id="ai-what-err" message={errors.what} />
         ) : null}
       </div>
 
@@ -913,13 +1020,20 @@ function ActionItemFormContents({
         <Textarea
           id="ai-why"
           value={why}
-          onChange={(e) => setWhy(e.target.value)}
+          onChange={(e) => {
+            setWhy(e.target.value);
+            if (errors.why)
+              setErrors((p) => ({ ...p, why: undefined }));
+          }}
+          onBlur={() => validateOnBlur("why")}
           placeholder="Justifique o motivo da ação…"
           rows={2}
           aria-invalid={!!errors.why}
+          aria-describedby={errors.why ? "ai-why-err" : undefined}
+          className={errors.why ? FIELD_ERROR_CLASS : ""}
         />
         {errors.why ? (
-          <p className="text-xs text-[var(--risk-high)]">{errors.why}</p>
+          <FieldError id="ai-why-err" message={errors.why} />
         ) : null}
       </div>
 
@@ -933,12 +1047,19 @@ function ActionItemFormContents({
             id="ai-who"
             type="text"
             value={who}
-            onChange={(e) => setWho(e.target.value)}
+            onChange={(e) => {
+              setWho(e.target.value);
+              if (errors.who)
+                setErrors((p) => ({ ...p, who: undefined }));
+            }}
+            onBlur={() => validateOnBlur("who")}
             placeholder="Responsável pela ação"
             aria-invalid={!!errors.who}
+            aria-describedby={errors.who ? "ai-who-err" : undefined}
+            className={errors.who ? FIELD_ERROR_CLASS : ""}
           />
           {errors.who ? (
-            <p className="text-xs text-[var(--risk-high)]">{errors.who}</p>
+            <FieldError id="ai-who-err" message={errors.who} />
           ) : null}
         </div>
         <div className="space-y-1.5">
@@ -949,12 +1070,19 @@ function ActionItemFormContents({
             id="ai-where"
             type="text"
             value={whereVal}
-            onChange={(e) => setWhereVal(e.target.value)}
+            onChange={(e) => {
+              setWhereVal(e.target.value);
+              if (errors.where)
+                setErrors((p) => ({ ...p, where: undefined }));
+            }}
+            onBlur={() => validateOnBlur("where")}
             placeholder="Local de execução"
             aria-invalid={!!errors.where}
+            aria-describedby={errors.where ? "ai-where-err" : undefined}
+            className={errors.where ? FIELD_ERROR_CLASS : ""}
           />
           {errors.where ? (
-            <p className="text-xs text-[var(--risk-high)]">{errors.where}</p>
+            <FieldError id="ai-where-err" message={errors.where} />
           ) : null}
         </div>
       </div>
@@ -969,28 +1097,44 @@ function ActionItemFormContents({
             id="ai-when"
             type="date"
             value={whenDate}
-            onChange={(e) => setWhenDate(e.target.value)}
+            onChange={(e) => {
+              setWhenDate(e.target.value);
+              if (errors.whenDate)
+                setErrors((p) => ({ ...p, whenDate: undefined }));
+            }}
+            onBlur={() => validateOnBlur("whenDate")}
             aria-invalid={!!errors.whenDate}
+            aria-describedby={errors.whenDate ? "ai-when-err" : undefined}
+            className={`font-mono-numeric ${errors.whenDate ? FIELD_ERROR_CLASS : ""}`}
           />
           {errors.whenDate ? (
-            <p className="text-xs text-[var(--risk-high)]">{errors.whenDate}</p>
+            <FieldError id="ai-when-err" message={errors.whenDate} />
           ) : null}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ai-cost">Quanto custa (opcional)</Label>
           <Input
             id="ai-cost"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="numeric"
             value={estimatedCost}
-            onChange={(e) => setEstimatedCost(e.target.value)}
+            onChange={(e) => {
+              setEstimatedCost(maskCurrency(e.target.value));
+              if (errors.estimatedCost)
+                setErrors((p) => ({ ...p, estimatedCost: undefined }));
+            }}
+            onBlur={() => validateOnBlur("estimatedCost")}
             placeholder="0,00"
             aria-invalid={!!errors.estimatedCost}
+            aria-describedby={
+              errors.estimatedCost ? "ai-cost-err" : undefined
+            }
+            className={`font-mono-numeric ${
+              errors.estimatedCost ? FIELD_ERROR_CLASS : ""
+            }`}
           />
           {errors.estimatedCost ? (
-            <p className="text-xs text-[var(--risk-high)]">{errors.estimatedCost}</p>
+            <FieldError id="ai-cost-err" message={errors.estimatedCost} />
           ) : null}
         </div>
       </div>
@@ -1003,13 +1147,19 @@ function ActionItemFormContents({
         <Textarea
           id="ai-how"
           value={how}
-          onChange={(e) => setHow(e.target.value)}
+          onChange={(e) => {
+            setHow(e.target.value);
+            if (errors.how) setErrors((p) => ({ ...p, how: undefined }));
+          }}
+          onBlur={() => validateOnBlur("how")}
           placeholder="Descreva o método de execução da ação…"
           rows={3}
           aria-invalid={!!errors.how}
+          aria-describedby={errors.how ? "ai-how-err" : undefined}
+          className={errors.how ? FIELD_ERROR_CLASS : ""}
         />
         {errors.how ? (
-          <p className="text-xs text-[var(--risk-high)]">{errors.how}</p>
+          <FieldError id="ai-how-err" message={errors.how} />
         ) : null}
       </div>
 
@@ -1107,9 +1257,66 @@ function ActionItemFormContents({
 function PlanoSkeleton() {
   return (
     <div className="space-y-8" aria-hidden="true">
-      <Skeleton className="h-24 rounded-lg" />
-      <Skeleton className="h-24" />
-      <Skeleton className="h-96" />
+      {/* KPI stat strip skeleton — 5 divided cells */}
+      <div className="bg-[var(--surface)] rounded-lg p-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="px-3 first:pl-0 last:pr-0">
+              <Skeleton className="h-2.5 w-20" />
+              <Skeleton className="h-7 w-10 mt-2" />
+              <Skeleton className="h-2.5 w-24 mt-1.5" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Filters skeleton — chip row */}
+      <div className="flex flex-wrap gap-2">
+        <Skeleton className="h-9 w-36 rounded-md" />
+        <Skeleton className="h-9 w-32 rounded-md" />
+        <Skeleton className="h-9 w-32 rounded-md" />
+        <Skeleton className="h-9 w-40 rounded-md" />
+        <Skeleton className="h-9 w-24 rounded-md" />
+      </div>
+
+      {/* Action items table skeleton — title + header + 6 rows */}
+      <div className="border-t border-border">
+        <div className="pt-5 pb-4 flex items-center gap-2">
+          <Skeleton className="h-4 w-4" />
+          <Skeleton className="h-6 w-40" />
+        </div>
+        <Skeleton className="h-3 w-72 mb-3" />
+        <div className="rounded-md border border-border overflow-hidden">
+          {/* Header row */}
+          <div className="flex items-center gap-3 border-b border-border bg-[var(--surface)] px-4 py-3">
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-12 ml-auto" />
+          </div>
+          {/* Body rows */}
+          {Array.from({ length: 6 }).map((_, r) => (
+            <div
+              key={r}
+              className="flex items-center gap-3 border-b border-border last:border-b-0 px-4 py-3"
+            >
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-7 w-28 rounded-md" />
+              <div className="flex gap-1 ml-auto">
+                <Skeleton className="h-7 w-7 rounded-md" />
+                <Skeleton className="h-7 w-7 rounded-md" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1402,7 +1609,7 @@ export function PlanoView() {
         ) : loading ? (
           <PlanoSkeleton />
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-8 animate-in fade-in duration-300">
             <PlanHeaderKpis items={items} />
 
             {items.length === 0 ? (

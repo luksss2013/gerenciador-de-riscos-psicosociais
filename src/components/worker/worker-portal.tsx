@@ -299,7 +299,7 @@ export function WorkerPortal({ token }: { token: string }) {
             type="button"
             onClick={closeWorker}
             aria-label="Sair da pesquisa"
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors px-2 py-1.5 rounded-md hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Sair</span>
@@ -531,9 +531,9 @@ function WorkerQuestionItem({
                 aria-pressed={isSelected}
                 aria-label={`Opção ${opt.value} de 5: ${opt.label}`}
                 className={cn(
-                  "group relative flex items-center gap-3 w-full min-h-14 px-4 sm:px-5 rounded-lg border text-left transition-colors",
+                  "group relative flex items-center gap-3 w-full min-h-14 px-4 sm:px-5 rounded-lg border text-left cursor-pointer transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  "disabled:cursor-not-allowed",
+                  "disabled:cursor-not-allowed disabled:pointer-events-none",
                   isSelected
                     ? "bg-[var(--sidebar-accent)] border-[var(--brand)]"
                     : "border-border bg-[var(--card)] hover:bg-[var(--surface)]"

@@ -37,6 +37,12 @@ import {
   PROFESSION_TYPES,
   PROFESSION_TYPE_LABELS,
 } from "@/lib/errors";
+import {
+  FIELD_ERROR_CLASS,
+  FieldError,
+  maskPhone,
+  validateRequired,
+} from "@/lib/form-utils";
 import type {
   AuditLogEntry,
   ProfessionType,
@@ -144,6 +150,9 @@ function ProfileSection() {
     phone: "",
   });
   const [saving, setSaving] = useState(false);
+  // Per-field inline errors — same shared FieldError component + styling
+  // for front-side onBlur validation AND backend error display.
+  const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
     if (professional) {
@@ -154,12 +163,14 @@ function ProfileSection() {
         phone: professional.phone ?? "",
       });
     }
+    setNameError(null);
   }, [professional]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) {
-      toast.error("Informe seu nome.");
+    if (!validateRequired(form.name, 2)) {
+      setNameError("Informe seu nome (mínimo 2 caracteres).");
+      toast.error("Verifique os campos destacados.");
       return;
     }
     setSaving(true);
@@ -206,11 +217,24 @@ function ProfileSection() {
           <Input
             id="cfg-name"
             value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            onChange={(e) => {
+              setForm({ ...form, name: e.target.value });
+              setNameError(null);
+            }}
+            onBlur={() => {
+              if (!validateRequired(form.name, 2)) {
+                setNameError("Informe seu nome (mínimo 2 caracteres).");
+              }
+            }}
             disabled={saving}
             required
-            className="bg-[var(--card)]"
+            aria-invalid={!!nameError}
+            aria-describedby={nameError ? "cfg-name-err" : undefined}
+            className={`bg-[var(--card)] ${nameError ? FIELD_ERROR_CLASS : ""}`}
           />
+          {nameError ? (
+            <FieldError id="cfg-name-err" message={nameError} />
+          ) : null}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
@@ -253,11 +277,14 @@ function ProfileSection() {
           <Input
             id="cfg-phone"
             type="tel"
+            inputMode="tel"
             placeholder="(11) 99999-9999"
             value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, phone: maskPhone(e.target.value) })
+            }
             disabled={saving}
-            className="bg-[var(--card)]"
+            className="bg-[var(--card)] font-mono-numeric"
           />
         </div>
 
@@ -593,7 +620,7 @@ function SessionSection() {
           </div>
         ) : (
           <ul
-            className="border-t border-border max-h-96 overflow-y-auto scroll-area"
+            className="border-t border-border max-h-96 overflow-y-auto scroll-area animate-in fade-in duration-300"
             aria-label="Lista de sessões ativas"
           >
             {data.map((s) => (
@@ -678,21 +705,50 @@ function SessionRowItem({
             </TooltipContent>
           </Tooltip>
         ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={revoking}
-            onClick={onRevoke}
-            aria-label={`Encerrar sessão ${session.tokenPreview}`}
-            className="text-[var(--risk-high)] hover:bg-[var(--risk-high)]/10 hover:text-[var(--risk-high)]"
-          >
-            {revoking ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-            Encerrar
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={revoking}
+                aria-label={`Encerrar sessão ${session.tokenPreview}`}
+                className="text-[var(--risk-high)] hover:bg-[var(--risk-high)]/10 hover:text-[var(--risk-high)]"
+              >
+                {revoking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Encerrar
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="font-display text-xl">
+                  Encerrar esta sessão?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  A sessão selecionada será encerrada imediatamente e o
+                  dispositivo correspondente precisará autenticar-se
+                  novamente. Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={revoking}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={revoking}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onRevoke();
+                  }}
+                  className="bg-[var(--risk-high)] text-[var(--accent-foreground)] hover:bg-[var(--risk-high)]/90"
+                >
+                  {revoking && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Encerrar sessão
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
       </div>
     </li>
@@ -707,15 +763,17 @@ function SessionListSkeleton() {
           key={i}
           className="border-b border-border py-4 px-1 flex flex-col sm:flex-row sm:items-center gap-3"
         >
-          <div className="flex-1 space-y-2">
+          <div className="flex-1 min-w-0 space-y-1.5">
+            {/* token preview + badge */}
             <div className="flex items-center gap-2">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-5 w-20 rounded-full" />
             </div>
-            <Skeleton className="h-3 w-48" />
+            {/* created / expires lines */}
+            <Skeleton className="h-3 w-56" />
             <Skeleton className="h-3 w-44" />
           </div>
-          <Skeleton className="h-8 w-24 rounded-md" />
+          <Skeleton className="h-8 w-24 rounded-md shrink-0" />
         </li>
       ))}
     </ul>
@@ -1039,7 +1097,7 @@ function AuditLogSection() {
           Nenhuma ação registrada.
         </div>
       ) : (
-        <div className="max-h-96 overflow-y-auto scroll-area border-t border-border">
+        <div className="max-h-96 overflow-y-auto scroll-area border-t border-border animate-in fade-in duration-300">
           <Table>
             <TableCaption className="sr-only">
               Registro de auditoria — {meta?.total ?? data.length} entrada(s)
@@ -1165,17 +1223,28 @@ function AuditLogSection() {
 
 function AuditLogSkeleton() {
   return (
-    <div className="border-t border-border">
+    <div className="border-t border-border" aria-hidden="true">
       <div className="space-y-1">
+        {/* Header row — matches the 4-column audit table (Data/Hora · Ação · Recurso · Detalhes) */}
+        <div className="flex items-center gap-3 border-b border-border bg-[var(--surface)] px-3 py-2.5">
+          <Skeleton className="h-3 w-32" />
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-3 flex-1" />
+        </div>
+        {/* Body rows — icon block + action label, badge, details text */}
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 border-b border-border py-3"
+            className="flex items-center gap-3 border-b border-border py-3 px-3"
           >
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-4 w-40" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 flex-1" />
+            <Skeleton className="h-3.5 w-32" />
+            <div className="flex items-center gap-2 w-56">
+              <Skeleton className="h-6 w-6 rounded-md shrink-0" />
+              <Skeleton className="h-3.5 w-32" />
+            </div>
+            <Skeleton className="h-5 w-24 rounded-full" />
+            <Skeleton className="h-3.5 flex-1" />
           </div>
         ))}
       </div>

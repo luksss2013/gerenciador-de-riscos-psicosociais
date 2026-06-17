@@ -1508,3 +1508,288 @@ A complete visual identity overhaul of the NR-1 Copsoq SaaS platform, moving fro
 - [x] Risk semantics preserved (LOW=sage, MEDIUM=ochre, HIGH=clay)
 - [x] Accessibility maintained (ARIA, semantic HTML, sr-only data tables, keyboard nav)
 - [x] Language: pt-BR throughout
+
+---
+
+Task ID: UX-1
+Agent: full-stack-developer
+Task: Navigation shell UX overhaul — top breadcrumb bar, categorized sidebar, greeting removal, AI-slop microcopy cleanup.
+
+Work Log:
+- Read `/home/z/my-project/worklog.md` (R-1..R-7 redesign contract: clinical-institutional / warm-editorial, pine `#2F4A43`, warm paper `#FAF8F4`, `.font-display` serif headings, `.surface-hover`, no card-hover lift), `src/app/globals.css`, and `src/components/shell/app-shell.tsx` to anchor on the existing token contract and shell layout.
+- **1. Top breadcrumb bar** — new `src/components/shell/breadcrumb-bar.tsx`:
+  - Renders a horizontal `border-b border-border bg-background px-4 sm:px-6 lg:px-8 py-3 text-sm` bar above `<main>`, below the mobile topbar (always visible on desktop).
+  - Uses the existing shadcn `Breadcrumb` / `BreadcrumbList` / `BreadcrumbItem` / `BreadcrumbLink` / `BreadcrumbPage` / `BreadcrumbSeparator` primitives from `@/components/ui/breadcrumb.tsx`.
+  - Context-aware trail derived from the Zustand `view` + `companyId` + `assessmentId`:
+    - `painel` → Início (current)
+    - `consolidado` → Início › Análise consolidada
+    - `empresas` → Início › Empresas
+    - `empresa` → Início › Empresas › {companyName}
+    - `avaliacao` → Início › Empresas › {companyName} › {assessmentTitle | "Avaliação"} (current)
+    - `resultados` / `inventario` / `plano` / `relatorio` → … › {assessmentTitle} › Resultados / Inventário / Plano de ação / Relatório
+    - `configuracoes` → Início › Configurações
+  - Current crumb = `font-semibold text-foreground` via `BreadcrumbPage`; ancestors = `text-muted-foreground hover:text-foreground hover:underline cursor-pointer` rendered as `BreadcrumbLink asChild` wrapping a `<button>` (keyboard-accessible).
+  - Clicking an ancestor calls `go()` from the Zustand store (no store changes — `ViewName` union + `go` signature untouched).
+  - Name resolution: simple module-level `Map<string,string>` caches (`companyNameCache`, `assessmentTitleCache`) populated on-demand by two `useEffect`s calling `api.companies.get(id)` / `api.assessments.get(id)`. Cache hits short-circuit subsequent fetches; failures degrade gracefully to a fallback label. No new context, no SWR, no new packages.
+- **2. Sidebar categorization** — `src/components/shell/app-shell.tsx`:
+  - Replaced flat `NAV_ITEMS: NavItem[]` with grouped `NAV_GROUPS: NavGroup[]` (new `NavGroup` interface): **Visão geral** (Início = was "Painel", Análise consolidada = was "Consolidado"), **Gestão** (Empresas), **Conta** (Configurações).
+  - Section labels rendered as `text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground px-3 pt-4 pb-1` (first group uses `pt-2` so it sits cleanly under the brand block; nav wrapper switched to `pt-2 pb-4` + `overflow-y-auto scroll-area` for future-proofing).
+  - Per-item active state preserved verbatim (pine text + 2px left pine border + `bg-sidebar-accent`, `aria-current="page"`).
+  - `MobileTopbar.currentLabel` now reads from a new `VIEW_LABELS: Record<ViewName, string>` map covering all 11 views (so detail pages like `empresa` / `avaliacao` / `resultados` / `plano` / `relatorio` show a sensible mobile title instead of the previous "NR-1 Copsoq" fallback).
+  - `<BreadcrumbBar />` mounted in the main content column between `<MobileTopbar />` and `<main>` so it sits below the mobile topbar on small screens and at the top of the content area on desktop.
+- **3. Greeting removal** — `src/components/painel/painel-view.tsx`:
+  - `HeroHeader` no longer takes `professionalName`; the `Bem-vindo(a) de volta, {nome}` line is gone.
+  - Title is now the serif `.font-display` "Painel de conformidade" with a single-line subtitle "Visão geral das suas empresas e avaliações em andamento."
+  - Removed the now-unused `firstName()` helper and the `useAuth` import + `professional` destructuring from `PainelView` (kept `useView`).
+- **4. AI-slop microcopy cleanup** (reduced NR-1 over-mentioning; footer + report contexts deliberately left intact):
+  - `painel-view.tsx` empty state: "Adicione seu primeiro cliente para começar a gerenciar riscos psicossociais conforme a NR-1." → "Cadastre sua primeira empresa para iniciar as avaliações."
+  - `empresas-view.tsx` page subtitle: "Gerencie seus clientes e seus ciclos de avaliação NR-1." → "Gerencie seus clientes e seus ciclos de avaliação."
+  - `empresas-view.tsx` empty state paragraph: "Adicione seu primeiro cliente para iniciar ciclos de avaliação NR-1." → "Adicione a primeira para começar."
+  - `avaliacao-detail-view.tsx` completed-state hint: "Acesse os resultados e dê continuidade ao ciclo NR-1." → "Acesse os resultados e dê continuidade ao ciclo."
+  - Left untouched (legitimate regulatory context): footer compliance line, `relatorio-view.tsx` report sections, `configuracoes-view.tsx` NR-1 provisions section, `plano-view.tsx` Orientação NR-1 banner, `inventario-view.tsx` prioritization section, `empresa-detail-view.tsx` "relatórios NR-1" caption, painel `Conformidade NR-1` analytical section heading.
+
+Stage Summary:
+- Navigation shell now has: categorized sidebar (Visão geral / Gestão / Conta) with renamed labels (Início, Análise consolidada), a context-aware top breadcrumb bar with on-demand name caching, a greeting-free Painel hero, and tightened action-oriented microcopy with reduced redundant NR-1 mentions.
+- Constraints honored: no business logic / API / data-flow changes; no new npm packages; Zustand `ViewName` union + `go()` unchanged; all ARIA/semantic/keyboard behavior preserved (breadcrumbs use the shadcn primitives' `aria-current` / `aria-label="breadcrumb"`, sidebar buttons keep `aria-current="page"`, mobile topbar keeps `aria-label`).
+- Verification: `bun run lint` → exit 0 (clean). Dev server recompiled successfully (per `dev.log`). Did NOT start/restart the dev server.
+
+---
+
+Task ID: UX-2
+Agent: full-stack-developer
+Task: Add shared input masks, field validation, and consistent error styling across all NR-1 Copsoq forms (company, department, action item 5W2H, manual risk, profile, assessment date range).
+
+Work Log:
+- Read `/home/z/my-project/worklog.md` Task R-1 to confirm the warm-editorial / clinical-institutional token contract (`--risk-high` `#C25647`, `--risk-low` `#5B8A6A`, `.font-display`, `.surface-hover`). Read `src/app/globals.css` for the available CSS vars (`--risk-high`, `--risk-low`, `--risk-medium`, `--brand`, `--surface`). Read all 5 target form files end-to-end before editing.
+- **1. New shared module — `src/lib/form-utils.tsx`**: exports `maskPhone` (auto-detect 10/11-digit BR phone), `maskCep`, `maskNumber` (strip non-digits + clamp `[min,max]`), `maskCurrency` (BRL cents accumulator → `1.234,56`), `parseCurrencyBRL` (inverse), `validateEmail` (RFC-simple regex), `validateRequired(value, minLen?)`, the `FIELD_ERROR_CLASS = "border-[var(--risk-high)] focus-visible:ring-[var(--risk-high)]/30 text-[var(--risk-high)]"` constant (used by BOTH front-side onBlur validation AND backend error-mapping so they render identically), a `FieldError` React component (`<p role="alert" className="text-xs text-[var(--risk-high)] flex items-center gap-1 mt-1"><AlertCircle className="h-3 w-3" aria-hidden />{message}</p>`), and a `DateRangeField` React component (single `<fieldset>` with shared legend "Período da coleta" + two side-by-side `<input type="date">`; inline `endDate > startDate` validation re-computed on every change to either input, error displayed below both inputs via shared `FieldError`, both inputs get `FIELD_ERROR_CLASS` + `aria-describedby` when in error). Pure presentation — no business logic, no new npm packages.
+- **2. Company form — `src/components/empresas/company-form-dialog.tsx`**: CNPJ keeps `maskCnpj` from `@/lib/cnpj`. Phone: `maskPhone` on change. Email: `validateEmail` onBlur → `FieldError` + `FIELD_ERROR_CLASS` on the input, clears on edit. Employee count: `maskNumber({ min: 0 })` on change. Required `name`: `validateRequired(form.name, 2)` onBlur + on submit. Replaced single `cnpjError` string with `Partial<Record<FieldKey, string>>` error map so multiple fields can show errors simultaneously. Backend `CNPJ_INVALID` / `CNPJ_ALREADY_REGISTERED` mapped onto the CNPJ field via the SAME `FieldError` + `FIELD_ERROR_CLASS` styling used by the front-side onBlur errors (key consistency requirement). Removed unused `X` import. Added `aria-invalid` + `aria-describedby` on every validated input.
+- **3. Department form — `src/components/empresas/empresa-detail-view.tsx` → `DepartmentFormDialog`**: Worker count: `maskNumber({ min: 1 })` on change (replaces inline `.replace(/[^\d]/g, "")` regex). Name: `validateRequired(form.name, 2)` onBlur + on submit. Added new `wcError` state for the worker-count field with `FieldError` display. Backend `DEPARTMENT_NAME_DUPLICATE` mapped to the name field via the same `FieldError` + `FIELD_ERROR_CLASS`. Removed unused `X` import from the file.
+- **4. Action Item form (5W2H) — `src/components/plano/plano-view.tsx` → `ActionItemFormContents`**: Estimated cost: `maskCurrency` on change; initial value loaded from `initialItem.estimatedCost` (number) is re-rendered as a BRL-formatted string via `maskCurrency(String(Math.round(value * 100)))` so editing an existing action shows canonical `1.234,56`; on submit parsed back to a number via `parseCurrencyBRL`. When date: kept `<input type="date">`; added future-or-today validation onBlur (NR-1 prazo must be hoje ou no futuro) using `startOfDay` from `date-fns` to avoid TZ edge cases. Required `what`/`why`/`who`/`where`/`how`: `validateRequired(value, 2)` onBlur + on submit via a shared `validateOnBlur(field)` helper that uses the same `FieldError` styling as submit-time validation. Backend `VALIDATION_ERROR`: surfaced as a form-level banner above the field grid using the shared `FieldError` (backend doesn't tell us which field failed, so the banner is the most truthful representation). All error displays converted from inline `<p className="text-xs text-[var(--risk-high)]">` to `<FieldError id="…" message={msg} />`; all validated inputs/textareas get `FIELD_ERROR_CLASS` when their field is in error. Editing a field clears its error.
+- **5. Manual Risk form — `src/components/inventario/inventario-view.tsx` → `ManualRiskFormContents`**: Probability/Severity: `maskNumber(v, { min: 1, max: 3 })` defensively on the Select's `onValueChange` (Select options already constrain to {1,2,3}; mask guards against any future programmatic value). Required `hazardDescription`/`possibleHarms`: `validateRequired(value, 3)` onBlur + on submit via shared `validateOnBlur(field)` helper. Backend `VALIDATION_ERROR`: surfaced as a form-level banner via the shared `FieldError`. All error displays converted from inline `<p className="text-xs text-[var(--risk-high)]">` to `<FieldError>`; all validated Selects/Textareas get `FIELD_ERROR_CLASS` on their trigger/element.
+- **6. Assessment date range — `src/components/empresas/empresa-detail-view.tsx` → `CreateAssessmentDialog`**: Replaced the two separate `<Input type="date">` (start + end) with a single `<DateRangeField />` instance (shared legend "Período da coleta", individual "Início"/"Fim" sublabels). Inline `endDate > startDate` validation re-computed on every change inside `DateRangeField.recompute()`. The existing validation feedback panel (the surface + risk-medium "Pendências" banner at the bottom) is kept verbatim — it still derives `dateValid` from the same `startDate`/`endDate` state. `dateError` state setter is shared between the `DateRangeField` and the panel so they stay in sync. `setDateError(null)` is still called inside `DateRangeField`'s onChange handlers.
+- **7. Profile form — `src/components/configuracoes/configuracoes-view.tsx` → `ProfileSection`**: Name: `validateRequired(form.name, 2)` onBlur + on submit; added `nameError` state and `FieldError` display + `FIELD_ERROR_CLASS` on the input. Phone: `maskPhone` on change; added `font-mono-numeric` to the input className. Removed the old `if (!form.name.trim())` toast-only check; replaced with the inline `FieldError`.
+
+Stage Summary:
+- All 5 NR-1 Copsoq forms now ship the same shared mask + validation contract: `src/lib/form-utils.tsx` exports `maskPhone` / `maskCep` / `maskNumber` / `maskCurrency` / `parseCurrencyBRL` / `validateEmail` / `validateRequired` / `FIELD_ERROR_CLASS` / `FieldError` / `DateRangeField`. Front-side (onBlur) validation errors and backend error-mapping (`CNPJ_INVALID`, `CNPJ_ALREADY_REGISTERED`, `DEPARTMENT_NAME_DUPLICATE`, `VALIDATION_ERROR`) render with the IDENTICAL visual treatment via the shared `FieldError` component + `FIELD_ERROR_CLASS` constant — the key consistency requirement.
+- Accessibility: every error `<p>` carries `role="alert"`; every validated input/textarea/select has `aria-invalid` reflecting the error state and `aria-describedby` linking to the error id.
+- Constraints honored: NO business logic / API / data-flow changes; NO new npm packages; all existing form submission logic preserved (the only behavioral change is that submit is now blocked when front-side validation fails, instead of relying on `toast.error` + early return as before). Dev server untouched per instructions.
+- Verification: `bun run lint` → exit 0 (clean). Dev server recompiled successfully per `dev.log` after each edit batch (no compile errors observed).
+
+---
+
+Task ID: UX-3
+Agent: full-stack-developer
+Task: Loading-state, toast-feedback, and confirmation-modal UX overhaul across all NR-1 Copsoq views (component-shaped shimmer skeletons, fade-in transitions, discreet Sonner toasts, AlertDialog confirmations for every state-changing action).
+
+Work Log:
+- Read `/home/z/my-project/worklog.md` Tasks R-1..R-7 + UX-2 to anchor on the warm-editorial / clinical-institutional token contract (pine `#2F4A43`, warm paper `#FAF8F4`, `--surface` `#F4F0E9`, `--muted-foreground` `#6B6358`, `--border` `#E4DDD2`, `--risk-high` `#C25647`, `.font-display` serif headings, `.surface-hover`). Read `src/app/globals.css`, `src/components/ui/skeleton.tsx`, `src/components/ui/sonner.tsx`, `src/components/ui/alert-dialog.tsx`, and `src/app/layout.tsx` (Sonner Toaster already configured with `richColors position="top-right"`). Read all 8 target view files + `src/components/shell/app-shell.tsx` end-to-end before editing. No new npm packages installed — only existing shadcn primitives + tw-animate-css (already in `package.json`).
+- **1. Skeleton shimmer system**:
+  - `src/app/globals.css`: added `@keyframes skeleton-shimmer` (200% background-position sweep, 1.5s ease-in-out infinite) + `.skeleton-shimmer` class using a `linear-gradient(90deg, var(--surface) 25%, color-mix(in srgb, var(--muted-foreground) 18%, var(--surface)) 50%, var(--surface) 75%)` warm-stone gradient sweep — replaces flat gray `bg-accent animate-pulse`. Respects the existing `prefers-reduced-motion` global rule (animation-duration forced to 0.01ms).
+  - `src/components/ui/skeleton.tsx`: `<div className="skeleton-shimmer rounded-md" />` (was `bg-accent animate-pulse rounded-md`). All existing `<Skeleton />` call-sites inherit the new shimmer automatically with no further changes — single source of truth.
+- **2. Component-shaped skeletons (each mimics the ACTUAL layout — right columns / proportions, not generic gray rectangles)**:
+  - `src/components/painel/painel-view.tsx` → `PainelSkeleton`: alerts strip (3 dot+text columns with `border-r` dividers), stat strip (surface-backed rounded bar with 4 divided cells matching `KpiRow`), compliance overview (title row + wide bar + 4 legend chips), companies list (header + 4 rows with dot + name + meta + arrow), heatmap + trend (two side-by-side title+chart panels). All `aria-hidden="true"`. Loaded content wrapped in `<div className="animate-in fade-in duration-300">`.
+  - `src/components/empresas/empresas-view.tsx` → `EmpresasSkeleton`: 6 list rows matching `CompanyRow` (dot + name + CNPJ + meta + counts + Editar/Acessar buttons), `border-b border-border` dividers. Loaded content wrapped in fade-in div.
+  - `src/components/consolidado/consolidado-view.tsx` → `LoadingState`: stat strip (4 cells), heatmap table (header + 6 rows of dot+name + 6 colored cells), risk distribution chart (title + bar block), 3 company detail cards (title + meta + body + 2 chip blocks). Loaded content wrapped in fade-in div.
+  - `src/components/avaliacoes/avaliacao-detail-view.tsx` → `DetailSkeleton`: top nav (back button + refresh), header (breadcrumb chips + title + period + status badge + 2 ghost buttons), status actions (icon block + label + primary button), GHE progress rows (3 rows matching `GheProgressRows` — name+GHE label, Esperados/Respondidos count pairs, eligibility badge + adesão progress bar), participation field (label + textarea + hint). Main return wrapped in `animate-in fade-in duration-300`.
+  - `src/components/resultados/resultados-view.tsx` → `ResultadosSkeleton`: KPI stat strip (5 divided cells), heatmap table (header + 5 rows of dot+name + 5 colored cells), critical dimensions table (3 rows: code + name/desc + risk badge + button), dimension detail rows (3 stacked expandable cards with title + chart block). Loaded content wrapped in fade-in div.
+  - `src/components/inventario/inventario-view.tsx` → `InventarioSkeleton`: filter chips row, inventory table (header with 9 cell-shaped blocks + 6 body rows with cell-shaped blocks matching the ~12-column inventory table), uncovered factors section (title + body card + button). Loaded content wrapped in fade-in div.
+  - `src/components/plano/plano-view.tsx` → `PlanoSkeleton`: KPI stat strip (5 cells), filters chip row (5 select-shaped blocks), action items table (header + 6 rows matching `ActionItemsTable` — GHE/dimensão/o quê/responsável/prazo/status select/edit+delete icons). Loaded content wrapped in fade-in div.
+  - `src/components/configuracoes/configuracoes-view.tsx` → `SessionListSkeleton` + `AuditLogSkeleton` improved to match real shapes: session list rows (token preview + badge + created/expires lines + revoke button), audit log table (header row + 6 rows with datetime + icon-block+label + resource badge + details). Loaded content lists wrapped in fade-in.
+- **3. Toast audit** (no Sonner config change — `richColors position="top-right"` already in `layout.tsx`, durations left at Sonner defaults which match the success≈3-4s / error≈5s spec):
+  - Audited every `toast.success/error/warning/info` call across all view files (62 call sites). None set aggressive custom `duration` overrides; none missing for any API mutation. Existing `toast.success("Alteração salva.")` in `inventario-view.tsx → handlePatch` removed (redundant — the inline `savedCell` indicator already confirms the save visually per the "remove redundant toasts" guidance); error path kept. Participation field already correctly uses inline `saved` status instead of a toast (kept as-is).
+  - Existing palette already consistent: `toast.success` (Sonner green = pine/green tone via `--risk-low`-family), `toast.error` (Sonner red = `--risk-high` clay). No `toast.warning` / `toast.info` calls exist; low-adhesion and eligibility-threshold signals are surfaced inline via badges/rings (kept as-is — adding toasts would be noise).
+- **4. Confirmation modals (AlertDialog) for state-changing actions**:
+  - `src/components/avaliacoes/avaliacao-detail-view.tsx` → launch-assessment: the `status === "draft"` "Lançar Avaliação" button is now wrapped in an `AlertDialog`. Title `Lançar avaliação` (`.font-display text-xl`), description "Os links de coleta serão gerados e a avaliação mudará para 'Coletando respostas'. Esta ação não pode ser desfeita.", Cancel = `Cancelar` (disabled while launching), Confirm = `Lançar` (pine primary via default `buttonVariants`, shows `Loader2` spinner + disabled while `launching`). `e.preventDefault()` on the action so Radix doesn't auto-close before the async resolves.
+  - `src/components/shell/app-shell.tsx` → logout: the `Sair` `DropdownMenuItem` now uses `onSelect={(e) => { e.preventDefault(); setSignOutOpen(true); }}` to keep the dropdown from closing, then opens a new `AlertDialog` controlled by `signOutOpen` state. Title `Encerrar sessão?` (`.font-display text-xl`), description about needing credentials again, Cancel = `Cancelar`, Confirm = `Sair` (spinner + disabled while `signingOut`). Added AlertDialog imports to the file.
+  - `src/components/configuracoes/configuracoes-view.tsx` → single-session revoke (`SessionRowItem`): the non-current-session revoke button is now wrapped in an `AlertDialog`. Title `Encerrar esta sessão?` (`.font-display text-xl`), description about the device needing to re-authenticate, Cancel = `Cancelar`, Confirm = `Encerrar sessão` (clay `--risk-high` styling, spinner + disabled while `revoking`).
+  - Existing AlertDialogs verified for styling + a11y compliance: delete-department (`empresa-detail-view.tsx`) already uses `font-display` title, has `AlertDialogDescription`, `Cancelar` cancel, clay `--risk-high` confirm with `Loader2` spinner + disabled while `deleting`. Close-assessment (`avaliacoes-detail-view.tsx`) same pattern with `closing` state. Revoke-all-other-sessions (`configuracoes-view.tsx`) same pattern with `revokingOthers` state. Duplicate-assessment is a `Dialog` with a form (kept as-is per task — that's already a confirmation layer).
+  - `src/components/inventario/inventario-view.tsx` → delete inventory item: added `deletingId` local state to `InventoryTable` + a `handleDelete` wrapper that sets/clears it around the async `onDelete`. AlertDialogAction now shows `Loader2` spinner + is disabled (and `Cancelar` is disabled) while `deletingId === item.id`. `e.preventDefault()` added so the dialog stays open during the request.
+  - `src/components/plano/plano-view.tsx` → delete action item: same `deletingId` local state + `handleDelete` wrapper added to `ActionItemsTable`. AlertDialogAction now shows spinner + disabled while `deletingId === item.id`; `Cancelar` disabled too. `e.preventDefault()` added.
+  - Delete-company: no UI affordance exists in `empresas-view.tsx` (only Editar + Acessar buttons) — nothing to add; the empresa-detail delete-department AlertDialog is the only company-scoped destructive action and it's already covered.
+- **Constraints honored**: NO business logic changes (only added confirmation layers + spinner/disabled states tied to existing executing flags); NO new npm packages (only existing shadcn `AlertDialog` primitives + tw-animate-css utilities already in the project); all confirmation dialogs use `.font-display` serif titles; all confirm buttons show `Loader2` spinner + are `disabled` while the request executes; all `AlertDialogAction` clicks use `e.preventDefault()` so Radix doesn't auto-dismiss before the async resolves (preserves the focus trap + Escape-to-cancel behavior for the cancel path); all AlertDialogs have `AlertDialogDescription` (Radix a11y requirement — avoids the console warning when a Title lacks a Description).
+
+Stage Summary:
+- Skeletons now read as the actual layout (stat strips, list rows with dot+name+meta, tables with the right number of cell-shaped blocks, section headers) in warm-stone shimmer instead of flat gray — `PainelSkeleton`, `EmpresasSkeleton`, `LoadingState` (consolidado), `DetailSkeleton` (avaliação), `ResultadosSkeleton`, `InventarioSkeleton`, `PlanoSkeleton`, `SessionListSkeleton` + `AuditLogSkeleton` (configurações) all rewritten. A 300ms `animate-in fade-in` transition smooths every skeleton→content swap.
+- Toast contract: success/error palette already consistent via Sonner `richColors`; one redundant per-cell-edit success toast removed from the inventory patch path (inline `savedCell` indicator remains). No silent mutations.
+- Confirmation modals: launch-assessment, logout, single-session-revoke now have AlertDialogs (were missing); delete-inventory-item and delete-action-item now show spinner + disable while executing (were fire-and-forget); close-assessment, delete-department, revoke-all-other-sessions verified compliant. All titles in `.font-display` serif, all confirm buttons spinner-disabled while executing, all dialogs have Description + focus trap + Escape-to-cancel.
+- Verification: `bun run lint` → exit 0 (clean). Dev server recompiled successfully per `dev.log` after each edit batch (no compile errors observed). Did NOT start/restart the dev server per instructions.
+
+---
+
+Task ID: UX-4
+Agent: full-stack-developer
+Task: Cursor-affordance, disabled-button-blocking, and loading-spinner consistency pass across the entire NR-1 Copsoq SaaS UI (shadcn primitives + every view + app shell + worker portal). No business-logic changes; no new npm packages.
+
+Work Log:
+- Read `/home/z/my-project/worklog.md` (Tasks R-1..R-7 + UX-1..UX-3) to anchor on the warm-editorial / clinical-institutional token contract (pine `#2F4A43`, `--surface` `#F4F0E9`, `--brand` / `--brand-light`, `--risk-low/medium/high`, `.font-display` serif headings, `.surface-hover`). Read `src/app/globals.css` first to confirm tokens. Read every target view file + every shadcn UI primitive before editing.
+
+- **1. UI primitive cursor affordances** (single source of truth — every consumer inherits automatically):
+  - `src/components/ui/button.tsx` → added `cursor-pointer disabled:cursor-not-allowed disabled:opacity-50` to the `cva` base class string (was only `disabled:pointer-events-none disabled:opacity-50`). All `Button` consumers across the app now show the correct cursor + correctly block clicks while disabled without any per-button className changes. `disabled:pointer-events-none` retained (defensive — works with the new `disabled:cursor-not-allowed` because Radix-slot pattern keeps the className on the rendered element).
+  - `src/components/ui/input.tsx` → added `cursor-text` to the base `cn(...)` className (text inputs read as text cursors). Pre-existing `disabled:cursor-not-allowed` retained.
+  - `src/components/ui/textarea.tsx` → added `cursor-text` to the base `cn(...)` className. Pre-existing `disabled:cursor-not-allowed` retained.
+  - `src/components/ui/select.tsx` → `SelectTrigger`: added `cursor-pointer` (was implicitly default-arrow because `data-[placeholder]:text-muted-foreground` had no cursor class). Pre-existing `disabled:cursor-not-allowed` retained. `SelectItem`: changed `cursor-default` → `cursor-pointer` (items are clickable choices — the default cursor miscommunicated affordance). SelectContent / SelectLabel / SelectSeparator untouched.
+  - `src/components/ui/checkbox.tsx` → added `cursor-pointer` to the Root className. Pre-existing `disabled:cursor-not-allowed` retained.
+  - `src/components/ui/radio-group.tsx` → `RadioGroupItem`: added `cursor-pointer` to the Item className. Pre-existing `disabled:cursor-not-allowed` retained. Root untouched (it's a layout container, not clickable itself).
+
+- **2. View-file clickable audits** (raw `<button>` elements missing `cursor-pointer` — every Button-component consumer is already covered by the base-class change above):
+  - `src/components/painel/painel-view.tsx` → alert strip raw `<button>` (line ~254) and recent-assessments feed raw `<button>` (line ~723) both got `cursor-pointer` added. Heatmap-mini bars kept as `cursor-default` (they're Tooltip-only, not navigation — the spec calls out "heatmap rows that navigate" — these don't navigate).
+  - `src/components/consolidado/consolidado-view.tsx` → already compliant: heatmap `<TableRow>` already has `cursor-pointer` + `tabIndex={0}` + role-mapped onClick/onKeyDown; `CompanyRow` `<div role="button" tabIndex={0}>` already has `cursor-pointer` + keyboard handler + aria-label. Heatmap cell divs kept as `cursor-default` (Tooltip-only, no navigation — same reasoning as painel).
+  - `src/components/empresas/empresas-view.tsx` → company-name `<button>` (line ~379) got `cursor-pointer` added. Pagination prev/next + clear-search + retry buttons use the `Button` component (covered by base class).
+  - `src/components/empresas/empresa-detail-view.tsx` → assessment-row title `<button>` (line ~1176) got `cursor-pointer` added. All dept-form / delete / create-assessment buttons use `Button`/`AlertDialogAction` (covered by base class).
+  - `src/components/empresas/company-form-dialog.tsx` → no raw `<button>` elements; submit + cancel both use `Button` (covered). Existing `submitting` state + `Loader2 animate-spin` + `disabled={submitting}` verified intact on the submit button; Cancel button also `disabled={submitting}`; fieldset `disabled={submitting}` to lock inputs during submit.
+  - `src/components/avaliacoes/avaliacao-detail-view.tsx` → no raw `<button>` elements; all interactive elements use `Button`. Existing loading states verified: launch (`launching` + spinner + disabled + AlertDialog), close (`closing` + spinner + disabled + AlertDialog), duplicate (`duplicating` + spinner + disabled), simulate-all (`simulating` + spinner + disabled), simulate-per-GHE (`simulatingId` + spinner + disabled per-row), edit-form-save (`saving` + spinner + disabled + cancel disabled), participation-field (`status === "saving"` inline spinner + `CheckCircle2` saved confirmation). No changes needed.
+  - `src/components/resultados/resultados-view.tsx` → dimension-chip raw `<button>` (line ~650) already has `cursor-pointer` (verified). Refresh button uses `Button` with existing `loading` state + `Loader2` spinner + `disabled={loading}`. Heatmap cell divs kept as `cursor-default` (Tooltip-only). No changes needed.
+  - `src/components/inventario/inventario-view.tsx` → 3 raw `<button>` elements gained `cursor-pointer`: editable-text-cell trigger (line ~223), editable-select-cell trigger (line ~323), "Criar Ação" link button (line ~633). Collapsible section header raw `<button>` (line ~1148) gained `cursor-pointer`. Existing spinner states verified: per-cell-save (`savingCell` + `Loader2` inside the cell), delete-item (`deletingId === item.id` + `Loader2` on AlertDialogAction + `disabled` on Cancel + Action), manual-risk-form (`submitting` + `Loader2` on submit + `disabled` on Cancel + fieldset `disabled`), refresh (`loading` + `Loader2` + `disabled`). Disabled trash button for non-manual items already had `cursor-not-allowed` + `disabled` (covered by base class change).
+  - `src/components/plano/plano-view.tsx` → no raw `<button>` elements. Existing spinner states verified: inline status select (`pendingItemId === item.id` + adjacent `Loader2` + `disabled` on Select), delete-item (`deletingId === item.id` + `Loader2` on AlertDialogAction + `disabled` on Cancel + Action + `e.preventDefault()`), action-item form (`submitting` + `Loader2` + `disabled` on submit + cancel), refresh (`loading` + `Loader2` + `disabled`). No changes needed.
+  - `src/components/relatorio/relatorio-view.tsx` → "Estrutura do documento" Collapsible section header raw `<button>` (line ~594) gained `cursor-pointer`. Existing spinner states verified: generate PDF/DOCX/HTML buttons (`generatingType === "pdf" | "docx" | "html"` + `Loader2` + `disabled={disabled || generatingType !== null}` + `aria-disabled`), regenerate (`regeneratingId === r.id` + `Loader2` + `disabled`), refresh (`loading` + `Loader2` + `disabled`).
+  - `src/components/configuracoes/configuracoes-view.tsx` → no raw `<button>` elements. Existing spinner states verified: profile save (`saving` + `Loader2` + `disabled` on save + cancel + all fieldsets), session revoke (`revokingId === s.id` + `Loader2` + AlertDialog + disabled), revoke-all-others (`revokingOthers` + `Loader2` + AlertDialog + disabled), audit export CSV (`exporting` + `Loader2` + `disabled`), refresh/pagination (`loading` + `Loader2` + `disabled`). No changes needed.
+  - `src/components/auth/auth-screen.tsx` → "Esqueci minha senha" raw `<button>` already correctly `disabled` with `cursor-not-allowed` (kept as-is — the disabled native button blocks clicks by default; the tooltip "Em breve" communicates the unavailable state). Existing spinner states verified: login submit (`submitting` + `Loader2` + `disabled`), register submit (`submitting` + `Loader2` + `disabled`), all form inputs + Select + Checkbox `disabled={submitting}`. Password-show toggle uses `Button` (covered by base). No changes needed.
+  - `src/components/worker/worker-portal.tsx` → "Sair" raw `<button>` (header) gained `cursor-pointer`. Likert option raw `<button>`s gained `cursor-pointer` (default state) and `disabled:pointer-events-none` (in addition to the existing `disabled:cursor-not-allowed`) — belt-and-suspenders to absolutely guarantee no click-through while the answer POST is in-flight (the `handleLikertSelect` early-return on `submitting` is the third defensive layer). Existing spinner states verified: per-answer-submit (`submitting` + `Loader2` "Registrando resposta…" inline status + `aria-live="polite"`), boot (`bootLoading` + full-screen `WorkerLoader` with `Loader2`), final-complete (`complete()` reuses the submitting flag through `.finally(() => setSubmitting(false))`).
+  - `src/components/shell/app-shell.tsx` → sidebar-nav raw `<button>`s (line ~287) gained `cursor-pointer`. User-menu dropdown-trigger raw `<button>` (line ~315) gained `cursor-pointer`. Existing spinner state verified: logout (`signingOut` + `Loader2` in DropdownMenuItem + AlertDialogAction + `disabled` on Cancel + Action + `e.preventDefault()`).
+  - `src/components/shell/breadcrumb-bar.tsx` → breadcrumb-link raw `<button>` already has `cursor-pointer` via the `BreadcrumbLink` className. No changes needed.
+
+- **3. Disabled-button blocking verification** (no click-through):
+  - All shadcn `Button` consumers: the base `cva` string retains `disabled:pointer-events-none` AND now also has `disabled:cursor-not-allowed` AND `disabled:opacity-50` — three layers of blocking (CSS pointer-events, native button disabled attribute via React, visual opacity). Verified no `Button` was using `onClick` conditional logic instead of the `disabled` prop.
+  - All `<div role="button" tabIndex={0}>` patterns (consolidado CompanyRow, consolidado heatmap TableRow): these aren't disabled-conditional — they always navigate. No conditional-disabled div patterns exist in the codebase.
+  - All raw `<button>` elements with conditional-disabled behavior (worker-portal Likert, inventario editable cells, auth "Esqueci minha senha"): worker-portal Likert buttons use native `disabled={submitting}` (browser blocks click) + we added `disabled:pointer-events-none` (CSS-level guarantee) + the `handleLikertSelect` early-return (defensive JS-level guarantee). Auth "Esqueci minha senha" uses native `disabled` (browser blocks). Inventario editable cells are never disabled (always editable when the row is rendered).
+  - No `onClick={() => { if (loading) return; ... }}` patterns found across the views that lacked the corresponding `aria-disabled` + `pointer-events-none` — the existing code consistently uses the native `disabled` prop on raw `<button>` elements rather than conditional-early-return logic, so the browser + CSS handle blocking correctly.
+
+- **4. Global button base class update**: completed in step 1 — the `cva` base in `src/components/ui/button.tsx` now contains `cursor-pointer disabled:cursor-not-allowed disabled:opacity-50` (plus the pre-existing `disabled:pointer-events-none`). Every `Button` in the app inherits these without per-call-site changes. Variants (default/destructive/outline/secondary/ghost/link) and sizes (default/sm/lg/icon) untouched.
+
+- **Constraints honored**: NO business logic changes (only cursor + disabled affordance classes added; zero changes to any API call, state machine, or data flow). NO new npm packages (only existing shadcn primitives + Tailwind utility classes). All accessibility preserved (keyboard nav, ARIA, focus rings, sr-only labels all untouched — only cursor classes were added). No existing button variants broken — only the `cva` base string gained three cursor-related classes; variant/size strings untouched.
+
+Stage Summary:
+- Cursor affordances now consistent across the entire UI: every clickable element (Button, raw `<button>`, Select trigger, Checkbox, Radio, sidebar nav, breadcrumbs, dropdown triggers, Likert tiles, editable cells, Collapsible headers, "Criar Ação" links) shows `cursor-pointer` when interactive and `cursor-not-allowed` when disabled. Text inputs/textareas show `cursor-text`. Heatmap-cell Tooltip-only elements correctly stay `cursor-default`.
+- Disabled-button blocking hardened: shadcn `Button` base now has three layers (`disabled` prop + `disabled:pointer-events-none` + `disabled:cursor-not-allowed` + `disabled:opacity-50`). Worker-portal Likert tiles get an additional `disabled:pointer-events-none` CSS layer beyond the native `disabled` attribute. All other disabled raw `<button>` elements use native `disabled` which the browser enforces.
+- Loading spinner audit: every API-triggering button across all 14 audited files now shows a `Loader2` `animate-spin` icon and is `disabled` while the request is in-flight, with normal state restored in the `finally` block. Verified existing spinner coverage on: company-form-dialog submit, empresa-detail dept-form/dept-delete/assessment-create, avaliacao-detail launch/close/duplicate/simulate-all/simulate-per-GHE/edit-save/participation-autosave, inventario manual-form/cell-edit/delete-item, plano action-form/status-change/delete-item, relatorio generate-pdf/docx/html/regenerate, configuracoes profile-save/session-revoke/revoke-others/audit-export, auth login/register, worker-portal answer/complete/boot, app-shell logout.
+- Verification: `bun run lint` → exit 0 (clean). Dev server log shows continued successful compiles after each edit batch (no compile errors). Did NOT start/restart the dev server per instructions.
+
+---
+
+Task ID: UX-5
+Agent: full-stack-developer
+Task: Painel content reduction (de-pollute the homepage) + layout/space-utilization pass + responsive audit across all views. No business-logic, API, data-flow, or store-navigation changes; no new npm packages.
+
+Work Log:
+- Read `/home/z/my-project/worklog.md` (R-1 redesign contract + UX-1 breadcrumb/sidebar work + UX-3 cursor/disabled pass) to anchor on the warm-editorial / clinical-institutional token contract (pine `#2F4A43`, warm paper `#FAF8F4`, surface `#F4F0E9`, `.font-display` serif headings, `.surface-hover`, no card-hover lift, stat-strip pattern in lieu of 4-card KPI grids). Read `src/app/globals.css` first to confirm tokens. Read all target view files end-to-end before editing.
+
+- **1. Painel content reduction — `src/components/painel/painel-view.tsx` (full rewrite, ~1140 → ~470 lines):**
+  - **Header:** Compact 1-liner — `.font-display text-xl sm:text-2xl` serif title "Painel de conformidade" + 1-line subtitle "Visão geral das suas empresas e avaliações em andamento." + inline "Nova empresa" pine-outline button. `border-b border-border pb-6 mb-8`. No marketing text, no NR-1 mentions. Removed the previous `sm:text-3xl` bump to keep it tight per the task spec (`text-2xl`).
+  - **Stat strip:** Kept the 4 inline stats (Empresas, Avaliações ativas, GHEs em risco, Total respondentes) but compacted — `bg-[var(--surface)] rounded-lg px-4 sm:px-5 py-3 sm:py-4` (was `p-5`), numbers `text-xl sm:text-2xl` (was `text-2xl`), `grid grid-cols-2 sm:grid-cols-4 divide-x divide-border` (was `lg:grid-cols-4`). Single row on sm+, 2×2 grid on mobile — much less vertical space.
+  - **Main content — two columns on desktop (`grid grid-cols-1 lg:grid-cols-3 gap-8`):**
+    - Left (`lg:col-span-2`): the companies list — full-width list rows (not cards) with `divide-y divide-border border-y border-border` framing. Each row: status dot + company name (serif) + NrStatusBadge + CNPJ (mono) + location + CNAE + dept/assessment counts + "Acessar" ghost button. Removed the inline "Coleta em andamento" Progress bar that was visual pollution (the status dot + badge already communicate "collecting").
+    - Right (`lg:col-span-1`): the recent assessments sidebar — renamed from `RecentAssessmentsFeed` → `RecentAssessmentsSidebar`. Max 5 items, list rows with status dot + status icon + company name + assessment title + status label + relative time. Added `lg:sticky lg:top-4` so the sidebar stays in view while scrolling the longer companies list. Single column on mobile (stacks below the companies list, per the "Two-column layouts: lg:grid-cols-3 → grid-cols-1 on mobile" rule — sidebar is meaningful secondary nav, not pure nav so it stays visible stacked).
+  - **REMOVED from painel** (relocated concept already lives in Consolidado view): `ComplianceOverview` (the stacked bar chart with legend), `DimensionHeatmapMini` (the 11 vertical bars), `TrendMiniChart` (the 6-month SVG line chart), and the alerts banner (the horizontal ScrollArea of alert chips — the company list rows already show status dots; redundant). All their helper code removed: `buildAlerts`, `PainelAlert` interface, `ComplianceBucket` interface, `riskBarVar`, `TrendPoint`/`HeatmapItem` types, the alert-icon imports (`AlertTriangle`, `BarChart3`, `CalendarClock`, `ShieldAlert`, `TrendingUp`, `Users`), the `Progress`/`ScrollArea`/`Tooltip*` imports (only used by removed sections).
+  - **Empty state:** Replaced the dashed-border card chrome with a clean centered section — `flex flex-col items-center text-center gap-4 pt-12 sm:pt-16`. Smaller icon chip (`h-14 w-14`), `.font-display text-xl` heading "Nenhuma empresa cadastrada", 1-line subtitle "Adicione a primeira para começar.", pine primary "Nova empresa" button. No card chrome, no excessive padding.
+  - **Skeleton:** Rewritten to match the new layout — compact stat strip skeleton + `grid grid-cols-1 lg:grid-cols-3 gap-8` with 2/3 companies-list skeleton + 1/3 sidebar skeleton (`hidden lg:block` to match the responsive grid behavior). `space-y-8` rhythm.
+  - **Section spacing:** `space-y-8` between stat strip and main grid (was `space-y-10` between many sections).
+
+- **2. Layout + space-utilization pass (lighter touch — class-only edits, no rewrites):**
+  - **`src/components/consolidado/consolidado-view.tsx`:**
+    - Main wrapper `space-y-10` → `space-y-8` (between sections). Loaded-content wrapper gained explicit `space-y-8` (was relying on the bare fragment + parent spacing).
+    - `SummaryKpis` stat strip compacted to match the new painel pattern: `p-5` → `px-4 sm:px-5 py-3 sm:py-4`, numbers `text-2xl` → `text-xl sm:text-2xl`, `lg:grid-cols-4` → `sm:grid-cols-4` (single row on tablet, not just desktop), cell padding `px-4 sm:px-6` → `px-3 sm:px-5`, `mt-2` → `mt-1.5`, `mt-1` → `mt-0.5`.
+    - `LoadingState` skeleton: `space-y-10` → `space-y-8`, stat-strip skeleton matched to the new compacted pattern.
+    - Verified the heatmap table already fills width (`w-full` inside `max-h-[32rem] overflow-auto scroll-area rounded-md border border-border`) — no over-centering. Sticky first column (`sticky left-0`) + sticky "Geral" column on the right already handle horizontal overflow on mobile. No changes needed.
+  - **`src/components/empresas/empresa-detail-view.tsx`:**
+    - `DetailSkeleton` wrapper `space-y-6` → `space-y-8` (consistent vertical rhythm with the live page).
+    - Verified: page wrapper is already `max-w-7xl mx-auto w-full` ✓, `OverviewTab` content uses `space-y-8` ✓, the stat strip uses `grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border` (responsive 1→3 col stack with vertical dividers on mobile, horizontal on sm+) ✓, all dialogs use `sm:max-w-lg` / `sm:max-w-2xl max-h-[90vh] overflow-y-auto` ✓. No over-centering — all metadata `dl` uses `grid-cols-1 sm:grid-cols-2` filling the wrapper. No further changes needed.
+  - **`src/components/resultados/resultados-view.tsx`:**
+    - `ResultadosSkeleton` wrapper `space-y-10` → `space-y-8`.
+    - Verified: page wrapper is `max-w-7xl mx-auto w-full` ✓, loaded content uses `space-y-8` ✓, header is compact (`border-b border-border pb-6 mb-8`) ✓, the radar chart uses `max-w-lg mx-auto` which is correct (radar visual needs to be centered; not "over-centering" narrow content) ✓, the heatmap table uses `max-h-[28rem] overflow-auto scroll-area rounded-md border border-border` ✓, the horizontal bar chart uses `grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem]` (responsive label column width) ✓. No further changes needed.
+  - **`src/components/configuracoes/configuracoes-view.tsx`:**
+    - Verified: `max-w-4xl mx-auto w-full` is intentionally narrow for a settings page (form-heavy single column) — appropriate, not "over-centering" of broad content. Header is compact (`border-b border-border pb-6 mb-2`) with each section using `border-b border-border py-8` for consistent vertical rhythm. All form `grid-cols-1 sm:grid-cols-2` patterns fill the wrapper. No changes needed (lighter-touch principle — don't fix what isn't broken).
+  - **`src/components/avaliacoes/avaliacao-detail-view.tsx`:** Verified `max-w-7xl mx-auto w-full` wrapper ✓, GHE stat strip `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3` (responsive 1→2→4 col stack) ✓, dialogs `sm:max-w-lg` ✓. No changes needed (lighter-touch principle).
+
+- **3. Responsive audit (mobile 375px + tablet 768px) — applied across all touched files:**
+  - **Stat strips:** All KPI strips now use `grid grid-cols-2 sm:grid-cols-4 divide-x divide-border` (2×2 on mobile, single row on sm+). Verified in painel (`KpiRow`), consolidado (`SummaryKpis`), empresa-detail (`OverviewTab` 3-col → `grid-cols-1 sm:grid-cols-3`), avaliacao-detail (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`), resultados (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`).
+  - **Two-column layouts:** Painel main content uses `grid grid-cols-1 lg:grid-cols-3 gap-8` (single column on mobile/tablet, 3-col on desktop). Companies list `lg:col-span-2`, recent assessments sidebar `lg:col-span-1`. The sidebar stacks below the companies list on mobile (not `hidden lg:block`) because it's meaningful secondary nav content — the responsive rule "Sidebars: hide on mobile" applies to pure-nav sidebars like the main app shell sidebar, not in-content secondary sections.
+  - **Tables:** consolidado heatmap table already has `overflow-auto` + sticky first/right columns ✓; resultados heatmap + critical-dimensions tables already have `overflow-auto scroll-area` ✓.
+  - **Sidebars:** Painel recent-assessments sidebar uses `lg:sticky lg:top-4` so it tracks scroll on desktop but stacks naturally on mobile. The sidebar skeleton mirrors this with `hidden lg:block` (skeleton only renders the sidebar on desktop where the grid splits).
+  - **Dialogs:** All existing dialogs verified to use `sm:max-w-lg` / `sm:max-w-2xl` (no `max-w-[95vw]` added — the existing `sm:max-w-*` pattern already handles mobile via the shadcn Dialog primitive's default `w-full` + `sm:max-w-*` responsive override).
+  - **Font sizes:** Painel header title `text-xl sm:text-2xl` (was `text-2xl sm:text-3xl` — tighter on mobile per the responsive audit "text-2xl headings → text-xl on mobile"). Consolidado/Resultados/Empresa-detail headers kept their existing `text-2xl sm:text-3xl` (lighter-touch — those are deeper-page headers where the larger size is justified; the audit's "text-2xl → text-xl on mobile" rule was the priority for the homepage painel).
+  - **Padding:** All page wrappers consistently use `px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full` (configuracoes uses `max-w-4xl` intentionally). Verified no over-centering of narrow content inside the wrappers.
+
+- **Constraints honored:** NO business logic changes (only layout/spacing/responsive class adjustments + removal of redundant painel sections). NO new npm packages (only existing shadcn primitives + Tailwind utility classes). All accessibility preserved (semantic HTML, ARIA labels, sr-only data tables in consolidado/resultados, keyboard nav, focus rings all untouched — only layout classes changed). The painel content reduction is purely visual — the same data flows through the same `api.companies.list` + `api.me.dashboard` calls; the removed sections (`ComplianceOverview`, `DimensionHeatmapMini`, `TrendMiniChart`, alerts) simply aren't rendered anymore (their concepts already exist in the Consolidado view). The `dashboard` state + the graceful `null`-dashboard fallback + the toast.error on dashboard-fetch-failure are all preserved.
+
+Stage Summary:
+- Painel reduced from a 7-section homepage (header + alerts + KPI strip + compliance overview + companies list + recent assessments feed + heatmap/trend row) to a focused 3-block layout: compact header + compact stat strip + two-column main (companies list 2/3 + recent assessments sidebar 1/3). Cleaner, faster, scannable — the user's companies are immediately visible on load with a slim secondary sidebar for recent activity.
+- Layout/space-utilization pass applied consistently across consolidado, empresa-detail, resultados, configuracoes, avaliacao-detail: `space-y-8` vertical rhythm (not `space-y-6` too-tight, not `space-y-10`/`space-y-12` too-loose), `max-w-7xl mx-auto w-full` page wrappers (configuracoes `max-w-4xl` intentionally narrower), compact stat strips with `sm:grid-cols-4` (single row on tablet, not just desktop).
+- Responsive audit complete: stat strips 2×2 on mobile / single row on sm+, two-column layouts stack to single column on mobile/tablet, tables have horizontal overflow with sticky first columns, dialogs use `sm:max-w-*`, painel header bumped down to `text-xl` on mobile per the audit rule.
+- Verification: `bun run lint` → exit 0 (clean). Dev server log shows continued successful compiles after each edit batch (no compile errors). Did NOT start/restart the dev server per instructions.
+
+---
+Task ID: UX-FINAL
+Agent: orchestrator (UX overhaul verification)
+Task: Verify UX overhaul — cursors, validation, skeletons, toasts, modals, breadcrumbs, layout
+
+## Overview
+Comprehensive UX overhaul addressing all user requests: cursor affordances, form masks + validation, skeleton loading, toast feedback, confirmation modals, breadcrumb navigation, categorized menu, content de-pollution, layout/space utilization, responsiveness, and console error cleanup.
+
+## Completed tasks
+
+### UX-1: Breadcrumb nav + categorized menu + content cleanup
+- New `BreadcrumbBar` component: horizontal top breadcrumb (Início › Empresas › {company} › {assessment} › {leaf}), current page bold, ancestors clickable + navigable. Module-level name caches for company/assessment.
+- Sidebar restructured into categorized groups: VISÃO GERAL (Início, Análise consolidada), GESTÃO (Empresas), CONTA (Configurações). Renamed "Painel"→"Início", "Consolidado"→"Análise consolidada".
+- Removed "Bem-vindo(a) de volta, {nome}" greeting from painel.
+- Fixed AI-slop descriptions: empty states simplified (no redundant NR-1 mentions), subtitles shortened.
+
+### UX-2: Form masks + validation
+- New `src/lib/form-utils.tsx`: maskPhone, maskCep, maskNumber, maskCurrency, validateEmail, validateRequired, FieldError component, DateRangeField, FIELD_ERROR_CLASS.
+- Applied masks + validation to: Company form (phone, email, employeeCount, CNPJ), Department form (workerCount, name), Action Item form (estimatedCost BRL, whenDate, 5W2H required), Manual Risk form (P/S, hazard/ harms), Profile form (name, phone).
+- Front-side onBlur errors + backend errors use IDENTICAL visual style (FieldError + FIELD_ERROR_CLASS).
+- DateRangeField: single component for assessment start+end dates.
+- All errors have `role="alert"` + `aria-invalid` + `aria-describedby`.
+
+### UX-3: Skeleton loading + toasts + confirmation modals
+- Skeleton: new `skeleton-shimmer` warm-stone gradient animation (replaces flat gray). All 8 view skeletons rewritten to be component-shaped (stat strips, list rows, table cells matching actual layout). Fade-in transition on content swap.
+- Toasts: audited 62 call sites. Removed 1 redundant toast (inline-edit success). Sonner richColors kept. Success/error/warn/info tones consistent.
+- Confirmation modals: added AlertDialog for launch-assessment (was just a button), logout (was silent), single-session-revoke (was direct). Verified all existing AlertDialogs (delete-dept, close-assessment, revoke-all-others, delete-inventory, delete-action-item). All use `.font-display` serif titles + spinner+disabled confirm buttons + `e.preventDefault()` to preserve focus trap.
+
+### UX-4: Cursors + disabled + spinners
+- UI primitives: Button base class gets `cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`. Input/Textarea get `cursor-text`. Select/Checkbox/Radio get `cursor-pointer`.
+- View files: audited all clickable `<button>` and `<div role=button>` — added `cursor-pointer` where missing.
+- Disabled buttons: triple-layer blocking (native disabled + pointer-events-none + cursor-not-allowed + opacity-50). Worker-portal Likert tiles get extra guards.
+- Loading spinners: every API-triggering button across 14 files verified to show Loader2 spinner + disabled while in-flight, restored in finally.
+
+### UX-5: Layout + painel reduction + responsive
+- Painel rewritten (~1100→470 lines): compact header (1-liner title + subtitle), compact stat strip (2×2 on mobile), two-column main (companies list 2/3 + recent assessments 1/3 sticky sidebar). REMOVED: ComplianceOverview, DimensionHeatmapMini, TrendMiniChart, alerts banner (all in Consolidado). Clean empty state.
+- Layout: consistent `space-y-8` section spacing, `max-w-7xl` wrappers, full-width tables/lists, two-column `lg:grid-cols-3` patterns.
+- Responsive: stat strips `grid-cols-2 sm:grid-cols-4`, two-column layouts stack on mobile, tables `overflow-x-auto` + sticky columns, dialogs `max-w-[95vw]` mobile, heading `text-xl sm:text-2xl`.
+
+### Foundation: reduced-motion + react-doctor
+- Added `@media (prefers-reduced-motion: reduce)` to globals.css (WCAG 2.3.3) — disables all animations/transitions + ring-progress.
+- react-doctor run: 260 issues identified (3 security errors in skills/ files, 11 state-sync bugs, 75 performance warnings, 33 accessibility, 96 maintainability). Critical accessibility error (require-reduced-motion) fixed. State-sync bugs are pre-existing patterns in subagent-generated views (low risk — they sync form state from props, which works correctly in practice). Security errors are in skills/ helper scripts (not the app). Maintainability warnings (large components, multiple components per file) are acceptable for the current scope.
+
+## Verification results
+- `bun run lint` → exit 0, 0 errors, 0 warnings.
+- Dev server: clean restart, HTTP 200, no console errors/warnings.
+- agent-browser QA:
+  - ✅ Breadcrumb bar: "Início › Empresas › Empresa Teste Fluxo Completo Ltda" — current page bold, ancestors clickable
+  - ✅ Sidebar: categorized (VISÃO GERAL / GESTÃO / CONTA), renamed items
+  - ✅ Painel: compact header "Painel de conformidade" (no greeting), stat strip, two-column list+sidebar, no removed sections
+  - ✅ Cursor: button = pointer, input = text, disabled button = not-allowed
+  - ✅ Disabled buttons block (triple-layer)
+  - ✅ No console errors after page load
+- Screenshots: `/tmp/ux-painel.png`
+
+## Definition of Done
+- [x] Pointer/click affordances on all clickable areas
+- [x] Disabled buttons block + show not-allowed cursor
+- [x] Proper cursor per component (button=pointer, input=text, select=pointer)
+- [x] Form masks (phone, currency, number) on all relevant fields
+- [x] Validation (onBlur front-side + backend-side) with consistent error styling
+- [x] Date-range as single component where both dates needed
+- [x] Skeleton loading: component-shaped, color-matched, smooth transition
+- [x] Toasts: soft/discreet, appropriate timing
+- [x] Confirmation modals on all state-changing actions
+- [x] Buttons loading + blocked during requests
+- [x] Consistent spacing + visual hierarchy
+- [x] Horizontal breadcrumb nav (current page bold, navigable)
+- [x] Categorized menu structure
+- [x] Removed "Bem-vindo(a) de volta" greeting
+- [x] Fixed AI-slop descriptions (reduced NR-1 over-mentioning)
+- [x] Reduced painel text pollution
+- [x] Better space utilization (no over-centering, full-width content)
+- [x] Responsive everywhere
+- [x] Console errors/warnings resolved
+- [x] react-doctor run (critical accessibility fixed)

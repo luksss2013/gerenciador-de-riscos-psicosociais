@@ -190,7 +190,7 @@ export function EmpresasView() {
             Empresas
           </h1>
           <p className="text-sm text-muted-foreground mt-1.5">
-            Gerencie seus clientes e seus ciclos de avaliação NR-1.
+            Gerencie seus clientes e seus ciclos de avaliação.
           </p>
         </div>
         <Button onClick={openCreate} className="shrink-0">
@@ -265,6 +265,7 @@ export function EmpresasView() {
 
       {/* Loaded */}
       {!loading && !error && companies && (
+        <div className="animate-in fade-in duration-300">
         <>
           {companies.length === 0 ? (
             <EmptyState onAdd={openCreate} />
@@ -329,6 +330,7 @@ export function EmpresasView() {
             </>
           )}
         </>
+        </div>
       )}
 
       {/* Create / Edit modal */}
@@ -377,7 +379,7 @@ function CompanyRow({
               <button
                 type="button"
                 onClick={onOpen}
-                className="font-display font-medium text-lg leading-tight text-foreground text-left hover:text-[var(--brand-light)] transition-colors truncate"
+                className="font-display font-medium text-lg leading-tight text-foreground text-left hover:text-[var(--brand-light)] cursor-pointer transition-colors truncate"
                 aria-label={`Acessar empresa ${company.name}`}
               >
                 {company.name}
@@ -450,7 +452,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       <div className="max-w-md">
         <h2 className="font-display text-xl">Nenhuma empresa cadastrada</h2>
         <p className="text-sm text-muted-foreground mt-1.5">
-          Adicione seu primeiro cliente para iniciar ciclos de avaliação NR-1.
+          Adicione a primeira para começar.
         </p>
       </div>
       <Button onClick={onAdd}>
@@ -484,9 +486,37 @@ function NoResults({ onClear }: { onClear: () => void }) {
 
 function EmpresasSkeleton() {
   return (
-    <div className="border-t border-border">
+    <div className="border-t border-border" aria-hidden="true">
       {Array.from({ length: 6 }).map((_, i) => (
-        <Skeleton key={i} className="h-20 w-full rounded-none border-b border-border/40" />
+        <div
+          key={i}
+          className="border-b border-border py-4 px-1 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
+        >
+          {/* Identity — dot + name + CNPJ + meta line */}
+          <div className="min-w-0 flex-1 flex items-start gap-3">
+            <Skeleton className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-baseline gap-2">
+                <Skeleton className="h-5 w-44" />
+                <Skeleton className="h-3.5 w-28" />
+              </div>
+              <div className="flex gap-4">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3.5 w-24" />
+              </div>
+            </div>
+          </div>
+          {/* Counts */}
+          <div className="flex items-center gap-5 shrink-0 lg:pr-2">
+            <Skeleton className="h-3.5 w-16" />
+            <Skeleton className="h-3.5 w-24" />
+          </div>
+          {/* Actions */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Skeleton className="h-8 w-16 rounded-md" />
+            <Skeleton className="h-8 w-20 rounded-md" />
+          </div>
+        </div>
       ))}
     </div>
   );
