@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth, useView } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { AppShell } from "@/components/shell/app-shell";
 import { WorkerPortal } from "@/components/worker/worker-portal";
 
-export default function Home() {
+function HomeContent() {
   const { professional, loading, set, setLoading } = useAuth();
-  const { view, workerToken } = useView();
+  const { view, workerToken, openWorker } = useView();
+  const searchParams = useSearchParams();
 
   // Bootstrap session on mount.
   useEffect(() => {
@@ -19,12 +21,8 @@ export default function Home() {
       try {
         const p = await api.me.get();
         if (!cancelled) set(p);
-      } catch (e) {
-        if (e instanceof ApiError && e.status === 401) {
-          if (!cancelled) set(null);
-        } else {
-          if (!cancelled) set(null);
-        }
+      } catch {
+        if (!cancelled) set(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -38,6 +36,16 @@ export default function Home() {
   useEffect(() => {
     api.system.seedCopsoq().catch(() => {});
   }, []);
+
+  // Read ?worker=<token> from URL — opens the worker portal full-screen.
+  // This lets workers access the questionnaire via the generated link
+  // (e.g. https://app.example.com/?worker=abc-123).
+  useEffect(() => {
+    const token = searchParams.get("worker");
+    if (token && view !== "worker") {
+      openWorker(token);
+    }
+  }, [searchParams, view, openWorker]);
 
   // Worker portal is rendered full-screen (simulated distinct context).
   if (view === "worker" && workerToken) {
@@ -60,4 +68,19 @@ export default function Home() {
   }
 
   return <AppShell />;
+}
+
+export default function Home() {
+  // Suspense boundary required by Next.js for useSearchParams
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
+  );
 }
