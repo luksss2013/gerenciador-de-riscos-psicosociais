@@ -4,11 +4,13 @@ import type {
   ActionPlan,
   Assessment,
   AssessmentProgress,
+  AuditLogEntry,
   CompanySummary,
   DashboardData,
   Department,
   CycleTrend,
   Professional,
+  ProfessionalDashboard,
   Report,
   RiskInventoryGroup,
   RiskInventoryItem,
@@ -82,6 +84,21 @@ export const api = {
     get: () => req<Professional>("/professionals/me"),
     update: (body: Partial<Professional>) =>
       req<Professional>("/professionals/me", { method: "PATCH", json: body }),
+    dashboard: () => req<ProfessionalDashboard>("/professionals/me/dashboard"),
+  },
+
+  auditLogs: {
+    list: (params: { page?: number; limit?: number; action?: string; resourceType?: string } = {}) => {
+      const q = new URLSearchParams({
+        page: String(params.page ?? 1),
+        limit: String(params.limit ?? 50),
+      });
+      if (params.action) q.set("action", params.action);
+      if (params.resourceType) q.set("resourceType", params.resourceType);
+      return req<{ data: AuditLogEntry[]; meta: { total: number; page: number; limit: number; pages: number } }>(
+        `/audit-logs?${q}`
+      );
+    },
   },
 
   companies: {

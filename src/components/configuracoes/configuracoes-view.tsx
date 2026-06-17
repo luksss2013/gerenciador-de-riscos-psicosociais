@@ -1,15 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   BadgeInfo,
   BookOpen,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   Cookie,
+  FileText,
+  History,
   KeyRound,
   Loader2,
   Lock,
+  LogIn,
+  RefreshCw,
+  Rocket,
   Save,
   ShieldCheck,
   User,
@@ -22,7 +31,11 @@ import {
   PROFESSION_TYPES,
   PROFESSION_TYPE_LABELS,
 } from "@/lib/errors";
-import type { ProfessionType, Professional } from "@/lib/types";
+import type {
+  AuditLogEntry,
+  ProfessionType,
+  Professional,
+} from "@/lib/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +49,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -43,6 +57,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableCaption,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const APP_VERSION = "1.0.0-sandbox";
@@ -71,6 +94,7 @@ export function ConfiguracoesView() {
         <AccountSection />
         <SecuritySection />
         <AboutSection />
+        <AuditLogSection />
       </div>
     </div>
   );
@@ -411,5 +435,398 @@ function AboutSection() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ─── Auditoria ──────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 20;
+
+const ACTION_LABELS: Record<string, string> = {
+  "company.create": "Empresa criada",
+  "assessment.launch": "Avaliação lançada",
+  "assessment.close": "Avaliação encerrada",
+  "report.generate": "Relatório gerado",
+  "auth.login": "Login realizado",
+};
+
+const ACTION_OPTIONS: Array<{ value: string; label: string; icon: React.ElementType }> = [
+  { value: "company.create", label: "Empresa criada", icon: Building2 },
+  { value: "assessment.launch", label: "Avaliação lançada", icon: Rocket },
+  { value: "assessment.close", label: "Avaliação encerrada", icon: Lock },
+  { value: "report.generate", label: "Relatório gerado", icon: FileText },
+  { value: "auth.login", label: "Login realizado", icon: LogIn },
+];
+
+const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  company: "Empresa",
+  assessment: "Avaliação",
+  professional: "Profissional",
+  report: "Relatório",
+};
+
+const RESOURCE_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "company", label: "Empresa" },
+  { value: "assessment", label: "Avaliação" },
+  { value: "professional", label: "Profissional" },
+  { value: "report", label: "Relatório" },
+];
+
+function actionIcon(action: string): React.ElementType {
+  const found = ACTION_OPTIONS.find((o) => o.value === action);
+  if (found) return found.icon;
+  return History;
+}
+
+function actionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? action;
+}
+
+function resourceTypeLabel(resourceType: string): string {
+  return RESOURCE_TYPE_LABELS[resourceType] ?? resourceType;
+}
+
+function formatDateTime(iso: string): string {
+  try {
+    return format(new Date(iso), "dd/MM/yyyy HH:mm", { locale: ptBR });
+  } catch {
+    return iso;
+  }
+}
+
+function summarizeMetadata(
+  metadata: Record<string, unknown> | null,
+): string {
+  if (!metadata) return "—";
+  const entries = Object.entries(metadata);
+  if (entries.length === 0) return "—";
+  // Show up to 3 key=value pairs compactly.
+  return entries
+    .slice(0, 3)
+    .map(([k, v]) => {
+      const value =
+        typeof v === "string"
+          ? v
+          : typeof v === "number" || typeof v === "boolean"
+            ? String(v)
+            : Array.isArray(v)
+              ? `[${v.length} itens]`
+              : "{…}";
+      return `${k}: ${value}`;
+    })
+    .join(" · ");
+}
+
+function AuditLogSection() {
+  const [data, setData] = useState<AuditLogEntry[]>([]);
+  const [meta, setMeta] = useState<{
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  } | null>(null);
+  const [page, setPage] = useState(1);
+  const [actionFilter, setActionFilter] = useState<string>("");
+  const [resourceFilter, setResourceFilter] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.auditLogs.list({
+        page,
+        limit: PAGE_SIZE,
+        action: actionFilter || undefined,
+        resourceType: resourceFilter || undefined,
+      });
+      setData(res.data);
+      setMeta(res.meta);
+    } catch (e) {
+      if (e instanceof ApiError) {
+        setError(e.message);
+      } else {
+        setError("Não foi possível carregar o registro de auditoria.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [page, actionFilter, resourceFilter]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const onClearFilters = () => {
+    setActionFilter("");
+    setResourceFilter("");
+    setPage(1);
+  };
+
+  const onPrevPage = () => setPage((p) => Math.max(1, p - 1));
+  const onNextPage = () =>
+    setPage((p) => Math.min(meta?.pages ?? 1, p + 1));
+
+  const hasFilters = actionFilter !== "" || resourceFilter !== "";
+
+  return (
+    <Card id="auditoria">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <History className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base">Registro de Auditoria</CardTitle>
+        </div>
+        <CardDescription>
+          Trilha de ações realizadas na sua conta.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Filter row */}
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="audit-filter-resource"
+              className="text-xs text-muted-foreground"
+            >
+              Recurso
+            </Label>
+            <Select
+              value={resourceFilter || "__all__"}
+              onValueChange={(v) => {
+                setResourceFilter(v === "__all__" ? "" : v);
+                setPage(1);
+              }}
+              disabled={loading}
+            >
+              <SelectTrigger
+                id="audit-filter-resource"
+                className="w-44"
+                aria-label="Filtrar por tipo de recurso"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {RESOURCE_TYPE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="audit-filter-action"
+              className="text-xs text-muted-foreground"
+            >
+              Ação
+            </Label>
+            <Select
+              value={actionFilter || "__all__"}
+              onValueChange={(v) => {
+                setActionFilter(v === "__all__" ? "" : v);
+                setPage(1);
+              }}
+              disabled={loading}
+            >
+              <SelectTrigger
+                id="audit-filter-action"
+                className="w-52"
+                aria-label="Filtrar por tipo de ação"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todas</SelectItem>
+                {ACTION_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearFilters}
+              disabled={loading}
+              className="h-9"
+              aria-label="Limpar filtros"
+            >
+              Limpar
+            </Button>
+          )}
+
+          <div className="ml-auto">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => void load()}
+              disabled={loading}
+              aria-label="Atualizar registro de auditoria"
+              className="h-9 w-9"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Table or states */}
+        {error ? (
+          <div className="py-10 flex flex-col items-center text-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center">
+              <Lock className="h-4 w-4 text-destructive" />
+            </div>
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              Tentar novamente
+            </Button>
+          </div>
+        ) : loading ? (
+          <AuditLogSkeleton />
+        ) : data.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">
+            Nenhuma ação registrada.
+          </div>
+        ) : (
+          <div className="max-h-96 overflow-y-auto scroll-area rounded-md border border-border">
+            <Table>
+              <TableCaption className="sr-only">
+                Registro de auditoria — {meta?.total ?? data.length} entrada(s)
+                {hasFilters ? " com filtros aplicados" : ""}. Página{" "}
+                {meta?.page ?? page} de {meta?.pages ?? 1}.
+              </TableCaption>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="w-40">Data/Hora</TableHead>
+                  <TableHead className="w-56">Ação</TableHead>
+                  <TableHead className="w-36">Recurso</TableHead>
+                  <TableHead>Detalhes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map((entry) => {
+                  const Icon = actionIcon(entry.action);
+                  const details = summarizeMetadata(entry.metadata);
+                  const fullDetails =
+                    entry.metadata != null
+                      ? JSON.stringify(entry.metadata, null, 2)
+                      : null;
+                  return (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-mono-numeric text-xs text-muted-foreground">
+                        {formatDateTime(entry.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="h-6 w-6 rounded-md bg-muted flex items-center justify-center shrink-0"
+                            aria-hidden="true"
+                          >
+                            <Icon className="h-3.5 w-3.5 text-foreground/70" />
+                          </span>
+                          <span className="text-sm truncate">
+                            {actionLabel(entry.action)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="font-normal text-xs"
+                        >
+                          {resourceTypeLabel(entry.resourceType)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {fullDetails ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help truncate block max-w-xs">
+                                {details}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              className="max-w-sm whitespace-pre-wrap font-mono-numeric text-xs"
+                            >
+                              {fullDetails}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <span>{details}</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!error && !loading && data.length > 0 && meta && (
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              Página {meta.page} de {meta.pages} · {meta.total} registro
+              {meta.total === 1 ? "" : "s"}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onPrevPage}
+                disabled={meta.page <= 1}
+                className="h-8"
+                aria-label="Página anterior"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Anterior
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onNextPage}
+                disabled={meta.page >= meta.pages}
+                className="h-8"
+                aria-label="Próxima página"
+              >
+                Próxima
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AuditLogSkeleton() {
+  return (
+    <div className="rounded-md border border-border">
+      <div className="space-y-2 p-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="h-4 w-32 bg-muted rounded" />
+            <div className="h-4 w-40 bg-muted rounded" />
+            <div className="h-4 w-24 bg-muted rounded" />
+            <div className="h-4 flex-1 bg-muted rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

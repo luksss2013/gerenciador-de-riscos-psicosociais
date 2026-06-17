@@ -1,10 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Exclude project docs/logs from Tailwind v4's content scanner —
-   markdown worklog entries can contain class-like strings that break the build. */
+/* Exclude project docs/logs/tool-results from Tailwind v4's content scanner —
+   markdown + agent tool-output text can contain class-like strings that break the build. */
 @source not "../worklog.md";
 @source not "../../worklog.md";
+@source not "../../tool-results";
+@source not "../tool-results";
 
 @custom-variant dark (&:is(.dark *));
 

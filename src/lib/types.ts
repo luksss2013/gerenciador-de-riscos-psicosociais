@@ -218,3 +218,51 @@ export interface CycleTrend {
   completedAt: string;
   dimensions: Array<{ code: DimensionCode; avgRiskScore: number }>;
 }
+
+export interface ProfessionalDashboard {
+  kpis: {
+    totalCompanies: number;
+    totalDepartments: number;
+    totalAssessments: number;
+    activeAssessments: number;
+    completedAssessments: number;
+    totalRespondents: number;
+    atRiskGhes: number;
+    mediumRiskGhes: number;
+  };
+  compliance: {
+    compliant: number;
+    pendingReview: number;
+    noAssessment: number;
+    inProgress: number;
+  };
+  recentAssessments: Array<{
+    id: string;
+    title: string;
+    status: AssessmentStatus;
+    companyId: string;
+    companyName: string;
+    completedAt: string | null;
+    updatedAt: string;
+  }>;
+  dimensionHeatmap: Array<{
+    code: DimensionCode;
+    name: string;
+    weightedAvgRiskScore: number;
+    riskLevel: RiskLevel;
+  }>;
+  trend: Array<{
+    month: string;
+    label: string;
+    count: number;
+  }>;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}

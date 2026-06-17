@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PainelView } from "@/components/painel/painel-view";
 import { ConfiguracoesView } from "@/components/configuracoes/configuracoes-view";
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 
 // ─── View router ────────────────────────────────────────────────────────────
 
@@ -242,60 +243,63 @@ function SidebarContent({ onNavigate }: SidebarContentProps) {
 
       {/* User */}
       <div className="border-t border-sidebar-border p-3 shrink-0">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="w-full flex items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent/60 transition-colors text-left">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate">
-                  {professional?.name ?? "—"}
+        <div className="flex items-center gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex-1 flex items-center gap-3 rounded-md px-2 py-2 hover:bg-sidebar-accent/60 transition-colors text-left">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">
+                    {professional?.name ?? "—"}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {professional?.email ?? ""}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {professional?.email ?? ""}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-medium">
+                    {professional?.name ?? "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {professional?.email ?? ""}
+                  </span>
                 </div>
-              </div>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" className="w-56">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium">
-                  {professional?.name ?? "—"}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {professional?.email ?? ""}
-                </span>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                go("configuracoes");
-                onNavigate?.();
-              }}
-            >
-              <Settings className="h-4 w-4" />
-              Configurações
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={handleSignOut}
-              disabled={signingOut}
-            >
-              {signingOut ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <LogOut className="h-4 w-4" />
-              )}
-              Sair
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  go("configuracoes");
+                  onNavigate?.();
+                }}
+              >
+                <Settings className="h-4 w-4" />
+                Configurações
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={handleSignOut}
+                disabled={signingOut}
+              >
+                {signingOut ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4" />
+                )}
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   );
@@ -340,6 +344,10 @@ function MobileTopbar() {
           <ShieldCheck className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="font-semibold text-sm">{currentLabel}</span>
+      </div>
+
+      <div className="ml-auto">
+        <ThemeToggle />
       </div>
     </header>
   );

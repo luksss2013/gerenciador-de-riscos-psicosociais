@@ -193,6 +193,17 @@ export async function POST(request: Request) {
       },
     });
 
+    // Fire-and-forget audit log — never blocks the response.
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "company.create",
+        resourceType: "company",
+        resourceId: company.id,
+        metadataJson: JSON.stringify({ name: company.name, cnpj: company.cnpj }),
+      },
+    }).catch(() => {});
+
     return jsonResponse(
       { ...serializeCompany(company), summary: await buildCompanySummary(company.id) },
       201

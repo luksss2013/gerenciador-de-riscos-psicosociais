@@ -47,6 +47,18 @@ export async function POST(request: Request) {
       createdAt: professional.createdAt,
       updatedAt: professional.updatedAt,
     };
+
+    // Fire-and-forget audit log — never blocks the login response.
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "auth.login",
+        resourceType: "professional",
+        resourceId: professional.id,
+        metadataJson: JSON.stringify({ email: professional.email }),
+      },
+    }).catch(() => {});
+
     return new Response(JSON.stringify({ professional: pub }), {
       status: 200,
       headers: {

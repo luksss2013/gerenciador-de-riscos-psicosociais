@@ -92,6 +92,17 @@ export async function POST(request: Request, { params }: RouteCtx) {
       },
     });
 
+    // Fire-and-forget audit log — never blocks the response.
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "report.generate",
+        resourceType: "assessment",
+        resourceId: assessment.id,
+        metadataJson: JSON.stringify({ type, reportId: report.id }),
+      },
+    }).catch(() => {});
+
     return jsonResponse(
       { reportId: report.id, status: report.status, type: report.type, storageKey: report.storageKey },
       201
