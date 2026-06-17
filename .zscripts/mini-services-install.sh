@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # 配置项
-ROOT_DIR="/home/z/my-project/mini-services"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$SCRIPT_DIR/../mini-services"
 
 main() {
     echo "🚀 开始批量安装依赖..."
