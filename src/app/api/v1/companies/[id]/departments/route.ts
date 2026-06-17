@@ -115,6 +115,15 @@ export async function POST(request: Request, { params }: RouteCtx) {
         workerCount,
       },
     });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "department.create",
+        resourceType: "department",
+        resourceId: dept.id,
+        metadataJson: JSON.stringify({ name: dept.name, workerCount: dept.workerCount }),
+      },
+    }).catch(() => {});
     return jsonResponse(serializeDept(dept), 201);
   } catch (e) {
     const code = (e as { code?: string })?.code;

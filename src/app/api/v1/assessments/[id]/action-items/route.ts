@@ -105,6 +105,16 @@ export async function POST(request: Request, { params }: RouteCtx) {
       include: { department: { select: { name: true } } },
     });
 
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "action_item.create",
+        resourceType: "action_item",
+        resourceId: item.id,
+        metadataJson: JSON.stringify({ what: item.what.slice(0, 60) }),
+      },
+    }).catch(() => {});
+
     return jsonResponse(
       {
         id: item.id,

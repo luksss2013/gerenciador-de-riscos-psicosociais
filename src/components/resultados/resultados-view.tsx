@@ -30,6 +30,7 @@ import type {
   DashboardData,
   DimensionCode,
   DimensionResultDTO,
+  RiskLevel,
 } from "@/lib/types";
 import {
   COPSOQ_DIMENSIONS,
@@ -119,13 +120,23 @@ interface KpiCardProps {
   value: string;
   icon: React.ElementType;
   accentClass: string;
+  tintClass: string;
+  borderClass: string;
   description?: string;
 }
 
-function KpiCard({ label, value, icon: Icon, accentClass, description }: KpiCardProps) {
+function KpiCard({
+  label,
+  value,
+  icon: Icon,
+  accentClass,
+  tintClass,
+  borderClass,
+  description,
+}: KpiCardProps) {
   return (
     <Card
-      className="card-hover py-4"
+      className={`card-hover py-4 overflow-hidden relative ${tintClass} ${borderClass}`}
       role="group"
       aria-label={`${label}: ${value}${description ? `. ${description}` : ""}`}
     >
@@ -140,7 +151,7 @@ function KpiCard({ label, value, icon: Icon, accentClass, description }: KpiCard
           <div className="text-xs font-medium text-muted-foreground leading-tight">
             {label}
           </div>
-          <div className="text-2xl font-semibold font-mono-numeric mt-1 leading-tight">
+          <div className="text-2xl md:text-4xl font-semibold font-mono-numeric mt-1 leading-tight">
             {value}
           </div>
           {description ? (
@@ -165,6 +176,8 @@ function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
         value={`${kpis.globalAdesao.toFixed(0)}%`}
         icon={Users}
         accentClass="bg-brand-light/10 text-brand-light"
+        tintClass="bg-gradient-to-br from-brand-light/5 to-transparent"
+        borderClass="border-b-2 border-brand-light"
         description="Participação sobre o esperado"
       />
       <KpiCard
@@ -172,6 +185,8 @@ function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
         value={String(kpis.ghesHighRisk)}
         icon={ShieldAlert}
         accentClass="risk-high-bg"
+        tintClass="bg-gradient-to-br from-risk-high/5 to-transparent"
+        borderClass="border-b-2 border-risk-high"
         description="≥1 dimensão HIGH"
       />
       <KpiCard
@@ -179,6 +194,8 @@ function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
         value={String(kpis.ghesMediumRisk)}
         icon={ShieldAlert}
         accentClass="risk-medium-bg"
+        tintClass="bg-gradient-to-br from-risk-medium/5 to-transparent"
+        borderClass="border-b-2 border-risk-medium"
         description="≥1 dimensão MEDIUM"
       />
       <KpiCard
@@ -186,6 +203,8 @@ function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
         value={String(kpis.ghesIneligible)}
         icon={Lock}
         accentClass="bg-muted text-muted-foreground"
+        tintClass="bg-gradient-to-br from-muted/30 to-transparent"
+        borderClass="border-b-2 border-muted-foreground/40"
         description="< 5 respostas"
       />
       <KpiCard
@@ -193,6 +212,8 @@ function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
         value={String(kpis.totalRespondents)}
         icon={Activity}
         accentClass="bg-brand/10 text-brand"
+        tintClass="bg-gradient-to-br from-brand/5 to-transparent"
+        borderClass="border-b-2 border-brand"
         description="Trabalhadores que responderam"
       />
     </section>
@@ -253,8 +274,8 @@ function HeatRow({
 }) {
   if (!row.isEligible || !row.dimensions) {
     return (
-      <tr className="bg-muted/40 text-muted-foreground">
-        <td className="sticky left-0 z-10 bg-muted/40 px-3 py-2 font-medium border-b border-r border-border/60">
+      <tr className="bg-muted/40 text-muted-foreground hover:bg-accent/30 transition-colors">
+        <td className="sticky left-0 z-10 bg-muted/40 px-3 py-2 font-medium border-b border-r border-border/60 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
           <div className="truncate max-w-[10rem]" title={row.deptName}>
             {row.deptName}
           </div>
@@ -277,8 +298,8 @@ function HeatRow({
 
   const dimMap = new Map(row.dimensions.map((d) => [d.code, d]));
   return (
-    <tr className="border-b border-border/60">
-      <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium border-r border-b border-border/60">
+    <tr className="border-b border-border/60 hover:bg-accent/30 transition-colors">
+      <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium border-r border-b border-border/60 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
         <div className="truncate max-w-[10rem]" title={row.deptName}>
           {row.deptName}
         </div>
@@ -338,7 +359,7 @@ function HeatMap({ heatmap }: { heatmap: DashboardData["heatmap"] }) {
               <tr>
                 <th
                   scope="col"
-                  className="sticky left-0 z-30 bg-card px-3 py-2 text-left font-medium border-b border-r border-border/60 min-w-[10rem]"
+                  className="sticky left-0 z-30 bg-card px-3 py-2 text-left font-medium border-b border-r border-border/60 min-w-[10rem] shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]"
                 >
                   GHE
                 </th>
@@ -362,6 +383,28 @@ function HeatMap({ heatmap }: { heatmap: DashboardData["heatmap"] }) {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium">Escala de risco:</span>
+          <div className="flex flex-col gap-0.5">
+            <div
+              className="h-3 w-40 sm:w-48 rounded-sm border border-border/40"
+              style={{
+                background:
+                  "linear-gradient(to right, hsl(120,65%,45%), hsl(60,65%,45%), hsl(0,65%,45%))",
+              }}
+              aria-hidden="true"
+            />
+            <div className="flex justify-between w-40 sm:w-48 text-[10px] font-mono-numeric">
+              <span>0</span>
+              <span>33</span>
+              <span>66</span>
+              <span>100</span>
+            </div>
+          </div>
+          <span className="hidden md:inline text-muted-foreground/80">
+            verde: favorável · amarelo: intermediário · vermelho: desfavorável
+          </span>
         </div>
       </CardContent>
     </Card>
@@ -397,6 +440,25 @@ function CompanyAvgBars({
       </CardHeader>
       <CardContent>
         <div className="space-y-2.5">
+          <div className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3">
+            <div />
+            <div className="relative h-3 text-[10px] font-mono-numeric">
+              <span
+                className="absolute -translate-x-1/2 text-risk-medium font-semibold"
+                style={{ left: "33%" }}
+              >
+                33
+              </span>
+              <span
+                className="absolute -translate-x-1/2 text-risk-high font-semibold"
+                style={{ left: "66%" }}
+              >
+                66
+              </span>
+            </div>
+            <div />
+            <div />
+          </div>
           {sorted.map((item) => {
             const dim = getDimension(item.code);
             const bg =
@@ -407,19 +469,36 @@ function CompanyAvgBars({
                 : "var(--risk-low)";
             const width = Math.max(2, Math.min(100, item.weightedAvgRiskScore));
             const ariaLabel = `${item.code} ${dim.namePtBr}: risco ${item.weightedAvgRiskScore.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[item.riskLevel]}`;
+            const RiskIcon =
+              item.riskLevel === "HIGH"
+                ? AlertTriangle
+                : item.riskLevel === "MEDIUM"
+                ? AlertCircle
+                : ShieldCheck;
+            const riskIconClass =
+              item.riskLevel === "HIGH"
+                ? "text-risk-high"
+                : item.riskLevel === "MEDIUM"
+                ? "text-risk-medium"
+                : "text-risk-low";
             return (
               <div
                 key={item.code}
-                className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[14rem_1fr_3rem] items-center gap-2 sm:gap-3"
+                className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3"
               >
                 <div
-                  className="text-sm truncate"
+                  className="text-sm flex items-center gap-1.5 min-w-0"
                   title={`${item.code} — ${dim.namePtBr}`}
                 >
-                  <span className="font-mono-numeric text-xs text-muted-foreground mr-1.5">
+                  <Badge
+                    variant="outline"
+                    className="font-mono-numeric text-[10px] px-1.5 py-0 shrink-0"
+                  >
                     {item.code}
+                  </Badge>
+                  <span className="text-foreground truncate min-w-0">
+                    {dim.namePtBr}
                   </span>
-                  <span className="text-foreground">{dim.namePtBr}</span>
                 </div>
                 <div
                   className="relative h-7 rounded-md bg-muted overflow-hidden"
@@ -427,13 +506,21 @@ function CompanyAvgBars({
                   aria-label={ariaLabel}
                 >
                   <div
-                    className="absolute inset-y-0 border-l border-foreground/40 z-10"
-                    style={{ left: "33%" }}
+                    className="absolute inset-y-0 z-10"
+                    style={{
+                      left: "33%",
+                      borderLeft: "2px dashed var(--risk-medium)",
+                      opacity: 0.7,
+                    }}
                     aria-hidden="true"
                   />
                   <div
-                    className="absolute inset-y-0 border-l border-foreground/40 z-10"
-                    style={{ left: "66%" }}
+                    className="absolute inset-y-0 z-10"
+                    style={{
+                      left: "66%",
+                      borderLeft: "2px dashed var(--risk-high)",
+                      opacity: 0.7,
+                    }}
                     aria-hidden="true"
                   />
                   <div
@@ -443,6 +530,9 @@ function CompanyAvgBars({
                 </div>
                 <div className="text-right font-mono-numeric text-sm font-semibold">
                   {item.weightedAvgRiskScore.toFixed(0)}
+                </div>
+                <div className="flex justify-center" aria-hidden="true">
+                  <RiskIcon className={`h-4 w-4 ${riskIconClass}`} />
                 </div>
               </div>
             );
@@ -564,6 +654,18 @@ function CriticalDimensionsTable({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-risk-high/30 bg-risk-high/5 px-3 py-2 text-sm">
+          <AlertTriangle
+            className="h-4 w-4 shrink-0 text-risk-high"
+            aria-hidden="true"
+          />
+          <span className="font-medium text-risk-high">
+            Atenção: dimensões críticas identificadas
+          </span>
+          <span className="text-muted-foreground hidden sm:inline">
+            — priorize a elaboração de inventário e plano de ação.
+          </span>
+        </div>
         <div className="max-h-[28rem] overflow-y-auto scroll-area rounded-md border">
           <Table>
             <TableHeader className="sticky top-0 bg-card z-10">
@@ -592,13 +694,15 @@ function CriticalDimensionsTable({
                         ) : (
                           <>
                             {c.affectedDepts.slice(0, 5).map((deptId) => (
-                              <Badge
+                              <button
                                 key={deptId}
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0"
+                                type="button"
+                                onClick={() => handleInventory(c.code)}
+                                className="inline-flex items-center text-[10px] px-1.5 h-5 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                aria-label={`Abrir inventário de riscos para a dimensão ${c.code} (${c.name})`}
                               >
                                 {deptNameMap.get(deptId) ?? deptId.slice(0, 8)}
-                              </Badge>
+                              </button>
                             ))}
                             {c.affectedDepts.length > 5 ? (
                               <Badge
@@ -646,6 +750,402 @@ function CriticalDimensionsTable({
               })}
             </TableBody>
           </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── DimensionRadar ─────────────────────────────────────────────────────────
+
+function DimensionRadar({
+  companyAvg,
+}: {
+  companyAvg: DashboardData["companyAvg"];
+}) {
+  const CX = 200;
+  const CY = 200;
+  const R_MAX = 150;
+  const N = COPSOQ_DIMENSIONS.length;
+
+  const scoreMap = useMemo(() => {
+    const m = new Map<
+      DimensionCode,
+      { score: number; riskLevel: RiskLevel }
+    >();
+    for (const item of companyAvg) {
+      m.set(item.code, {
+        score: item.weightedAvgRiskScore,
+        riskLevel: item.riskLevel,
+      });
+    }
+    return m;
+  }, [companyAvg]);
+
+  const angleAt = (i: number) => ((-90 + (i * 360) / N) * Math.PI) / 180;
+  const pointFor = (i: number, score: number) => ({
+    x: CX + R_MAX * (score / 100) * Math.cos(angleAt(i)),
+    y: CY + R_MAX * (score / 100) * Math.sin(angleAt(i)),
+  });
+
+  const points = COPSOQ_DIMENSIONS.map((d, i) => {
+    const entry = scoreMap.get(d.code);
+    const score = entry?.score ?? 0;
+    const riskLevel = entry?.riskLevel ?? "LOW";
+    return { dim: d, i, score, riskLevel, ...pointFor(i, score) };
+  });
+
+  const polygonPoints = points
+    .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(" ");
+
+  const rings = [25, 50, 75, 100];
+  const labelR = R_MAX + 18;
+
+  const dotColor = (level: RiskLevel) =>
+    level === "HIGH"
+      ? "var(--risk-high)"
+      : level === "MEDIUM"
+      ? "var(--risk-medium)"
+      : "var(--risk-low)";
+
+  const ariaSummary =
+    `Perfil psicossocial da empresa — radar de 11 dimensões COPSOQ II-BR ` +
+    `(média ponderada entre GHEs elegíveis). ${points
+      .map(
+        (p) =>
+          `${p.dim.code} ${p.dim.namePtBr}: ${p.score.toFixed(0)} (${
+            RISK_LEVEL_LABELS[p.riskLevel]
+          })`
+      )
+      .join("; ")}.`;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-5 w-5 text-muted-foreground" />
+          Perfil psicossocial da empresa
+        </CardTitle>
+        <CardDescription>
+          Distribuição do risco médio por dimensão COPSOQ II-BR (média ponderada
+          entre GHEs elegíveis).
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <svg
+          viewBox="0 0 400 400"
+          className="w-full h-auto max-w-lg mx-auto"
+          role="img"
+          aria-label={ariaSummary}
+        >
+          {/* Concentric reference rings */}
+          {rings.map((r) => {
+            const ringPts = COPSOQ_DIMENSIONS.map((_, i) => {
+              const x = CX + R_MAX * (r / 100) * Math.cos(angleAt(i));
+              const y = CY + R_MAX * (r / 100) * Math.sin(angleAt(i));
+              return `${x.toFixed(1)},${y.toFixed(1)}`;
+            }).join(" ");
+            return (
+              <polygon
+                key={r}
+                points={ringPts}
+                fill="none"
+                stroke="var(--border)"
+                strokeWidth={0.5}
+                opacity={0.7}
+              />
+            );
+          })}
+
+          {/* Axis lines from center to outer edge */}
+          {COPSOQ_DIMENSIONS.map((d, i) => {
+            const end = pointFor(i, 100);
+            return (
+              <line
+                key={d.code}
+                x1={CX}
+                y1={CY}
+                x2={end.x}
+                y2={end.y}
+                stroke="var(--border)"
+                strokeWidth={0.5}
+                opacity={0.7}
+              />
+            );
+          })}
+
+          {/* Ring scale labels along the top axis */}
+          {rings.map((r) => {
+            const y = CY - R_MAX * (r / 100);
+            return (
+              <text
+                key={r}
+                x={CX + 4}
+                y={y + 3}
+                fontSize="9"
+                fill="var(--muted-foreground)"
+                className="font-mono-numeric"
+              >
+                {r}
+              </text>
+            );
+          })}
+
+          {/* Axis labels (D1..D11) at outer edge */}
+          {COPSOQ_DIMENSIONS.map((d, i) => {
+            const x = CX + labelR * Math.cos(angleAt(i));
+            const y = CY + labelR * Math.sin(angleAt(i));
+            return (
+              <text
+                key={d.code}
+                x={x}
+                y={y + 4}
+                textAnchor="middle"
+                fontSize="11"
+                fontWeight="600"
+                fill="var(--muted-foreground)"
+                className="font-mono-numeric"
+              >
+                {d.code}
+              </text>
+            );
+          })}
+
+          {/* Filled polygon — company risk profile */}
+          <polygon
+            points={polygonPoints}
+            fill="var(--brand)"
+            fillOpacity={0.3}
+            stroke="var(--brand)"
+            strokeWidth={2}
+            strokeLinejoin="round"
+          />
+
+          {/* Vertex dots colored by dimension risk level */}
+          {points.map((p) => (
+            <circle
+              key={p.dim.code}
+              cx={p.x}
+              cy={p.y}
+              r={4.5}
+              fill={dotColor(p.riskLevel)}
+              stroke="var(--card)"
+              strokeWidth={1.5}
+            >
+              <title>{`${p.dim.code} ${p.dim.namePtBr}: risco ${p.score.toFixed(0)} de 100 (${RISK_LEVEL_LABELS[p.riskLevel]})`}</title>
+            </circle>
+          ))}
+
+          {/* Center marker */}
+          <circle
+            cx={CX}
+            cy={CY}
+            r={1.5}
+            fill="var(--muted-foreground)"
+            opacity={0.5}
+          />
+        </svg>
+
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-3 h-3 rounded-full"
+              style={{ backgroundColor: "var(--risk-low)" }}
+              aria-hidden="true"
+            />
+            {RISK_LEVEL_LABELS.LOW}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-3 h-3 rounded-full"
+              style={{ backgroundColor: "var(--risk-medium)" }}
+              aria-hidden="true"
+            />
+            {RISK_LEVEL_LABELS.MEDIUM}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-3 h-3 rounded-full"
+              style={{ backgroundColor: "var(--risk-high)" }}
+              aria-hidden="true"
+            />
+            {RISK_LEVEL_LABELS.HIGH}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-4 h-2 rounded-sm"
+              style={{ backgroundColor: "var(--brand)", opacity: 0.3 }}
+              aria-hidden="true"
+            />
+            <span>Perfil da empresa</span>
+          </div>
+        </div>
+
+        {/* sr-only data table alternative */}
+        <div className="sr-only">
+          <table>
+            <caption>
+              Tabela alternativa ao radar: escore de risco médio ponderado por
+              dimensão COPSOQ II-BR.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Código</th>
+                <th scope="col">Dimensão</th>
+                <th scope="col">Grupo</th>
+                <th scope="col">Escore (0–100)</th>
+                <th scope="col">Classificação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {points.map((p) => (
+                <tr key={p.dim.code}>
+                  <th scope="row">{p.dim.code}</th>
+                  <td>{p.dim.namePtBr}</td>
+                  <td>{p.dim.groupName}</td>
+                  <td>{p.score.toFixed(0)}</td>
+                  <td>{RISK_LEVEL_LABELS[p.riskLevel]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── DimensionDetailCards ───────────────────────────────────────────────────
+
+function DimensionDetailCards({
+  companyAvg,
+}: {
+  companyAvg: DashboardData["companyAvg"];
+}) {
+  const scoreMap = useMemo(() => {
+    const m = new Map<
+      DimensionCode,
+      { score: number; riskLevel: RiskLevel }
+    >();
+    for (const item of companyAvg) {
+      m.set(item.code, {
+        score: item.weightedAvgRiskScore,
+        riskLevel: item.riskLevel,
+      });
+    }
+    return m;
+  }, [companyAvg]);
+
+  const riskColor = (level: RiskLevel) =>
+    level === "HIGH"
+      ? "var(--risk-high)"
+      : level === "MEDIUM"
+      ? "var(--risk-medium)"
+      : "var(--risk-low)";
+
+  const riskTextClass = (level: RiskLevel) =>
+    level === "HIGH"
+      ? "text-risk-high"
+      : level === "MEDIUM"
+      ? "text-risk-medium"
+      : "text-risk-low";
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-muted-foreground" />
+          Detalhamento por dimensão
+        </CardTitle>
+        <CardDescription>
+          Visão analítica das 11 dimensões psicossociais avaliadas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {COPSOQ_DIMENSIONS.map((d) => {
+            const entry = scoreMap.get(d.code);
+            const score = entry?.score ?? 0;
+            const level = entry?.riskLevel ?? "LOW";
+            const width = Math.max(2, Math.min(100, score));
+            return (
+              <div
+                key={d.code}
+                className="rounded-lg border border-border/60 bg-card p-4 card-hover relative overflow-hidden min-h-[10rem]"
+                aria-label={`${d.code} ${d.namePtBr}: risco ${score.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[level]}, grupo ${d.groupName}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <Badge
+                    variant="outline"
+                    className="font-mono-numeric text-xs px-2"
+                  >
+                    {d.code}
+                  </Badge>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: riskColor(level) }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {RISK_LEVEL_LABELS[level]}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="text-sm font-medium text-foreground leading-snug mb-2 min-h-[2.5rem]"
+                  title={d.namePtBr}
+                >
+                  {d.namePtBr}
+                </div>
+
+                <div
+                  className={`font-mono-numeric text-3xl font-semibold leading-none mb-1 ${riskTextClass(level)}`}
+                >
+                  {score.toFixed(0)}
+                  <span className="text-sm text-muted-foreground font-normal ml-1">
+                    /100
+                  </span>
+                </div>
+
+                <div
+                  className="text-[11px] text-muted-foreground mb-2 truncate"
+                  title={d.groupName}
+                >
+                  {d.groupName}
+                </div>
+
+                <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
+                  {d.mteFactorsCovered.length === 0 ? (
+                    <span className="text-[10px] text-muted-foreground italic">
+                      Sem fator MTE direto
+                    </span>
+                  ) : (
+                    d.mteFactorsCovered.map((f) => (
+                      <span
+                        key={f}
+                        className="inline-flex items-center text-[10px] font-mono-numeric px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground"
+                      >
+                        {f}
+                      </span>
+                    ))
+                  )}
+                </div>
+
+                <div
+                  className="absolute bottom-0 left-0 h-1"
+                  style={{
+                    width: `${width}%`,
+                    backgroundColor: riskColor(level),
+                  }}
+                  aria-hidden="true"
+                />
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
@@ -1178,10 +1678,12 @@ export function ResultadosView() {
             <DashboardKpis kpis={dashboard.kpis} />
             <HeatMap heatmap={dashboard.heatmap} />
             <CompanyAvgBars companyAvg={dashboard.companyAvg} />
+            <DimensionRadar companyAvg={dashboard.companyAvg} />
             <CriticalDimensionsTable
               critical={dashboard.criticalDimensions}
               heatmap={dashboard.heatmap}
             />
+            <DimensionDetailCards companyAvg={dashboard.companyAvg} />
             <CycleComparisonChart trend={trend ?? []} />
           </div>
         ) : null}

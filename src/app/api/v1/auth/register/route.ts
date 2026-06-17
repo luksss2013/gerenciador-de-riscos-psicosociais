@@ -95,7 +95,7 @@ export async function POST(request: Request) {
       },
     });
 
-    const cookie = createSessionCookie(professional.id);
+    const cookie = await createSessionCookie(professional.id);
     return new Response(
       JSON.stringify({ professional: publicProfessional(professional) }),
       {

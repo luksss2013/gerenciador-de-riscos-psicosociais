@@ -28,6 +28,7 @@ model Professional {
   companies   Company[]
   assessments Assessment[]
   auditLogs   AuditLog[]
+  sessions    Session[]
 }
 
 model Company {
@@ -281,4 +282,19 @@ model AuditLog {
 
   @@index([professionalId, createdAt])
   @@index([resourceType, resourceId])
+}
+
+// ─── Sessions (DB-backed, replaces in-memory Map) ───────────────────────────
+
+model Session {
+  id            String   @id @default(cuid())
+  token         String   @unique
+  professionalId String
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId, expiresAt])
+  @@index([expiresAt])
 }

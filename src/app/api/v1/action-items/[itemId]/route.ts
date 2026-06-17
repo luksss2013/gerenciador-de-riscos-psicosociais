@@ -136,6 +136,18 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
       data,
       include: { department: { select: { name: true } } },
     });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "action_item.update",
+        resourceType: "action_item",
+        resourceId: updated.id,
+        metadataJson: JSON.stringify({
+          fields: Object.keys(body),
+          ...(typeof body.status === "string" ? { status: body.status } : {}),
+        }),
+      },
+    }).catch(() => {});
     return jsonResponse({
       id: updated.id,
       actionPlanId: updated.actionPlanId,
@@ -176,6 +188,15 @@ export async function DELETE(_request: Request, { params }: RouteCtx) {
       return errorJson(ERROR_CODES.NOT_FOUND, "Action item not found");
     }
     await db.actionItem.delete({ where: { id: item.id } });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "action_item.delete",
+        resourceType: "action_item",
+        resourceId: item.id,
+        metadataJson: JSON.stringify({}),
+      },
+    }).catch(() => {});
     return jsonResponse({ ok: true });
   } catch (e) {
     const code = (e as { code?: string })?.code;

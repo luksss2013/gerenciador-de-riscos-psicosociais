@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Cookie,
+  Download,
   FileText,
   History,
   KeyRound,
@@ -529,6 +530,7 @@ function AuditLogSection() {
   const [actionFilter, setActionFilter] = useState<string>("");
   const [resourceFilter, setResourceFilter] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -569,6 +571,31 @@ function AuditLogSection() {
     setPage((p) => Math.min(meta?.pages ?? 1, p + 1));
 
   const hasFilters = actionFilter !== "" || resourceFilter !== "";
+
+  const onExportCSV = useCallback(async () => {
+    setExporting(true);
+    try {
+      const res = await api.auditLogs.exportCSV({
+        action: actionFilter || undefined,
+        resourceType: resourceFilter || undefined,
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-log-${format(new Date(), "yyyy-MM-dd")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("CSV exportado.");
+    } catch {
+      toast.error("Falha ao exportar.");
+    } finally {
+      setExporting(false);
+    }
+  }, [actionFilter, resourceFilter]);
 
   return (
     <Card id="auditoria">
@@ -663,7 +690,22 @@ function AuditLogSection() {
             </Button>
           )}
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void onExportCSV()}
+              disabled={exporting || loading}
+              className="h-9"
+              aria-label="Exportar registro de auditoria em CSV"
+            >
+              {exporting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              <span className="ml-1.5">Exportar CSV</span>
+            </Button>
             <Button
               variant="outline"
               size="icon"

@@ -70,6 +70,15 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     }
 
     const updated = await db.department.update({ where: { id: dept.id }, data });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "department.update",
+        resourceType: "department",
+        resourceId: updated.id,
+        metadataJson: JSON.stringify({ fields: Object.keys(body) }),
+      },
+    }).catch(() => {});
     return jsonResponse({
       id: updated.id,
       companyId: updated.companyId,
@@ -124,6 +133,15 @@ export async function DELETE(_request: Request, { params }: RouteCtx) {
     }
 
     await db.department.update({ where: { id: dept.id }, data: { isActive: false } });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "department.delete",
+        resourceType: "department",
+        resourceId: dept.id,
+        metadataJson: JSON.stringify({ name: dept.name }),
+      },
+    }).catch(() => {});
     return jsonResponse({ ok: true });
   } catch (e) {
     const code = (e as { code?: string })?.code;

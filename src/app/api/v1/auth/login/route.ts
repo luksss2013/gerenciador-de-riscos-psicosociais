@@ -3,6 +3,7 @@ import { ERROR_CODES } from "@/lib/errors";
 import {
   createSessionCookie,
   errorJson,
+  pruneExpiredSessions,
   verifyPassword,
 } from "@/lib/session";
 
@@ -35,7 +36,9 @@ export async function POST(request: Request) {
       return errorJson(ERROR_CODES.INVALID_CREDENTIALS, "Invalid credentials");
     }
 
-    const cookie = createSessionCookie(professional.id);
+    const cookie = await createSessionCookie(professional.id);
+    // Opportunistic expired-session cleanup (fire-and-forget).
+    pruneExpiredSessions().catch(() => {});
     const pub = {
       id: professional.id,
       name: professional.name,

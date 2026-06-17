@@ -188,6 +188,15 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     }
 
     const updated = await db.company.update({ where: { id: company.id }, data });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "company.update",
+        resourceType: "company",
+        resourceId: updated.id,
+        metadataJson: JSON.stringify({ id: updated.id, fields: Object.keys(body) }),
+      },
+    }).catch(() => {});
     return jsonResponse(serializeCompany(updated));
   } catch (e) {
     const code = (e as { code?: string })?.code;
@@ -228,6 +237,15 @@ export async function DELETE(_request: Request, { params }: RouteCtx) {
     }
 
     await db.company.update({ where: { id: company.id }, data: { isActive: false } });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "company.delete",
+        resourceType: "company",
+        resourceId: company.id,
+        metadataJson: JSON.stringify({ id: company.id, name: company.name }),
+      },
+    }).catch(() => {});
     return jsonResponse({ ok: true });
   } catch (e) {
     const code = (e as { code?: string })?.code;

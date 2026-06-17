@@ -81,9 +81,16 @@ export const api = {
   },
 
   me: {
-    get: () => req<Professional>("/professionals/me"),
-    update: (body: Partial<Professional>) =>
-      req<Professional>("/professionals/me", { method: "PATCH", json: body }),
+    get: async (): Promise<Professional> => {
+      const res = await req<{ professional: Professional }>("/professionals/me");
+      return res.professional;
+    },
+    update: async (body: Partial<Professional>): Promise<Professional> => {
+      const res = await req<{ professional: Professional }>("/professionals/me", {
+        method: "PATCH", json: body,
+      });
+      return res.professional;
+    },
     dashboard: () => req<ProfessionalDashboard>("/professionals/me/dashboard"),
   },
 
@@ -98,6 +105,13 @@ export const api = {
       return req<{ data: AuditLogEntry[]; meta: { total: number; page: number; limit: number; pages: number } }>(
         `/audit-logs?${q}`
       );
+    },
+    exportCSV: (params: { action?: string; resourceType?: string } = {}): Promise<Response> => {
+      const q = new URLSearchParams();
+      if (params.action) q.set("action", params.action);
+      if (params.resourceType) q.set("resourceType", params.resourceType);
+      // Return the raw Response so the caller can trigger a download.
+      return fetch(`${BASE}/audit-logs/export?${q}`, { credentials: "include" });
     },
   },
 

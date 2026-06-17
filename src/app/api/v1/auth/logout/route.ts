@@ -8,7 +8,7 @@ export async function POST() {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE)?.value ?? "";
-    if (token) clearSessionCookie(token);
+    if (token) await clearSessionCookie(token);
     return new Response(null, {
       status: 204,
       headers: {

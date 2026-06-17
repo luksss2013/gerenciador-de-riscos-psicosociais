@@ -1,5 +1,7 @@
 // Lightweight session layer (sandbox adaptation of spec §3.2).
 // Uses httpOnly cookie `nr1_session` containing a signed token.
+// Sessions are persisted in the Session table (DB-backed) so they survive
+// dev-server restarts and HMR — production-grade.
 // Password hashing via Web Crypto PBKDF2 (no external bcrypt dep).
 
 import { cookies } from "next/headers";
@@ -9,41 +11,48 @@ import { ApiError, ERROR_CODES, HTTP_STATUS, errorResponse } from "./errors";
 const SESSION_COOKIE = "nr1_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// In-process session registry (sandbox — production would use a DB table).
-// Map: sessionToken -> { professionalId, expiresAt }
-const sessions = new Map<string, { professionalId: string; expiresAt: number }>();
-
 function randomToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function createSessionCookie(professionalId: string): {
+export async function createSessionCookie(professionalId: string): Promise<{
   name: string;
   value: string;
   maxAge: number;
-} {
+}> {
   const token = randomToken();
-  sessions.set(token, {
-    professionalId,
-    expiresAt: Date.now() + SESSION_TTL_MS,
+  await db.session.create({
+    data: {
+      token,
+      professionalId,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    },
   });
   return { name: SESSION_COOKIE, value: token, maxAge: SESSION_TTL_MS / 1000 };
 }
 
-export function clearSessionCookie(token: string): void {
-  sessions.delete(token);
+export async function clearSessionCookie(token: string): Promise<void> {
+  try {
+    await db.session.delete({ where: { token } });
+  } catch {
+    // Token may already be gone — no-op.
+  }
 }
 
 export async function getCurrentProfessional() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const session = sessions.get(token);
+  const session = await db.session.findUnique({
+    where: { token },
+    select: { professionalId: true, expiresAt: true },
+  });
   if (!session) return null;
-  if (session.expiresAt < Date.now()) {
-    sessions.delete(token);
+  if (session.expiresAt.getTime() < Date.now()) {
+    // Expired — clean up and deny.
+    db.session.delete({ where: { token } }).catch(() => {});
     return null;
   }
   const professional = await db.professional.findUnique({
@@ -65,6 +74,16 @@ export async function requireTenantOwnership(resourceProfessionalId: string, cur
       ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS,
       "Cross-tenant access denied"
     );
+  }
+}
+
+// Opportunistic cleanup of expired sessions (fire-and-forget, called on login).
+// Prevents the Session table from growing unbounded.
+export async function pruneExpiredSessions(): Promise<void> {
+  try {
+    await db.session.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+  } catch {
+    // no-op
   }
 }
 

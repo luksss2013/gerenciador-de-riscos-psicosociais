@@ -135,6 +135,15 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     }
 
     const updated = await db.assessment.update({ where: { id: assessment.id }, data });
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "assessment.update",
+        resourceType: "assessment",
+        resourceId: updated.id,
+        metadataJson: JSON.stringify({ fields: Object.keys(body) }),
+      },
+    }).catch(() => {});
     return jsonResponse({
       id: updated.id,
       companyId: updated.companyId,

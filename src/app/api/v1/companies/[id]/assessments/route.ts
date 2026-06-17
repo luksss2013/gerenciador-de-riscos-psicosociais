@@ -160,6 +160,16 @@ export async function POST(request: Request, { params }: RouteCtx) {
       include: { departments: true },
     });
 
+    db.auditLog.create({
+      data: {
+        professionalId: professional.id,
+        action: "assessment.create",
+        resourceType: "assessment",
+        resourceId: assessment.id,
+        metadataJson: JSON.stringify({ title: assessment.title, deptCount: deptInputs.length }),
+      },
+    }).catch(() => {});
+
     return jsonResponse(
       { id: assessment.id, status: assessment.status, ...serializeAssessment(assessment) },
       201

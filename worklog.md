@@ -544,3 +544,136 @@ Task: Enhanced Painel dashboard + dark mode + audit log viewer
 4. **Export/download audit log** as CSV.
 5. **Responsive polish** — verify all new painel sections on mobile viewport (375px).
 6. **Dark mode visual QA** — screenshot every view in dark mode to catch contrast issues.
+
+---
+Task ID: 9-a
+Agent: full-stack-developer
+Task: Expand audit log coverage + CSV export
+
+Work Log:
+- Read prior worklog (Task 8-a for the audit log fire-and-forget pattern, Task 8-b for the AuditLogSection component, Task 8 orchestrator notes on coverage gaps + CSV export recommendation) and inspected the existing audit-logs list route (`src/app/api/v1/audit-logs/route.ts` — auth + filter + pagination pattern to mirror for export), `src/lib/session.ts` (DB-backed sessions via Session model already live from Task 9 migration — requireProfessional/errorJson/jsonResponse helpers confirmed), `src/lib/api.ts` (existing `auditLogs.list()` shape + the req() fetch wrapper that auto-parses JSON — for CSV export we bypass req() and use raw `fetch` to preserve the blob), `src/lib/types.ts` (`AuditLogEntry` shape), `src/components/configuracoes/configuracoes-view.tsx` (AuditLogSection component — filter row + table + pagination), and `prisma/schema.prisma` (AuditLog model: professionalId?, action, resourceType, resourceId?, metadataJson?, createdAt — already wired).
+- WORKSTREAM A — expanded audit log coverage to 13 new mutation routes. Each fire-and-forget `db.auditLog.create({...}).catch(()=>{})` write placed AFTER the main DB mutation succeeds and BEFORE the `return jsonResponse(...)`. Reused the already-loaded `professional` from `requireProfessional()` for `professionalId`. For PATCH routes computed `fields: Object.keys(body)` from the parsed request body. For DELETE routes captured the resource name BEFORE the soft-delete (since name remains on the row but we snapshot it for clarity). Each entry uses `resourceId` = the affected resource's id (company/dept/assessment/item). NEVER awaited the audit create.
+  - `src/app/api/v1/companies/[id]/route.ts` PATCH → `company.update`, metadata `{ id, fields: Object.keys(body) }`. DELETE → `company.delete`, metadata `{ id, name }` (name captured from the fetched company before the `isActive:false` soft-delete).
+  - `src/app/api/v1/companies/[id]/departments/route.ts` POST → `department.create`, metadata `{ name, workerCount }` (from the freshly-created dept).
+  - `src/app/api/v1/companies/[id]/departments/[deptId]/route.ts` PATCH → `department.update`, metadata `{ fields: Object.keys(body) }`. DELETE → `department.delete`, metadata `{ name }` (captured from the fetched dept before soft-delete).
+  - `src/app/api/v1/companies/[id]/assessments/route.ts` POST → `assessment.create`, metadata `{ title, deptCount: deptInputs.length }` (deptInputs is the validated parsed array of `{ departmentId, expectedResponses }`).
+  - `src/app/api/v1/assessments/[id]/route.ts` PATCH → `assessment.update`, metadata `{ fields: Object.keys(body) }`.
+  - `src/app/api/v1/assessments/[id]/risk-inventory/manual/route.ts` POST → `inventory.create`, metadata `{ mteFactorCode, dimensionCode }` (dimensionCode is null on freshly-created manual items but captured anyway per spec).
+  - `src/app/api/v1/risk-inventory-items/[itemId]/route.ts` PATCH → `inventory.update`, metadata `{ fields: Object.keys(body) }`. DELETE → `inventory.delete`, metadata `{}`.
+  - `src/app/api/v1/assessments/[id]/action-items/route.ts` POST → `action_item.create`, metadata `{ what: item.what.slice(0, 60) }` (first 60 chars of the `what` field, per spec).
+  - `src/app/api/v1/action-items/[itemId]/route.ts` PATCH → `action_item.update`, metadata `{ fields: Object.keys(body), ...(typeof body.status === "string" ? { status: body.status } : {}) }` (status conditionally included when present in the patch). DELETE → `action_item.delete`, metadata `{}`.
+- WORKSTREAM B — CSV export for audit log:
+  - **NEW** `src/app/api/v1/audit-logs/export/route.ts` — GET endpoint, returns a CSV file download. Mirrors the auth + filter logic of `audit-logs/route.ts` (requireProfessional + optional `?action=` / `?resourceType=` query filters) but skips pagination — fetches ALL matching logs capped at `take: 10_000` for safety. Builds a CSV string with header `Data/Hora,Ação,Recurso,ID do Recurso,Detalhes` and one row per log entry: ISO-8601 createdAt, raw action string, resourceType, resourceId or "", metadataJson or "". CSV escaping via `csvEscape()` helper — wraps fields containing commas/quotes/newlines/CRs in double quotes and escapes internal quotes by doubling them (RFC 4180). Prepends `\uFEFF` UTF-8 BOM so Excel opens the file with the correct encoding (critical for pt-BR accented characters). Returns `text/csv; charset=utf-8` with `Content-Disposition: attachment; filename="audit-log-YYYY-MM-DD.csv"` (filename uses today's UTC date) + `Cache-Control: no-store`. Same try/catch + errorJson error envelope as the rest of the API.
+  - `src/lib/api.ts` — added `exportCSV(params: { action?: string; resourceType?: string } = {}): Promise<Response>` to the `auditLogs` object. Bypasses the typed `req<T>()` wrapper (which auto-parses JSON) and uses raw `fetch` with `credentials: "include"` so the caller can call `res.blob()` and trigger a download. Constructs the query string with `URLSearchParams` mirroring the `list()` filter param shape.
+  - `src/components/configuracoes/configuracoes-view.tsx` — added `Download` icon to the lucide-react import block. In `AuditLogSection`: added `exporting` boolean state, added `onExportCSV` `useCallback` (deps: `[actionFilter, resourceFilter]`) that calls `api.auditLogs.exportCSV({ action: actionFilter || undefined, resourceType: resourceFilter || undefined })`, throws on `!res.ok`, builds a blob → object URL → temporary `<a download="audit-log-YYYY-MM-DD.csv">` → click → cleanup → `URL.revokeObjectURL`. Toast success `"CSV exportado."` / error `"Falha ao exportar."`. Added a new "Exportar CSV" button (variant outline, size sm) in the filter row, placed in a `ml-auto flex items-center gap-2` container next to the existing refresh icon button. Button is `disabled={exporting || loading}` and swaps the `Download` icon for a `Loader2 animate-spin` while the export is in-flight. `aria-label="Exportar registro de auditoria em CSV"` for accessibility.
+- Verification: `cd /home/z/my-project && bun run lint` → exit 0, 0 errors, 0 warnings on the first pass (no iteration needed). Dev log (post-HMR, no server restart) shows clean compiles (`✓ Compiled in 158ms / 152ms / 244ms`) with no new errors related to the modified routes or the new export endpoint. Did NOT start the dev server (per task constraints).
+
+Stage Summary:
+- 1 file created: `src/app/api/v1/audit-logs/export/route.ts` — CSV export endpoint, auth + filter parity with `audit-logs/route.ts`, UTF-8 BOM, RFC-4180 escaping, `Content-Disposition: attachment`, 10k row safety cap.
+- 8 files modified:
+  - `src/app/api/v1/companies/[id]/route.ts` — PATCH + DELETE audit writes (company.update / company.delete).
+  - `src/app/api/v1/companies/[id]/departments/route.ts` — POST audit write (department.create).
+  - `src/app/api/v1/companies/[id]/departments/[deptId]/route.ts` — PATCH + DELETE audit writes (department.update / department.delete).
+  - `src/app/api/v1/companies/[id]/assessments/route.ts` — POST audit write (assessment.create).
+  - `src/app/api/v1/assessments/[id]/route.ts` — PATCH audit write (assessment.update).
+  - `src/app/api/v1/assessments/[id]/risk-inventory/manual/route.ts` — POST audit write (inventory.create).
+  - `src/app/api/v1/risk-inventory-items/[itemId]/route.ts` — PATCH + DELETE audit writes (inventory.update / inventory.delete).
+  - `src/app/api/v1/assessments/[id]/action-items/route.ts` — POST audit write (action_item.create).
+  - `src/app/api/v1/action-items/[itemId]/route.ts` — PATCH + DELETE audit writes (action_item.update / action_item.delete).
+  - `src/lib/api.ts` — added `auditLogs.exportCSV()` raw-fetch method (returns `Promise<Response>`).
+  - `src/components/configuracoes/configuracoes-view.tsx` — added Download icon import, `exporting` state, `onExportCSV` handler, and the "Exportar CSV" button next to the refresh button in `AuditLogSection`.
+- Audit log coverage now spans 18 actions total (5 from Task 8-a + 13 new): company.create/update/delete, department.create/update/delete, assessment.create/update/launch/close, inventory.create/update/delete, action_item.create/update/delete, report.generate, auth.login.
+- All audit writes remain fire-and-forget (`.catch(()=>{})`, never awaited) so a DB failure on the audit insert can never fail the user-facing response. The main mutation always runs to completion before the audit write fires.
+- CSV export applies the current resourceType + action filters to the export (matching what the user is currently viewing) and triggers a browser-native download via temporary `<a>` element. Lint clean. No new npm packages. No test files. No store changes. No `useView`/`page.tsx` changes.
+
+---
+Task ID: 9-b
+Agent: full-stack-developer
+Task: Enhance resultados dashboard with radar chart + dimension detail cards + styling polish
+
+Work Log:
+- Read prior worklog (Task 5-d for resultados-view structure, Task 6 for design system + bug fixes — particularly the constraint that `risk-low/medium/high`, `brand`, `brand-light`, `warning` are registered theme colors supporting `/opacity` and that arbitrary `[var(--risk-X)]` classes are forbidden) and inspected `src/components/resultados/resultados-view.tsx` (1192 lines — DashboardKpis/HeatMap/CompanyAvgBars/CriticalDimensionsTable/CycleComparisonChart), `src/lib/copsoq-data.ts` (COPSOQ_DIMENSIONS shape: code/namePtBr/groupName/mteFactorsCovered), `src/lib/types.ts` (DashboardData.companyAvg = Array<{code, weightedAvgRiskScore, riskLevel}>), `src/lib/errors.ts` (RISK_LEVEL_LABELS: LOW→Favorável, MEDIUM→Intermediário, HIGH→Desfavorável), and `src/app/globals.css` (CSS vars --brand/--risk-low/medium/high, theme color registrations enabling `text-risk-high`/`bg-risk-high/5`/`from-brand-light/5`).
+- Applied a single MultiEdit with 13 surgical edits to `src/components/resultados/resultados-view.tsx`. No new files. No new dependencies. No changes to ResultadosView signature, data-fetching, or existing component contracts.
+
+ENHANCEMENTS to existing components:
+- DashboardKpis: added `tintClass` + `borderClass` props to KpiCardProps. Each KPI card now has a subtle `bg-gradient-to-br from-{accent}/5 to-transparent` overlay and a 2px colored bottom border (`border-b-2 border-{accent}`) matching the KPI's accent color (brand-light / risk-high / risk-medium / muted-foreground / brand). Number font size bumped from `text-2xl` to `text-2xl md:text-4xl` (responsive desktop enlargement). Card class includes `overflow-hidden relative` so the gradient + border render cleanly within the rounded corners.
+- HeatMap: (1) added a color legend below the table — a 160px (sm:192px) gradient bar using `linear-gradient(to right, hsl(120,65%,45%), hsl(60,65%,45%), hsl(0,65%,45%))` matching the existing `riskScoreBg()` hue interpolation, with 0/33/66/100 labels positioned via flex justify-between, plus a descriptive caption "verde: favorável · amarelo: intermediário · vermelho: desfavorável" (hidden on mobile). (2) sticky first column (header `th` + both eligible `td` and ineligible `td`) now has `shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]` for a subtle right-edge shadow indicating stickiness. (3) both row variants (eligible + ineligible) now have `hover:bg-accent/30 transition-colors` for row hover highlight.
+- CompanyAvgBars: (1) added a 4th grid column for a risk-level Lucide icon at the end of each bar — AlertTriangle (HIGH, text-risk-high), AlertCircle (MEDIUM, text-risk-medium), ShieldCheck (LOW, text-risk-low). Grid layout changed from `[8rem_1fr_2.5rem] sm:[14rem_1fr_3rem]` to `[8rem_1fr_2.5rem_1.5rem] sm:[14rem_1fr_3rem_2rem]`. (2) dimension code now rendered as a `<Badge variant="outline">` (font-mono-numeric, text-[10px], px-1.5 py-0, shrink-0) before the dimension name, replacing the old plain text span. The name span uses `truncate min-w-0` and the outer container is `flex items-center gap-1.5 min-w-0`. (3) reference lines at 33% and 66% changed from solid `border-l border-foreground/40` to dashed `borderLeft: "2px dashed var(--risk-medium)"` (33) and `var(--risk-high)` (66) via inline style, opacity 0.7. (4) added a scale row above the bars (same grid layout) showing "33" and "66" labels in text-risk-medium / text-risk-high, absolutely positioned at 33% and 66% with `-translate-x-1/2` centering. The existing bottom legend (LOW/MEDIUM/HIGH color swatches + "refs. 33 / 66" marker) is preserved.
+- CriticalDimensionsTable: (1) added a red-tinted alert banner inside CardContent (before the table) when critical dimensions exist — `border-risk-high/30 bg-risk-high/5` with an AlertTriangle icon (text-risk-high) and text "Atenção: dimensões críticas identificadas" + a muted caption "— priorize a elaboração de inventário e plano de ação." (hidden on mobile). (2) the affected GHE chips (previously static Badge elements) are now `<button type="button">` elements that call `handleInventory(c.code)` on click — navigating to the inventário view with the dimension's MTE factor prefilled, same as the existing "Inventário" action button. Styled as inline-flex chips with `cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:ring-2 focus-visible:ring-ring` and a descriptive aria-label. The "+N" overflow badge remains a static Badge (not clickable).
+
+NEW components:
+- DimensionRadar: pure-SVG radar/spider chart (NO chart library). viewBox="0 0 400 400", center (200,200), max radius 150. 11 axes radiating from center, one per COPSOQ dimension (D1–D11), evenly spaced at `angle = -90 + (i * 360/11)` degrees (starts at top, goes clockwise). Four concentric reference rings at 25/50/75/100 rendered as polygons with `stroke="var(--border)" strokeWidth=0.5 opacity=0.7`. 11 axis lines from center to outer edge. Ring scale labels (25/50/75/100) placed along the top axis. Axis labels (D1..D11) at radius 168 (R_MAX+18), textAnchor="middle", font-mono-numeric. Filled polygon connecting the 11 `weightedAvgRiskScore` points: `fill="var(--brand)" fillOpacity=0.3 stroke="var(--brand)" strokeWidth=2 strokeLinejoin="round"`. Each vertex has a `<circle r=4.5>` colored by its dimension's riskLevel (var(--risk-low/medium/high)) with a `var(--card)` stroke, and a nested `<title>` element providing a native browser tooltip ("D8 Burnout e estresse: risco 72 de 100 (Desfavorável)"). Responsive via `className="w-full h-auto max-w-lg mx-auto"`. SVG has `role="img"` + a comprehensive `aria-label` summarizing all 11 dimensions with scores and classifications. A visual legend below shows the 3 risk-level colors + the brand polygon swatch. An sr-only `<table>` provides the same data in tabular form (Código/Dimensão/Grupo/Escore/Classificação) for screen readers. Data source: `dashboard.companyAvg` + `COPSOQ_DIMENSIONS` for full names. Placement: new section between CompanyAvgBars and CriticalDimensionsTable. Title: "Perfil psicossocial da empresa". Subtitle: "Distribuição do risco médio por dimensão COPSOQ II-BR (média ponderada entre GHEs elegíveis)."
+- DimensionDetailCards: responsive grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`) of 11 small cards, one per dimension. Each card (`min-h-[10rem]`, `relative overflow-hidden`, `card-hover`) contains: (1) top row with dimension code Badge (font-mono-numeric, px-2) + risk-level colored dot (h-2 w-2 rounded-full, var(--risk-*)) + risk-level label (uppercase tracking-wide text-[10px], Favorável/Intermediário/Desfavorável). (2) dimension name (text-sm font-medium, min-h-[2.5rem] for consistent height). (3) risk score in `font-mono-numeric text-3xl font-semibold` colored by riskLevel via `text-risk-high/medium/low`, with a muted "/100" suffix. (4) group name caption (text-[11px] text-muted-foreground, truncate). (5) MTE factors covered as small chips (font-mono-numeric text-[10px] bg-muted) — or "Sem fator MTE direto" italic text if the dimension covers no MTE factor (e.g. D7). (6) absolute-positioned thin progress bar at the bottom (`absolute bottom-0 left-0 h-1`, width = riskScore%, backgroundColor = riskColor(level), clipped to the card's rounded corners via `overflow-hidden`). Each card has a descriptive `aria-label` ("D8 Burnout e estresse: risco 72 de 100, classificação Desfavorável, grupo Saúde e bem-estar"). Color is never the sole indicator — text labels accompany every color cue. Placement: new section below CriticalDimensionsTable. Title: "Detalhamento por dimensão". Subtitle: "Visão analítica das 11 dimensões psicossociais avaliadas."
+
+PLACEMENT in main render (ResultadosView dashboard branch):
+  DashboardKpis → HeatMap → CompanyAvgBars → **DimensionRadar (NEW)** → CriticalDimensionsTable → **DimensionDetailCards (NEW)** → CycleComparisonChart.
+
+Verification:
+- `cd /home/z/my-project && bun run lint` → exit 0, 0 errors, 0 warnings on the first pass (no iteration needed). No unused imports (ShieldCheck/AlertCircle/AlertTriangle already imported and now used in CompanyAvgBars; RiskLevel added to the `@/lib/types` import and used in both new components; Activity/BarChart3 reused for the new section icons). No TypeScript errors — the `RiskIcon` component-variable pattern mirrors the existing `icon: Icon` pattern in KpiCard. The `scoreMap.get(d.code) ?? { score: 0, riskLevel: "LOW" }` fallback handles missing dimensions gracefully. All SVG attributes use React-compatible camelCase (strokeWidth, strokeLinejoin, fillOpacity, textAnchor, fontWeight, fontSize). Did NOT start/restart the dev server (per task constraints).
+
+Stage Summary:
+- 1 file modified: `src/components/resultados/resultados-view.tsx` (grew from ~1192 lines to ~1693 lines, +~500 lines for the 2 new components + enhancements).
+- 4 existing components enhanced (DashboardKpis, HeatMap, CompanyAvgBars, CriticalDimensionsTable) — only additive changes, no breaking modifications to props or behavior.
+- 2 new components added (DimensionRadar, DimensionDetailCards) — both pure SVG/HTML, no chart libraries, fully accessible (role="img" + aria-label + sr-only table for radar; aria-label on each detail card).
+- All enhancements follow the existing design system: registered theme colors only (risk-low/medium/high, brand, brand-light, muted-foreground) with /opacity modifiers; font-mono-numeric for all scores; card-hover for interactive cards; scroll-area not needed here. No indigo/blue. No emojis (Lucide icons throughout). Color is never the sole indicator — text labels accompany every color cue (risk-level labels, scores, dimension names).
+- ResultadosView main component signature, data-fetching logic, and the empty/error/not-completed/loading states are all untouched. The dashboard branch now renders 7 sections instead of 5.
+- Lint clean. No new dependencies. No test files. No API or store changes.
+
+---
+Task ID: 9
+Agent: orchestrator (cron review round 2)
+Task: DB-backed sessions + audit log expansion + CSV export + resultados radar chart
+
+## Current project status assessment
+- App stable from round 1. `bun run lint` exit 0. Dev server HTTP 200.
+- QA via agent-browser confirmed enhanced painel (KPIs, compliance, heatmap, trend, dark mode, audit log viewer) all rendering correctly.
+- Identified the #1 risk from round 1 worklog: in-memory sessions (Map in session.ts) reset on dev-server restart / HMR — causing 401s and lost login state during development. This was the highest-priority fix.
+
+## Completed modifications (Tasks 9, 9-a, 9-b)
+
+### DB-backed sessions (Task 9 — orchestrator)
+- **Prisma schema**: added `Session` model (`id, token @unique, professionalId, expiresAt, createdAt`) with relation to Professional + indexes on `[professionalId, expiresAt]` and `[expiresAt]`. Ran `bun run db:push`.
+- **`src/lib/session.ts`**: rewrote `createSessionCookie` (now async, inserts a Session row), `clearSessionCookie` (now async, deletes the Session row), `getCurrentProfessional` (queries `db.session.findUnique` instead of Map.get). Added `pruneExpiredSessions()` helper for opportunistic cleanup.
+- **`src/app/api/v1/auth/register/route.ts`**: `await createSessionCookie(...)`.
+- **`src/app/api/v1/auth/login/route.ts`**: `await createSessionCookie(...)` + fire-and-forget `pruneExpiredSessions()`.
+- **`src/app/api/v1/auth/logout/route.ts`**: `await clearSessionCookie(...)`.
+- **CRITICAL bug fix**: `api.me.get()` and `api.me.update()` in `src/lib/api.ts` were typed as returning a bare `Professional`, but the API returns `{ professional: {...} }` (wrapped). This was a pre-existing bug masked by the in-memory session behavior (login always set the professional via the auth flow, which correctly unwrapped). With DB sessions surviving restarts, the bootstrap `me.get()` path in `page.tsx` was setting `{ professional: {...} }` as the professional state → sidebar showed "? —" and welcome message fell back to generic. Fixed by making `me.get()`/`me.update()` async wrappers that extract `.professional` from the response.
+
+### Audit log expansion (Task 9-a — subagent)
+- Added fire-and-forget `db.auditLog.create({...}).catch(()=>{})` to 13 additional routes: company.update/delete, department.create/update/delete, assessment.create/update, inventory.create/update/delete, action_item.create/update/delete. Total audit coverage now 18 actions.
+- **NEW** `GET /api/v1/audit-logs/export/route.ts` — CSV export with UTF-8 BOM, RFC-4180 escaping, `Content-Disposition: attachment`, up to 10,000 rows, same filters as the list endpoint.
+- `src/lib/api.ts` — added `auditLogs.exportCSV()` using raw fetch (returns Response for blob download).
+- `src/components/configuracoes/configuracoes-view.tsx` — added "Exportar CSV" button (Download icon) next to the refresh button, with in-flight spinner + toast feedback. Applies current filters to the export.
+
+### Resultados dashboard enhancements (Task 9-b — subagent)
+- **NEW `DimensionRadar`** — pure-SVG spider chart (no chart library): 11 axes for D1-D11, 4 concentric reference rings (25/50/75/100), filled brand-colored polygon (opacity 0.3), vertex dots colored by riskLevel with native `<title>` tooltips, `role="img"` + aria-label + sr-only data table. Placed between CompanyAvgBars and CriticalDimensionsTable.
+- **NEW `DimensionDetailCards`** — 11-card responsive grid (1/2/3/4 cols): code badge + risk dot, dimension name, large `font-mono-numeric` score colored by level, group caption, MTE factor chips, bottom progress bar. Placed after CriticalDimensionsTable.
+- **DashboardKpis polish**: gradient tint backgrounds + colored bottom borders + `text-4xl` numbers on desktop.
+- **HeatMap polish**: color legend (green→yellow→red gradient with 0/33/66/100 labels), sticky first-column shadow, row hover highlight.
+- **CompanyAvgBars polish**: dimension code Badge before name, risk-level icon (ShieldCheck/AlertCircle/AlertTriangle), dashed labeled reference lines.
+- **CriticalDimensionsTable polish**: red-tinted alert banner when critical dims exist, clickable GHE chips.
+
+## Verification results
+- `bun run lint` → exit 0, 0 errors, 0 warnings.
+- Dev server: clean restart, HTTP 200.
+- **Session survival test (CRITICAL)**: logged in, restarted dev server (`pkill` + `rm -rf .next` + restart), opened page → session survived, painel loaded with "Bem-vindo(a) de volta, Ana" + sidebar showing "Dr. Ana Paula Souza". The #1 risk from round 1 is resolved.
+- agent-browser QA:
+  - ✅ Enhanced painel: hero, KPIs, compliance, company cards, recent assessments, dimension heatmap, trend chart, dark mode toggle
+  - ✅ Resultados dashboard: KPIs, heatmap with color legend + tooltips, company avg bars with dimension badges + risk icons, **NEW radar chart** ("Perfil psicossocial da empresa"), critical dimensions, **NEW dimension detail cards** ("Detalhamento por dimensão") with 11 cards showing scores + group names + MTE factor chips
+  - ✅ Audit log viewer: 3 entries, "Exportar CSV" button present
+  - ✅ CSV export: clicked button → file downloaded to `~/Downloads/audit-log-2026-06-17.csv` (402 bytes, UTF-8 BOM, correct headers + RFC-4180 escaping, 3 login entries)
+- Screenshots: `/tmp/qa2-resultados-enhanced.png`, `/tmp/qa2-resultados-full.png`, `/tmp/qa2-session-survival.png`
+
+## Unresolved issues / risks
+- **Historical audit log gap**: audit entries for actions that occurred BEFORE the Task 9-a expansion (company.create, assessment.launch/close, report.generate from round 1 testing) were never captured. Only auth.login entries exist in the audit log. This is expected — the expansion only covers future actions. No fix needed.
+- **Radix Calendar Popover** in create-assessment dialog still hard to drive in headless automation (carried over from round 1). Low priority.
+- **Report DOCX generation** still creates a status='ready' row without a real .docx binary (carried over). The HTML preview + print-to-PDF covers PDF.
+- **Dark mode visual QA across all views** — only verified on painel so far. Other views (resultados, inventário, plano, relatório) should be screenshot-tested in dark mode to catch contrast issues.
+
+## Priority recommendations for next phase
+1. **Dark mode visual QA** — screenshot every view in dark mode; fix any contrast issues (especially in the heatmap, radar chart, and report preview which use hardcoded colors).
+2. **Cross-company consolidated analytics** — a new "Relatório Consolidado" view comparing risk dimensions across ALL companies (leveraging the professional dashboard's dimensionHeatmap data).
+3. **Responsive polish** — verify all views at 375px mobile viewport; the resultados heatmap table and inventário table are likely to need horizontal scroll optimization.
+4. **Session management UI** — show active sessions in Configurações with "encerrar todas as outras sessões" button (would need a `GET /sessions` + `DELETE /sessions/:id` API).
+5. **Assessment duplication** — "Duplicar avaliação" button to clone a completed assessment's config (depts + expected responses) into a new draft, speeding up recurring cycles.
+6. **Webhook / email notification** when an assessment reaches eligibility threshold (≥5 responses per GHE) or when the end date is approaching.
