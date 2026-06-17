@@ -5,6 +5,7 @@ import type {
   Assessment,
   AssessmentProgress,
   AuditLogEntry,
+  CompanyBreakdown,
   CompanySummary,
   DashboardData,
   Department,
@@ -92,6 +93,8 @@ export const api = {
       return res.professional;
     },
     dashboard: () => req<ProfessionalDashboard>("/professionals/me/dashboard"),
+    companiesBreakdown: () =>
+      req<{ data: CompanyBreakdown[] }>("/professionals/me/companies-breakdown"),
   },
 
   auditLogs: {

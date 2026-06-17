@@ -1,0 +1,1694 @@
+     1→"use client";
+     2→
+     3→import * as React from "react";
+     4→import { useCallback, useEffect, useMemo, useState } from "react";
+     5→import { format, isValid, parseISO } from "date-fns";
+     6→import { ptBR } from "date-fns/locale";
+     7→import {
+     8→  Activity,
+     9→  AlertCircle,
+    10→  AlertTriangle,
+    11→  ArrowRight,
+    12→  BarChart3,
+    13→  ChevronLeft,
+    14→  ClipboardList,
+    15→  ListChecks,
+    16→  Loader2,
+    17→  Lock,
+    18→  RefreshCw,
+    19→  ShieldAlert,
+    20→  ShieldCheck,
+    21→  TrendingUp,
+    22→  Users,
+    23→} from "lucide-react";
+    24→
+    25→import { api, ApiError } from "@/lib/api";
+    26→import { useView } from "@/lib/store";
+    27→import type {
+    28→  Assessment,
+    29→  CycleTrend,
+    30→  DashboardData,
+    31→  DimensionCode,
+    32→  DimensionResultDTO,
+    33→  RiskLevel,
+    34→} from "@/lib/types";
+    35→import {
+    36→  COPSOQ_DIMENSIONS,
+    37→  INVENTORY_TEMPLATES,
+    38→  getDimension,
+    39→} from "@/lib/copsoq-data";
+    40→import { RISK_LEVEL_LABELS } from "@/lib/errors";
+    41→
+    42→import { Button } from "@/components/ui/button";
+    43→import {
+    44→  Card,
+    45→  CardContent,
+    46→  CardDescription,
+    47→  CardHeader,
+    48→  CardTitle,
+    49→} from "@/components/ui/card";
+    50→import { Badge } from "@/components/ui/badge";
+    51→import { Skeleton } from "@/components/ui/skeleton";
+    52→import {
+    53→  Table,
+    54→  TableBody,
+    55→  TableCell,
+    56→  TableHead,
+    57→  TableHeader,
+    58→  TableRow,
+    59→} from "@/components/ui/table";
+    60→import {
+    61→  Tooltip,
+    62→  TooltipContent,
+    63→  TooltipProvider,
+    64→  TooltipTrigger,
+    65→} from "@/components/ui/tooltip";
+    66→
+    67→// ─── Color helpers ──────────────────────────────────────────────────────────
+    68→
+    69→function riskScoreBg(score: number): string {
+    70→  // Interpolate hue 120 (green) → 60 (yellow) → 0 (red) across 0..100.
+    71→  const h = score <= 50 ? 120 - (score / 50) * 60 : 60 - ((score - 50) / 50) * 60;
+    72→  return `hsl(${h}, 65%, 45%)`;
+    73→}
+    74→
+    75→function riskScoreFg(score: number): string {
+    76→  return score > 50 ? "#ffffff" : "#1A2535";
+    77→}
+    78→
+    79→const CHART_PALETTE = [
+    80→  "var(--chart-1)",
+    81→  "var(--chart-2)",
+    82→  "var(--chart-3)",
+    83→  "var(--chart-4)",
+    84→  "var(--chart-5)",
+    85→];
+    86→
+    87→function chartColor(idx: number): string {
+    88→  return CHART_PALETTE[idx % CHART_PALETTE.length];
+    89→}
+    90→
+    91→const DIM_SHORT_NAMES: Record<DimensionCode, string> = {
+    92→  D1: "Demandas",
+    93→  D2: "Influência",
+    94→  D3: "Significado",
+    95→  D4: "Valores",
+    96→  D5: "Liderança",
+    97→  D6: "Relações",
+    98→  D7: "Saúde",
+    99→  D8: "Burnout",
+   100→  D9: "Conflito T-F",
+   101→  D10: "Satisfação",
+   102→  D11: "Ofensivos",
+   103→};
+   104→
+   105→function fmtShortDate(iso: string | null): string {
+   106→  if (!iso) return "—";
+   107→  try {
+   108→    const d = parseISO(iso);
+   109→    if (!isValid(d)) return "—";
+   110→    return format(d, "dd/MM/yy", { locale: ptBR });
+   111→  } catch {
+   112→    return "—";
+   113→  }
+   114→}
+   115→
+   116→// ─── DashboardKpis ──────────────────────────────────────────────────────────
+   117→
+   118→interface KpiCardProps {
+   119→  label: string;
+   120→  value: string;
+   121→  icon: React.ElementType;
+   122→  accentClass: string;
+   123→  tintClass: string;
+   124→  borderClass: string;
+   125→  description?: string;
+   126→}
+   127→
+   128→function KpiCard({
+   129→  label,
+   130→  value,
+   131→  icon: Icon,
+   132→  accentClass,
+   133→  tintClass,
+   134→  borderClass,
+   135→  description,
+   136→}: KpiCardProps) {
+   137→  return (
+   138→    <Card
+   139→      className={`card-hover py-4 overflow-hidden relative ${tintClass} ${borderClass}`}
+   140→      role="group"
+   141→      aria-label={`${label}: ${value}${description ? `. ${description}` : ""}`}
+   142→    >
+   143→      <CardContent className="flex items-start gap-3">
+   144→        <div
+   145→          className={`h-10 w-10 shrink-0 rounded-md flex items-center justify-center ${accentClass}`}
+   146→          aria-hidden="true"
+   147→        >
+   148→          <Icon className="h-5 w-5" />
+   149→        </div>
+   150→        <div className="min-w-0">
+   151→          <div className="text-xs font-medium text-muted-foreground leading-tight">
+   152→            {label}
+   153→          </div>
+   154→          <div className="text-2xl md:text-4xl font-semibold font-mono-numeric mt-1 leading-tight">
+   155→            {value}
+   156→          </div>
+   157→          {description ? (
+   158→            <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
+   159→              {description}
+   160→            </div>
+   161→          ) : null}
+   162→        </div>
+   163→      </CardContent>
+   164→    </Card>
+   165→  );
+   166→}
+   167→
+   168→function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
+   169→  return (
+   170→    <section
+   171→      aria-label="Indicadores-chave"
+   172→      className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5"
+   173→    >
+   174→      <KpiCard
+   175→        label="Adesão Global"
+   176→        value={`${kpis.globalAdesao.toFixed(0)}%`}
+   177→        icon={Users}
+   178→        accentClass="bg-brand-light/10 text-brand-light"
+   179→        tintClass="bg-gradient-to-br from-brand-light/5 to-transparent"
+   180→        borderClass="border-b-2 border-brand-light"
+   181→        description="Participação sobre o esperado"
+   182→      />
+   183→      <KpiCard
+   184→        label="GHEs Alto Risco"
+   185→        value={String(kpis.ghesHighRisk)}
+   186→        icon={ShieldAlert}
+   187→        accentClass="risk-high-bg"
+   188→        tintClass="bg-gradient-to-br from-risk-high/5 to-transparent"
+   189→        borderClass="border-b-2 border-risk-high"
+   190→        description="≥1 dimensão HIGH"
+   191→      />
+   192→      <KpiCard
+   193→        label="GHEs Médio Risco"
+   194→        value={String(kpis.ghesMediumRisk)}
+   195→        icon={ShieldAlert}
+   196→        accentClass="risk-medium-bg"
+   197→        tintClass="bg-gradient-to-br from-risk-medium/5 to-transparent"
+   198→        borderClass="border-b-2 border-risk-medium"
+   199→        description="≥1 dimensão MEDIUM"
+   200→      />
+   201→      <KpiCard
+   202→        label="GHEs Inelegíveis"
+   203→        value={String(kpis.ghesIneligible)}
+   204→        icon={Lock}
+   205→        accentClass="bg-muted text-muted-foreground"
+   206→        tintClass="bg-gradient-to-br from-muted/30 to-transparent"
+   207→        borderClass="border-b-2 border-muted-foreground/40"
+   208→        description="< 5 respostas"
+   209→      />
+   210→      <KpiCard
+   211→        label="Total Respondentes"
+   212→        value={String(kpis.totalRespondents)}
+   213→        icon={Activity}
+   214→        accentClass="bg-brand/10 text-brand"
+   215→        tintClass="bg-gradient-to-br from-brand/5 to-transparent"
+   216→        borderClass="border-b-2 border-brand"
+   217→        description="Trabalhadores que responderam"
+   218→      />
+   219→    </section>
+   220→  );
+   221→}
+   222→
+   223→// ─── HeatMap ────────────────────────────────────────────────────────────────
+   224→
+   225→function ScoreCell({
+   226→  dimName,
+   227→  gheName,
+   228→  dr,
+   229→}: {
+   230→  dimName: string;
+   231→  gheName: string;
+   232→  dr: DimensionResultDTO;
+   233→}) {
+   234→  const bg = riskScoreBg(dr.riskScore);
+   235→  const fg = riskScoreFg(dr.riskScore);
+   236→  const lowAlpha = dr.cronbachAlpha !== null && dr.cronbachAlpha < 0.5;
+   237→  const ariaLabel = `${dr.code} ${dimName} — GHE ${gheName}: risco ${dr.riskScore.toFixed(0)}, bruto ${dr.rawScore.toFixed(0)}, N=${dr.nResponses}${lowAlpha ? ". Baixa confiabilidade (α < 0.5)" : ""}`;
+   238→  const tooltipText = `${dimName} — ${gheName}: bruto ${dr.rawScore.toFixed(0)}, risco ${dr.riskScore.toFixed(0)}, N=${dr.nResponses}${lowAlpha ? " · Baixa confiabilidade (α < 0.5)" : ""}`;
+   239→
+   240→  return (
+   241→    <td
+   242→      className="p-0 text-center align-middle border-r border-border/40"
+   243→      style={{ background: bg, color: fg }}
+   244→    >
+   245→      <Tooltip>
+   246→        <TooltipTrigger asChild>
+   247→          <div
+   248→            tabIndex={0}
+   249→            role="gridcell"
+   250→            aria-label={ariaLabel}
+   251→            className="flex items-center justify-center gap-1 px-2 py-2.5 min-w-[3rem] min-h-[2.5rem] cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+   252→          >
+   253→            <span
+   254→              className="font-mono-numeric text-sm font-semibold"
+   255→              aria-hidden="true"
+   256→            >
+   257→              {dr.riskScore.toFixed(0)}
+   258→            </span>
+   259→            {lowAlpha ? (
+   260→              <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+   261→            ) : null}
+   262→          </div>
+   263→        </TooltipTrigger>
+   264→        <TooltipContent>{tooltipText}</TooltipContent>
+   265→      </Tooltip>
+   266→    </td>
+   267→  );
+   268→}
+   269→
+   270→function HeatRow({
+   271→  row,
+   272→}: {
+   273→  row: DashboardData["heatmap"][number];
+   274→}) {
+   275→  if (!row.isEligible || !row.dimensions) {
+   276→    return (
+   277→      <tr className="bg-muted/40 text-muted-foreground hover:bg-accent/30 transition-colors">
+   278→        <td className="sticky left-0 z-10 bg-muted/40 px-3 py-2 font-medium border-b border-r border-border/60 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
+   279→          <div className="truncate max-w-[10rem]" title={row.deptName}>
+   280→            {row.deptName}
+   281→          </div>
+   282→          <div className="text-xs font-normal opacity-80 font-mono-numeric">
+   283→            N={row.nResponses}
+   284→          </div>
+   285→        </td>
+   286→        <td
+   287→          colSpan={COPSOQ_DIMENSIONS.length}
+   288→          className="px-3 py-2.5 text-center border-b border-border/60"
+   289→        >
+   290→          <div className="flex items-center justify-center gap-2 text-sm">
+   291→            <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+   292→            <span>&lt; 5 respostas — GHE inelegível (RB-03)</span>
+   293→          </div>
+   294→        </td>
+   295→      </tr>
+   296→    );
+   297→  }
+   298→
+   299→  const dimMap = new Map(row.dimensions.map((d) => [d.code, d]));
+   300→  return (
+   301→    <tr className="border-b border-border/60 hover:bg-accent/30 transition-colors">
+   302→      <td className="sticky left-0 z-10 bg-card px-3 py-2 font-medium border-r border-b border-border/60 shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
+   303→        <div className="truncate max-w-[10rem]" title={row.deptName}>
+   304→          {row.deptName}
+   305→        </div>
+   306→        <div className="text-xs text-muted-foreground font-normal font-mono-numeric">
+   307→          N={row.nResponses}
+   308→        </div>
+   309→      </td>
+   310→      {COPSOQ_DIMENSIONS.map((d) => {
+   311→        const dr = dimMap.get(d.code);
+   312→        if (!dr) {
+   313→          return (
+   314→            <td
+   315→              key={d.code}
+   316→              className="px-2 py-2.5 text-center text-muted-foreground/50 border-r border-border/40"
+   317→            >
+   318→              —
+   319→            </td>
+   320→          );
+   321→        }
+   322→        return (
+   323→          <ScoreCell
+   324→            key={d.code}
+   325→            dimName={d.namePtBr}
+   326→            gheName={row.deptName}
+   327→            dr={dr}
+   328→          />
+   329→        );
+   330→      })}
+   331→    </tr>
+   332→  );
+   333→}
+   334→
+   335→function HeatMap({ heatmap }: { heatmap: DashboardData["heatmap"] }) {
+   336→  return (
+   337→    <Card>
+   338→      <CardHeader>
+   339→        <CardTitle className="flex items-center gap-2">
+   340→          <BarChart3 className="h-5 w-5 text-muted-foreground" />
+   341→          Mapa de calor — GHE × Dimensão
+   342→        </CardTitle>
+   343→        <CardDescription>
+   344→          Cores verde → amarelo → vermelho indicam risco crescente (0 a 100).
+   345→          GHEs com menos de 5 respostas são exibidas como inelegíveis (RB-03).
+   346→          Ícone <AlertTriangle className="inline h-3 w-3" aria-hidden="true" />{" "}
+   347→          indica baixa confiabilidade (α &lt; 0,5).
+   348→        </CardDescription>
+   349→      </CardHeader>
+   350→      <CardContent>
+   351→        <div className="max-h-[28rem] overflow-auto scroll-area rounded-md border">
+   352→          <table className="w-full text-sm border-collapse" role="grid">
+   353→            <caption className="sr-only">
+   354→              Mapa de calor dos escores de risco por GHE (linha) e dimensão
+   355→              psicossocial D1 a D11 (coluna). GHEs inelegíveis apresentam menos
+   356→              de 5 respostas.
+   357→            </caption>
+   358→            <thead className="sticky top-0 z-20">
+   359→              <tr>
+   360→                <th
+   361→                  scope="col"
+   362→                  className="sticky left-0 z-30 bg-card px-3 py-2 text-left font-medium border-b border-r border-border/60 min-w-[10rem] shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+   363→                >
+   364→                  GHE
+   365→                </th>
+   366→                {COPSOQ_DIMENSIONS.map((d) => (
+   367→                  <th
+   368→                    key={d.code}
+   369→                    scope="col"
+   370→                    className="px-2 py-2 text-center font-medium border-b border-border/60 min-w-[3.5rem]"
+   371→                  >
+   372→                    <div className="font-mono-numeric text-xs">{d.code}</div>
+   373→                    <div className="text-[10px] text-muted-foreground font-normal leading-tight">
+   374→                      {DIM_SHORT_NAMES[d.code]}
+   375→                    </div>
+   376→                  </th>
+   377→                ))}
+   378→              </tr>
+   379→            </thead>
+   380→            <tbody>
+   381→              {heatmap.map((row) => (
+   382→                <HeatRow key={row.deptId} row={row} />
+   383→              ))}
+   384→            </tbody>
+   385→          </table>
+   386→        </div>
+   387→        <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-muted-foreground">
+   388→          <span className="font-medium">Escala de risco:</span>
+   389→          <div className="flex flex-col gap-0.5">
+   390→            <div
+   391→              className="h-3 w-40 sm:w-48 rounded-sm border border-border/40"
+   392→              style={{
+   393→                background:
+   394→                  "linear-gradient(to right, hsl(120,65%,45%), hsl(60,65%,45%), hsl(0,65%,45%))",
+   395→              }}
+   396→              aria-hidden="true"
+   397→            />
+   398→            <div className="flex justify-between w-40 sm:w-48 text-[10px] font-mono-numeric">
+   399→              <span>0</span>
+   400→              <span>33</span>
+   401→              <span>66</span>
+   402→              <span>100</span>
+   403→            </div>
+   404→          </div>
+   405→          <span className="hidden md:inline text-muted-foreground/80">
+   406→            verde: favorável · amarelo: intermediário · vermelho: desfavorável
+   407→          </span>
+   408→        </div>
+   409→      </CardContent>
+   410→    </Card>
+   411→  );
+   412→}
+   413→
+   414→// ─── CompanyAvgBars ─────────────────────────────────────────────────────────
+   415→
+   416→function CompanyAvgBars({
+   417→  companyAvg,
+   418→}: {
+   419→  companyAvg: DashboardData["companyAvg"];
+   420→}) {
+   421→  const sorted = useMemo(
+   422→    () =>
+   423→      [...companyAvg].sort(
+   424→        (a, b) => b.weightedAvgRiskScore - a.weightedAvgRiskScore
+   425→      ),
+   426→    [companyAvg]
+   427→  );
+   428→
+   429→  return (
+   430→    <Card>
+   431→      <CardHeader>
+   432→        <CardTitle className="flex items-center gap-2">
+   433→          <Activity className="h-5 w-5 text-muted-foreground" />
+   434→          Média da empresa por dimensão
+   435→        </CardTitle>
+   436→        <CardDescription>
+   437→          Escore médio ponderado por número de respondentes em GHEs elegíveis.
+   438→          Ordenado decrescente. Linhas de referência em 33 (médio) e 66 (alto).
+   439→        </CardDescription>
+   440→      </CardHeader>
+   441→      <CardContent>
+   442→        <div className="space-y-2.5">
+   443→          <div className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3">
+   444→            <div />
+   445→            <div className="relative h-3 text-[10px] font-mono-numeric">
+   446→              <span
+   447→                className="absolute -translate-x-1/2 text-risk-medium font-semibold"
+   448→                style={{ left: "33%" }}
+   449→              >
+   450→                33
+   451→              </span>
+   452→              <span
+   453→                className="absolute -translate-x-1/2 text-risk-high font-semibold"
+   454→                style={{ left: "66%" }}
+   455→              >
+   456→                66
+   457→              </span>
+   458→            </div>
+   459→            <div />
+   460→            <div />
+   461→          </div>
+   462→          {sorted.map((item) => {
+   463→            const dim = getDimension(item.code);
+   464→            const bg =
+   465→              item.riskLevel === "HIGH"
+   466→                ? "var(--risk-high)"
+   467→                : item.riskLevel === "MEDIUM"
+   468→                ? "var(--risk-medium)"
+   469→                : "var(--risk-low)";
+   470→            const width = Math.max(2, Math.min(100, item.weightedAvgRiskScore));
+   471→            const ariaLabel = `${item.code} ${dim.namePtBr}: risco ${item.weightedAvgRiskScore.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[item.riskLevel]}`;
+   472→            const RiskIcon =
+   473→              item.riskLevel === "HIGH"
+   474→                ? AlertTriangle
+   475→                : item.riskLevel === "MEDIUM"
+   476→                ? AlertCircle
+   477→                : ShieldCheck;
+   478→            const riskIconClass =
+   479→              item.riskLevel === "HIGH"
+   480→                ? "text-risk-high"
+   481→                : item.riskLevel === "MEDIUM"
+   482→                ? "text-risk-medium"
+   483→                : "text-risk-low";
+   484→            return (
+   485→              <div
+   486→                key={item.code}
+   487→                className="grid grid-cols-[8rem_1fr_2.5rem_1.5rem] sm:grid-cols-[14rem_1fr_3rem_2rem] items-center gap-2 sm:gap-3"
+   488→              >
+   489→                <div
+   490→                  className="text-sm flex items-center gap-1.5 min-w-0"
+   491→                  title={`${item.code} — ${dim.namePtBr}`}
+   492→                >
+   493→                  <Badge
+   494→                    variant="outline"
+   495→                    className="font-mono-numeric text-[10px] px-1.5 py-0 shrink-0"
+   496→                  >
+   497→                    {item.code}
+   498→                  </Badge>
+   499→                  <span className="text-foreground truncate min-w-0">
+   500→                    {dim.namePtBr}
+   501→                  </span>
+   502→                </div>
+   503→                <div
+   504→                  className="relative h-7 rounded-md bg-muted overflow-hidden"
+   505→                  role="img"
+   506→                  aria-label={ariaLabel}
+   507→                >
+   508→                  <div
+   509→                    className="absolute inset-y-0 z-10"
+   510→                    style={{
+   511→                      left: "33%",
+   512→                      borderLeft: "2px dashed var(--risk-medium)",
+   513→                      opacity: 0.7,
+   514→                    }}
+   515→                    aria-hidden="true"
+   516→                  />
+   517→                  <div
+   518→                    className="absolute inset-y-0 z-10"
+   519→                    style={{
+   520→                      left: "66%",
+   521→                      borderLeft: "2px dashed var(--risk-high)",
+   522→                      opacity: 0.7,
+   523→                    }}
+   524→                    aria-hidden="true"
+   525→                  />
+   526→                  <div
+   527→                    className="h-full transition-all duration-500 ease-out"
+   528→                    style={{ width: `${width}%`, backgroundColor: bg }}
+   529→                  />
+   530→                </div>
+   531→                <div className="text-right font-mono-numeric text-sm font-semibold">
+   532→                  {item.weightedAvgRiskScore.toFixed(0)}
+   533→                </div>
+   534→                <div className="flex justify-center" aria-hidden="true">
+   535→                  <RiskIcon className={`h-4 w-4 ${riskIconClass}`} />
+   536→                </div>
+   537→              </div>
+   538→            );
+   539→          })}
+   540→        </div>
+   541→        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+   542→          <div className="flex items-center gap-1.5">
+   543→            <span
+   544→              className="inline-block w-3 h-3 rounded-sm"
+   545→              style={{ backgroundColor: "var(--risk-low)" }}
+   546→              aria-hidden="true"
+   547→            />
+   548→            {RISK_LEVEL_LABELS.LOW}
+   549→          </div>
+   550→          <div className="flex items-center gap-1.5">
+   551→            <span
+   552→              className="inline-block w-3 h-3 rounded-sm"
+   553→              style={{ backgroundColor: "var(--risk-medium)" }}
+   554→              aria-hidden="true"
+   555→            />
+   556→            {RISK_LEVEL_LABELS.MEDIUM}
+   557→          </div>
+   558→          <div className="flex items-center gap-1.5">
+   559→            <span
+   560→              className="inline-block w-3 h-3 rounded-sm"
+   561→              style={{ backgroundColor: "var(--risk-high)" }}
+   562→              aria-hidden="true"
+   563→            />
+   564→            {RISK_LEVEL_LABELS.HIGH}
+   565→          </div>
+   566→          <div className="ml-auto flex items-center gap-2">
+   567→            <span
+   568→              className="inline-block w-px h-3 bg-foreground/40"
+   569→              aria-hidden="true"
+   570→            />
+   571→            <span>refs. 33 / 66</span>
+   572→          </div>
+   573→        </div>
+   574→      </CardContent>
+   575→    </Card>
+   576→  );
+   577→}
+   578→
+   579→// ─── CriticalDimensionsTable ────────────────────────────────────────────────
+   580→
+   581→function CriticalDimensionsTable({
+   582→  critical,
+   583→  heatmap,
+   584→}: {
+   585→  critical: DashboardData["criticalDimensions"];
+   586→  heatmap: DashboardData["heatmap"];
+   587→}) {
+   588→  const go = useView((s) => s.go);
+   589→  const assessmentId = useView((s) => s.assessmentId);
+   590→  const setActionItemPrefill = useView((s) => s.setActionItemPrefill);
+   591→  const setInventoryPrefill = useView((s) => s.setInventoryPrefill);
+   592→
+   593→  const deptNameMap = useMemo(() => {
+   594→    const m = new Map<string, string>();
+   595→    for (const row of heatmap) m.set(row.deptId, row.deptName);
+   596→    return m;
+   597→  }, [heatmap]);
+   598→
+   599→  const sorted = useMemo(
+   600→    () => [...critical].sort((a, b) => b.avgRiskScore - a.avgRiskScore),
+   601→    [critical]
+   602→  );
+   603→
+   604→  if (sorted.length === 0) {
+   605→    return (
+   606→      <Card>
+   607→        <CardHeader>
+   608→          <CardTitle className="flex items-center gap-2">
+   609→            <ShieldAlert className="h-5 w-5 text-muted-foreground" />
+   610→            Dimensões críticas
+   611→          </CardTitle>
+   612→          <CardDescription>
+   613→            Dimensões com classificação HIGH na média da empresa.
+   614→          </CardDescription>
+   615→        </CardHeader>
+   616→        <CardContent>
+   617→          <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
+   618→            <div className="h-12 w-12 rounded-full bg-risk-low/15 flex items-center justify-center">
+   619→              <ShieldCheck className="h-6 w-6 text-risk-low" />
+   620→            </div>
+   621→            <p className="text-sm text-muted-foreground max-w-md">
+   622→              Nenhuma dimensão com risco alto (HIGH) na média da empresa.
+   623→            </p>
+   624→          </div>
+   625→        </CardContent>
+   626→      </Card>
+   627→    );
+   628→  }
+   629→
+   630→  const handleInventory = (code: DimensionCode) => {
+   631→    if (!assessmentId) return;
+   632→    const mteFactorCode = INVENTORY_TEMPLATES[code].mteFactorCode;
+   633→    setInventoryPrefill({ mteFactorCode });
+   634→    go("inventario", { assessmentId });
+   635→  };
+   636→
+   637→  const handleAction = (code: DimensionCode) => {
+   638→    if (!assessmentId) return;
+   639→    setActionItemPrefill({ dimensionCode: code, riskLevelTrigger: "HIGH" });
+   640→    go("plano", { assessmentId });
+   641→  };
+   642→
+   643→  return (
+   644→    <Card>
+   645→      <CardHeader>
+   646→        <CardTitle className="flex items-center gap-2">
+   647→          <ShieldAlert className="h-5 w-5 text-risk-high" />
+   648→          Dimensões críticas
+   649→        </CardTitle>
+   650→        <CardDescription>
+   651→          Dimensões com classificação HIGH na média da empresa. Priorize a
+   652→          elaboração de inventário de fatores de risco e ações de melhoria das
+   653→          condições de trabalho.
+   654→        </CardDescription>
+   655→      </CardHeader>
+   656→      <CardContent>
+   657→        <div className="mb-3 flex items-center gap-2 rounded-md border border-risk-high/30 bg-risk-high/5 px-3 py-2 text-sm">
+   658→          <AlertTriangle
+   659→            className="h-4 w-4 shrink-0 text-risk-high"
+   660→            aria-hidden="true"
+   661→          />
+   662→          <span className="font-medium text-risk-high">
+   663→            Atenção: dimensões críticas identificadas
+   664→          </span>
+   665→          <span className="text-muted-foreground hidden sm:inline">
+   666→            — priorize a elaboração de inventário e plano de ação.
+   667→          </span>
+   668→        </div>
+   669→        <div className="max-h-[28rem] overflow-y-auto scroll-area rounded-md border">
+   670→          <Table>
+   671→            <TableHeader className="sticky top-0 bg-card z-10">
+   672→              <TableRow>
+   673→                <TableHead>Nome</TableHead>
+   674→                <TableHead>GHEs afetados</TableHead>
+   675→                <TableHead className="text-right">Escore médio</TableHead>
+   676→                <TableHead className="text-right">Ações</TableHead>
+   677→              </TableRow>
+   678→            </TableHeader>
+   679→            <TableBody>
+   680→              {sorted.map((c) => {
+   681→                const dim = getDimension(c.code);
+   682→                return (
+   683→                  <TableRow key={c.code}>
+   684→                    <TableCell>
+   685→                      <div className="font-medium">{c.name}</div>
+   686→                      <div className="text-xs text-muted-foreground font-mono-numeric">
+   687→                        {c.code} · {dim.groupName}
+   688→                      </div>
+   689→                    </TableCell>
+   690→                    <TableCell>
+   691→                      <div className="flex flex-wrap gap-1 max-w-md">
+   692→                        {c.affectedDepts.length === 0 ? (
+   693→                          <span className="text-xs text-muted-foreground">—</span>
+   694→                        ) : (
+   695→                          <>
+   696→                            {c.affectedDepts.slice(0, 5).map((deptId) => (
+   697→                              <button
+   698→                                key={deptId}
+   699→                                type="button"
+   700→                                onClick={() => handleInventory(c.code)}
+   701→                                className="inline-flex items-center text-[10px] px-1.5 h-5 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+   702→                                aria-label={`Abrir inventário de riscos para a dimensão ${c.code} (${c.name})`}
+   703→                              >
+   704→                                {deptNameMap.get(deptId) ?? deptId.slice(0, 8)}
+   705→                              </button>
+   706→                            ))}
+   707→                            {c.affectedDepts.length > 5 ? (
+   708→                              <Badge
+   709→                                variant="secondary"
+   710→                                className="text-[10px] px-1.5 py-0"
+   711→                              >
+   712→                                +{c.affectedDepts.length - 5}
+   713→                              </Badge>
+   714→                            ) : null}
+   715→                          </>
+   716→                        )}
+   717→                      </div>
+   718→                    </TableCell>
+   719→                    <TableCell className="text-right">
+   720→                      <span className="risk-high-bg inline-flex items-center justify-center min-w-[2.5rem] px-2 py-0.5 rounded font-mono-numeric font-semibold text-sm">
+   721→                        {c.avgRiskScore.toFixed(0)}
+   722→                      </span>
+   723→                    </TableCell>
+   724→                    <TableCell className="text-right">
+   725→                      <div className="flex justify-end gap-1.5">
+   726→                        <Button
+   727→                          size="sm"
+   728→                          variant="outline"
+   729→                          onClick={() => handleInventory(c.code)}
+   730→                          aria-label={`Ir para o inventário de riscos com fator ${INVENTORY_TEMPLATES[c.code].mteFactorCode} pré-preenchido (${c.name})`}
+   731→                        >
+   732→                          <ListChecks className="h-3.5 w-3.5" />
+   733→                          <span className="hidden sm:inline">Inventário</span>
+   734→                          <ArrowRight className="h-3 w-3" />
+   735→                        </Button>
+   736→                        <Button
+   737→                          size="sm"
+   738→                          variant="outline"
+   739→                          onClick={() => handleAction(c.code)}
+   740→                          aria-label={`Ir para o plano de ação com dimensão ${c.code} pré-preenchida`}
+   741→                        >
+   742→                          <ClipboardList className="h-3.5 w-3.5" />
+   743→                          <span className="hidden sm:inline">Ação</span>
+   744→                          <ArrowRight className="h-3 w-3" />
+   745→                        </Button>
+   746→                      </div>
+   747→                    </TableCell>
+   748→                  </TableRow>
+   749→                );
+   750→              })}
+   751→            </TableBody>
+   752→          </Table>
+   753→        </div>
+   754→      </CardContent>
+   755→    </Card>
+   756→  );
+   757→}
+   758→
+   759→// ─── DimensionRadar ─────────────────────────────────────────────────────────
+   760→
+   761→function DimensionRadar({
+   762→  companyAvg,
+   763→}: {
+   764→  companyAvg: DashboardData["companyAvg"];
+   765→}) {
+   766→  const CX = 200;
+   767→  const CY = 200;
+   768→  const R_MAX = 150;
+   769→  const N = COPSOQ_DIMENSIONS.length;
+   770→
+   771→  const scoreMap = useMemo(() => {
+   772→    const m = new Map<
+   773→      DimensionCode,
+   774→      { score: number; riskLevel: RiskLevel }
+   775→    >();
+   776→    for (const item of companyAvg) {
+   777→      m.set(item.code, {
+   778→        score: item.weightedAvgRiskScore,
+   779→        riskLevel: item.riskLevel,
+   780→      });
+   781→    }
+   782→    return m;
+   783→  }, [companyAvg]);
+   784→
+   785→  const angleAt = (i: number) => ((-90 + (i * 360) / N) * Math.PI) / 180;
+   786→  const pointFor = (i: number, score: number) => ({
+   787→    x: CX + R_MAX * (score / 100) * Math.cos(angleAt(i)),
+   788→    y: CY + R_MAX * (score / 100) * Math.sin(angleAt(i)),
+   789→  });
+   790→
+   791→  const points = COPSOQ_DIMENSIONS.map((d, i) => {
+   792→    const entry = scoreMap.get(d.code);
+   793→    const score = entry?.score ?? 0;
+   794→    const riskLevel = entry?.riskLevel ?? "LOW";
+   795→    return { dim: d, i, score, riskLevel, ...pointFor(i, score) };
+   796→  });
+   797→
+   798→  const polygonPoints = points
+   799→    .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+   800→    .join(" ");
+   801→
+   802→  const rings = [25, 50, 75, 100];
+   803→  const labelR = R_MAX + 18;
+   804→
+   805→  const dotColor = (level: RiskLevel) =>
+   806→    level === "HIGH"
+   807→      ? "var(--risk-high)"
+   808→      : level === "MEDIUM"
+   809→      ? "var(--risk-medium)"
+   810→      : "var(--risk-low)";
+   811→
+   812→  const ariaSummary =
+   813→    `Perfil psicossocial da empresa — radar de 11 dimensões COPSOQ II-BR ` +
+   814→    `(média ponderada entre GHEs elegíveis). ${points
+   815→      .map(
+   816→        (p) =>
+   817→          `${p.dim.code} ${p.dim.namePtBr}: ${p.score.toFixed(0)} (${
+   818→            RISK_LEVEL_LABELS[p.riskLevel]
+   819→          })`
+   820→      )
+   821→      .join("; ")}.`;
+   822→
+   823→  return (
+   824→    <Card>
+   825→      <CardHeader>
+   826→        <CardTitle className="flex items-center gap-2">
+   827→          <Activity className="h-5 w-5 text-muted-foreground" />
+   828→          Perfil psicossocial da empresa
+   829→        </CardTitle>
+   830→        <CardDescription>
+   831→          Distribuição do risco médio por dimensão COPSOQ II-BR (média ponderada
+   832→          entre GHEs elegíveis).
+   833→        </CardDescription>
+   834→      </CardHeader>
+   835→      <CardContent>
+   836→        <svg
+   837→          viewBox="0 0 400 400"
+   838→          className="w-full h-auto max-w-lg mx-auto"
+   839→          role="img"
+   840→          aria-label={ariaSummary}
+   841→        >
+   842→          {/* Concentric reference rings */}
+   843→          {rings.map((r) => {
+   844→            const ringPts = COPSOQ_DIMENSIONS.map((_, i) => {
+   845→              const x = CX + R_MAX * (r / 100) * Math.cos(angleAt(i));
+   846→              const y = CY + R_MAX * (r / 100) * Math.sin(angleAt(i));
+   847→              return `${x.toFixed(1)},${y.toFixed(1)}`;
+   848→            }).join(" ");
+   849→            return (
+   850→              <polygon
+   851→                key={r}
+   852→                points={ringPts}
+   853→                fill="none"
+   854→                stroke="var(--border)"
+   855→                strokeWidth={0.5}
+   856→                opacity={0.7}
+   857→              />
+   858→            );
+   859→          })}
+   860→
+   861→          {/* Axis lines from center to outer edge */}
+   862→          {COPSOQ_DIMENSIONS.map((d, i) => {
+   863→            const end = pointFor(i, 100);
+   864→            return (
+   865→              <line
+   866→                key={d.code}
+   867→                x1={CX}
+   868→                y1={CY}
+   869→                x2={end.x}
+   870→                y2={end.y}
+   871→                stroke="var(--border)"
+   872→                strokeWidth={0.5}
+   873→                opacity={0.7}
+   874→              />
+   875→            );
+   876→          })}
+   877→
+   878→          {/* Ring scale labels along the top axis */}
+   879→          {rings.map((r) => {
+   880→            const y = CY - R_MAX * (r / 100);
+   881→            return (
+   882→              <text
+   883→                key={r}
+   884→                x={CX + 4}
+   885→                y={y + 3}
+   886→                fontSize="9"
+   887→                fill="var(--muted-foreground)"
+   888→                className="font-mono-numeric"
+   889→              >
+   890→                {r}
+   891→              </text>
+   892→            );
+   893→          })}
+   894→
+   895→          {/* Axis labels (D1..D11) at outer edge */}
+   896→          {COPSOQ_DIMENSIONS.map((d, i) => {
+   897→            const x = CX + labelR * Math.cos(angleAt(i));
+   898→            const y = CY + labelR * Math.sin(angleAt(i));
+   899→            return (
+   900→              <text
+   901→                key={d.code}
+   902→                x={x}
+   903→                y={y + 4}
+   904→                textAnchor="middle"
+   905→                fontSize="11"
+   906→                fontWeight="600"
+   907→                fill="var(--muted-foreground)"
+   908→                className="font-mono-numeric"
+   909→              >
+   910→                {d.code}
+   911→              </text>
+   912→            );
+   913→          })}
+   914→
+   915→          {/* Filled polygon — company risk profile */}
+   916→          <polygon
+   917→            points={polygonPoints}
+   918→            fill="var(--brand)"
+   919→            fillOpacity={0.3}
+   920→            stroke="var(--brand)"
+   921→            strokeWidth={2}
+   922→            strokeLinejoin="round"
+   923→          />
+   924→
+   925→          {/* Vertex dots colored by dimension risk level */}
+   926→          {points.map((p) => (
+   927→            <circle
+   928→              key={p.dim.code}
+   929→              cx={p.x}
+   930→              cy={p.y}
+   931→              r={4.5}
+   932→              fill={dotColor(p.riskLevel)}
+   933→              stroke="var(--card)"
+   934→              strokeWidth={1.5}
+   935→            >
+   936→              <title>{`${p.dim.code} ${p.dim.namePtBr}: risco ${p.score.toFixed(0)} de 100 (${RISK_LEVEL_LABELS[p.riskLevel]})`}</title>
+   937→            </circle>
+   938→          ))}
+   939→
+   940→          {/* Center marker */}
+   941→          <circle
+   942→            cx={CX}
+   943→            cy={CY}
+   944→            r={1.5}
+   945→            fill="var(--muted-foreground)"
+   946→            opacity={0.5}
+   947→          />
+   948→        </svg>
+   949→
+   950→        {/* Legend */}
+   951→        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+   952→          <div className="flex items-center gap-1.5">
+   953→            <span
+   954→              className="inline-block w-3 h-3 rounded-full"
+   955→              style={{ backgroundColor: "var(--risk-low)" }}
+   956→              aria-hidden="true"
+   957→            />
+   958→            {RISK_LEVEL_LABELS.LOW}
+   959→          </div>
+   960→          <div className="flex items-center gap-1.5">
+   961→            <span
+   962→              className="inline-block w-3 h-3 rounded-full"
+   963→              style={{ backgroundColor: "var(--risk-medium)" }}
+   964→              aria-hidden="true"
+   965→            />
+   966→            {RISK_LEVEL_LABELS.MEDIUM}
+   967→          </div>
+   968→          <div className="flex items-center gap-1.5">
+   969→            <span
+   970→              className="inline-block w-3 h-3 rounded-full"
+   971→              style={{ backgroundColor: "var(--risk-high)" }}
+   972→              aria-hidden="true"
+   973→            />
+   974→            {RISK_LEVEL_LABELS.HIGH}
+   975→          </div>
+   976→          <div className="flex items-center gap-1.5">
+   977→            <span
+   978→              className="inline-block w-4 h-2 rounded-sm"
+   979→              style={{ backgroundColor: "var(--brand)", opacity: 0.3 }}
+   980→              aria-hidden="true"
+   981→            />
+   982→            <span>Perfil da empresa</span>
+   983→          </div>
+   984→        </div>
+   985→
+   986→        {/* sr-only data table alternative */}
+   987→        <div className="sr-only">
+   988→          <table>
+   989→            <caption>
+   990→              Tabela alternativa ao radar: escore de risco médio ponderado por
+   991→              dimensão COPSOQ II-BR.
+   992→            </caption>
+   993→            <thead>
+   994→              <tr>
+   995→                <th scope="col">Código</th>
+   996→                <th scope="col">Dimensão</th>
+   997→                <th scope="col">Grupo</th>
+   998→                <th scope="col">Escore (0–100)</th>
+   999→                <th scope="col">Classificação</th>
+  1000→              </tr>
+  1001→            </thead>
+  1002→            <tbody>
+  1003→              {points.map((p) => (
+  1004→                <tr key={p.dim.code}>
+  1005→                  <th scope="row">{p.dim.code}</th>
+  1006→                  <td>{p.dim.namePtBr}</td>
+  1007→                  <td>{p.dim.groupName}</td>
+  1008→                  <td>{p.score.toFixed(0)}</td>
+  1009→                  <td>{RISK_LEVEL_LABELS[p.riskLevel]}</td>
+  1010→                </tr>
+  1011→              ))}
+  1012→            </tbody>
+  1013→          </table>
+  1014→        </div>
+  1015→      </CardContent>
+  1016→    </Card>
+  1017→  );
+  1018→}
+  1019→
+  1020→// ─── DimensionDetailCards ───────────────────────────────────────────────────
+  1021→
+  1022→function DimensionDetailCards({
+  1023→  companyAvg,
+  1024→}: {
+  1025→  companyAvg: DashboardData["companyAvg"];
+  1026→}) {
+  1027→  const scoreMap = useMemo(() => {
+  1028→    const m = new Map<
+  1029→      DimensionCode,
+  1030→      { score: number; riskLevel: RiskLevel }
+  1031→    >();
+  1032→    for (const item of companyAvg) {
+  1033→      m.set(item.code, {
+  1034→        score: item.weightedAvgRiskScore,
+  1035→        riskLevel: item.riskLevel,
+  1036→      });
+  1037→    }
+  1038→    return m;
+  1039→  }, [companyAvg]);
+  1040→
+  1041→  const riskColor = (level: RiskLevel) =>
+  1042→    level === "HIGH"
+  1043→      ? "var(--risk-high)"
+  1044→      : level === "MEDIUM"
+  1045→      ? "var(--risk-medium)"
+  1046→      : "var(--risk-low)";
+  1047→
+  1048→  const riskTextClass = (level: RiskLevel) =>
+  1049→    level === "HIGH"
+  1050→      ? "text-risk-high"
+  1051→      : level === "MEDIUM"
+  1052→      ? "text-risk-medium"
+  1053→      : "text-risk-low";
+  1054→
+  1055→  return (
+  1056→    <Card>
+  1057→      <CardHeader>
+  1058→        <CardTitle className="flex items-center gap-2">
+  1059→          <BarChart3 className="h-5 w-5 text-muted-foreground" />
+  1060→          Detalhamento por dimensão
+  1061→        </CardTitle>
+  1062→        <CardDescription>
+  1063→          Visão analítica das 11 dimensões psicossociais avaliadas.
+  1064→        </CardDescription>
+  1065→      </CardHeader>
+  1066→      <CardContent>
+  1067→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+  1068→          {COPSOQ_DIMENSIONS.map((d) => {
+  1069→            const entry = scoreMap.get(d.code);
+  1070→            const score = entry?.score ?? 0;
+  1071→            const level = entry?.riskLevel ?? "LOW";
+  1072→            const width = Math.max(2, Math.min(100, score));
+  1073→            return (
+  1074→              <div
+  1075→                key={d.code}
+  1076→                className="rounded-lg border border-border/60 bg-card p-4 card-hover relative overflow-hidden min-h-[10rem]"
+  1077→                aria-label={`${d.code} ${d.namePtBr}: risco ${score.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[level]}, grupo ${d.groupName}`}
+  1078→              >
+  1079→                <div className="flex items-center justify-between mb-2">
+  1080→                  <Badge
+  1081→                    variant="outline"
+  1082→                    className="font-mono-numeric text-xs px-2"
+  1083→                  >
+  1084→                    {d.code}
+  1085→                  </Badge>
+  1086→                  <div className="flex items-center gap-1.5">
+  1087→                    <span
+  1088→                      className="inline-block h-2 w-2 rounded-full"
+  1089→                      style={{ backgroundColor: riskColor(level) }}
+  1090→                      aria-hidden="true"
+  1091→                    />
+  1092→                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+  1093→                      {RISK_LEVEL_LABELS[level]}
+  1094→                    </span>
+  1095→                  </div>
+  1096→                </div>
+  1097→
+  1098→                <div
+  1099→                  className="text-sm font-medium text-foreground leading-snug mb-2 min-h-[2.5rem]"
+  1100→                  title={d.namePtBr}
+  1101→                >
+  1102→                  {d.namePtBr}
+  1103→                </div>
+  1104→
+  1105→                <div
+  1106→                  className={`font-mono-numeric text-3xl font-semibold leading-none mb-1 ${riskTextClass(level)}`}
+  1107→                >
+  1108→                  {score.toFixed(0)}
+  1109→                  <span className="text-sm text-muted-foreground font-normal ml-1">
+  1110→                    /100
+  1111→                  </span>
+  1112→                </div>
+  1113→
+  1114→                <div
+  1115→                  className="text-[11px] text-muted-foreground mb-2 truncate"
+  1116→                  title={d.groupName}
+  1117→                >
+  1118→                  {d.groupName}
+  1119→                </div>
+  1120→
+  1121→                <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
+  1122→                  {d.mteFactorsCovered.length === 0 ? (
+  1123→                    <span className="text-[10px] text-muted-foreground italic">
+  1124→                      Sem fator MTE direto
+  1125→                    </span>
+  1126→                  ) : (
+  1127→                    d.mteFactorsCovered.map((f) => (
+  1128→                      <span
+  1129→                        key={f}
+  1130→                        className="inline-flex items-center text-[10px] font-mono-numeric px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground"
+  1131→                      >
+  1132→                        {f}
+  1133→                      </span>
+  1134→                    ))
+  1135→                  )}
+  1136→                </div>
+  1137→
+  1138→                <div
+  1139→                  className="absolute bottom-0 left-0 h-1"
+  1140→                  style={{
+  1141→                    width: `${width}%`,
+  1142→                    backgroundColor: riskColor(level),
+  1143→                  }}
+  1144→                  aria-hidden="true"
+  1145→                />
+  1146→              </div>
+  1147→            );
+  1148→          })}
+  1149→        </div>
+  1150→      </CardContent>
+  1151→    </Card>
+  1152→  );
+  1153→}
+  1154→
+  1155→// ─── CycleComparisonChart ───────────────────────────────────────────────────
+  1156→
+  1157→function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefined }) {
+  1158→  const cycles = useMemo(
+  1159→    () =>
+  1160→      [...(trend ?? [])].sort(
+  1161→        (a, b) =>
+  1162→          new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime()
+  1163→      ),
+  1164→    [trend]
+  1165→  );
+  1166→
+  1167→  if (cycles.length < 2) {
+  1168→    const message =
+  1169→      cycles.length === 0
+  1170→        ? "Nenhum ciclo concluído para esta empresa. Conclua uma avaliação para visualizar a evolução temporal."
+  1171→        : "Apenas 1 ciclo concluído. Conclua mais avaliações para visualizar a evolução temporal.";
+  1172→    return (
+  1173→      <Card>
+  1174→        <CardHeader>
+  1175→          <CardTitle className="flex items-center gap-2">
+  1176→            <TrendingUp className="h-5 w-5 text-muted-foreground" />
+  1177→            Evolução temporal
+  1178→          </CardTitle>
+  1179→          <CardDescription>
+  1180→            Comparação de ciclos de avaliação concluídos por dimensão
+  1181→            psicossocial.
+  1182→          </CardDescription>
+  1183→        </CardHeader>
+  1184→        <CardContent>
+  1185→          <div className="flex flex-col items-center justify-center text-center py-10 gap-3">
+  1186→            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+  1187→              <AlertCircle className="h-6 w-6 text-muted-foreground" />
+  1188→            </div>
+  1189→            <p className="text-sm text-muted-foreground max-w-md">{message}</p>
+  1190→          </div>
+  1191→        </CardContent>
+  1192→      </Card>
+  1193→    );
+  1194→  }
+  1195→
+  1196→  // Chart geometry
+  1197→  const W = 800;
+  1198→  const H = 400;
+  1199→  const M = { top: 20, right: 24, bottom: 48, left: 44 };
+  1200→  const plotW = W - M.left - M.right;
+  1201→  const plotH = H - M.top - M.bottom;
+  1202→
+  1203→  const xStep = plotW / (cycles.length - 1);
+  1204→  const yScale = (score: number) => M.top + plotH - (score / 100) * plotH;
+  1205→  const xScale = (i: number) => M.left + i * xStep;
+  1206→
+  1207→  const lines = COPSOQ_DIMENSIONS.map((d, idx) => {
+  1208→    const scores: (number | null)[] = cycles.map((c) => {
+  1209→      const dim = c.dimensions.find((x) => x.code === d.code);
+  1210→      return dim ? dim.avgRiskScore : null;
+  1211→    });
+  1212→    const svgPoints = scores
+  1213→      .map((s, i) =>
+  1214→        s === null
+  1215→          ? null
+  1216→          : {
+  1217→              x: xScale(i),
+  1218→              y: yScale(s),
+  1219→              score: s,
+  1220→            }
+  1221→      )
+  1222→      .filter((p): p is { x: number; y: number; score: number } => p !== null);
+  1223→    return {
+  1224→      code: d.code,
+  1225→      name: d.namePtBr,
+  1226→      color: chartColor(idx),
+  1227→      scores,
+  1228→      svgPoints,
+  1229→    };
+  1230→  });
+  1231→
+  1232→  const yTicks = [0, 25, 50, 75, 100];
+  1233→  const refLines = [33, 66];
+  1234→
+  1235→  return (
+  1236→    <Card>
+  1237→      <CardHeader>
+  1238→        <CardTitle className="flex items-center gap-2">
+  1239→          <TrendingUp className="h-5 w-5 text-muted-foreground" />
+  1240→          Evolução temporal por dimensão
+  1241→        </CardTitle>
+  1242→        <CardDescription>
+  1243→          Escore médio de risco (0–100) por dimensão psicossocial ao longo dos
+  1244→          ciclos de avaliação concluídos. Linhas tracejadas marcam os limiares
+  1245→          de risco médio (33) e alto (66).
+  1246→        </CardDescription>
+  1247→      </CardHeader>
+  1248→      <CardContent>
+  1249→        <div className="overflow-x-auto scroll-area">
+  1250→          <svg
+  1251→            viewBox={`0 0 ${W} ${H}`}
+  1252→            preserveAspectRatio="xMidYMid meet"
+  1253→            className="w-full h-auto min-w-[36rem]"
+  1254→            role="img"
+  1255→            aria-label={`Gráfico de evolução temporal: ${cycles.length} ciclos concluídos (${cycles
+  1256→              .map((c) => fmtShortDate(c.completedAt))
+  1257→              .join(", ")}), ${lines.length} dimensões psicossociais. Eixo Y: escore de risco 0 a 100.`}
+  1258→          >
+  1259→            {/* Y-axis */}
+  1260→            <line
+  1261→              x1={M.left}
+  1262→              y1={M.top}
+  1263→              x2={M.left}
+  1264→              y2={M.top + plotH}
+  1265→              stroke="var(--border)"
+  1266→              strokeWidth={1}
+  1267→            />
+  1268→            {/* X-axis */}
+  1269→            <line
+  1270→              x1={M.left}
+  1271→              y1={M.top + plotH}
+  1272→              x2={M.left + plotW}
+  1273→              y2={M.top + plotH}
+  1274→              stroke="var(--border)"
+  1275→              strokeWidth={1}
+  1276→            />
+  1277→
+  1278→            {/* Y-axis grid + ticks */}
+  1279→            {yTicks.map((t) => {
+  1280→              const y = yScale(t);
+  1281→              return (
+  1282→                <g key={t}>
+  1283→                  <line
+  1284→                    x1={M.left}
+  1285→                    y1={y}
+  1286→                    x2={M.left + plotW}
+  1287→                    y2={y}
+  1288→                    stroke="var(--border)"
+  1289→                    strokeWidth={0.5}
+  1290→                    strokeDasharray="2 4"
+  1291→                    opacity={0.6}
+  1292→                  />
+  1293→                  <text
+  1294→                    x={M.left - 6}
+  1295→                    y={y + 3}
+  1296→                    textAnchor="end"
+  1297→                    fontSize="10"
+  1298→                    fill="var(--muted-foreground)"
+  1299→                    className="font-mono-numeric"
+  1300→                  >
+  1301→                    {t}
+  1302→                  </text>
+  1303→                </g>
+  1304→              );
+  1305→            })}
+  1306→
+  1307→            {/* Reference lines at 33 and 66 */}
+  1308→            {refLines.map((r) => {
+  1309→              const y = yScale(r);
+  1310→              return (
+  1311→                <g key={r}>
+  1312→                  <line
+  1313→                    x1={M.left}
+  1314→                    y1={y}
+  1315→                    x2={M.left + plotW}
+  1316→                    y2={y}
+  1317→                    stroke="var(--risk-medium)"
+  1318→                    strokeWidth={1}
+  1319→                    strokeDasharray="6 3"
+  1320→                    opacity={0.5}
+  1321→                  />
+  1322→                  <text
+  1323→                    x={M.left + plotW - 4}
+  1324→                    y={y - 3}
+  1325→                    textAnchor="end"
+  1326→                    fontSize="9"
+  1327→                    fill="var(--risk-medium)"
+  1328→                    className="font-mono-numeric"
+  1329→                  >
+  1330→                    {r}
+  1331→                  </text>
+  1332→                </g>
+  1333→              );
+  1334→            })}
+  1335→
+  1336→            {/* X-axis labels (cycle dates) */}
+  1337→            {cycles.map((c, i) => (
+  1338→              <text
+  1339→                key={c.assessmentId}
+  1340→                x={xScale(i)}
+  1341→                y={M.top + plotH + 16}
+  1342→                textAnchor="middle"
+  1343→                fontSize="10"
+  1344→                fill="var(--muted-foreground)"
+  1345→                className="font-mono-numeric"
+  1346→              >
+  1347→                {fmtShortDate(c.completedAt)}
+  1348→              </text>
+  1349→            ))}
+  1350→
+  1351→            {/* Lines per dimension */}
+  1352→            {lines.map((line) => {
+  1353→              if (line.svgPoints.length < 2) return null;
+  1354→              const path = line.svgPoints
+  1355→                .map((p, i) =>
+  1356→                  `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`
+  1357→                )
+  1358→                .join(" ");
+  1359→              return (
+  1360→                <g key={line.code}>
+  1361→                  <path
+  1362→                    d={path}
+  1363→                    fill="none"
+  1364→                    stroke={line.color}
+  1365→                    strokeWidth={1.75}
+  1366→                    strokeLinecap="round"
+  1367→                    strokeLinejoin="round"
+  1368→                  />
+  1369→                  {line.svgPoints.map((p, i) => (
+  1370→                    <circle
+  1371→                      key={i}
+  1372→                      cx={p.x}
+  1373→                      cy={p.y}
+  1374→                      r={3}
+  1375→                      fill={line.color}
+  1376→                      stroke="var(--card)"
+  1377→                      strokeWidth={1}
+  1378→                    />
+  1379→                  ))}
+  1380→                </g>
+  1381→              );
+  1382→            })}
+  1383→
+  1384→            {/* Y-axis title */}
+  1385→            <text
+  1386→              x={M.left - 30}
+  1387→              y={M.top + plotH / 2}
+  1388→              textAnchor="middle"
+  1389→              fontSize="10"
+  1390→              fill="var(--muted-foreground)"
+  1391→              transform={`rotate(-90, ${M.left - 30}, ${M.top + plotH / 2})`}
+  1392→            >
+  1393→              Risco (0–100)
+  1394→            </text>
+  1395→          </svg>
+  1396→        </div>
+  1397→
+  1398→        {/* Legend */}
+  1399→        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5">
+  1400→          {lines.map((line) => (
+  1401→            <div
+  1402→              key={line.code}
+  1403→              className="flex items-center gap-2 text-xs min-w-0"
+  1404→            >
+  1405→              <span
+  1406→                className="inline-block w-3 h-0.5 shrink-0"
+  1407→                style={{ backgroundColor: line.color }}
+  1408→                aria-hidden="true"
+  1409→              />
+  1410→              <span className="font-mono-numeric text-muted-foreground shrink-0">
+  1411→                {line.code}
+  1412→              </span>
+  1413→              <span className="truncate" title={line.name}>
+  1414→                {line.name}
+  1415→              </span>
+  1416→            </div>
+  1417→          ))}
+  1418→        </div>
+  1419→
+  1420→        {/* sr-only data table alternative */}
+  1421→        <div className="sr-only">
+  1422→          <table>
+  1423→            <caption>
+  1424→              Tabela alternativa ao gráfico: escore de risco por dimensão e
+  1425→              ciclo.
+  1426→            </caption>
+  1427→            <thead>
+  1428→              <tr>
+  1429→                <th scope="col">Dimensão</th>
+  1430→                {cycles.map((c) => (
+  1431→                  <th key={c.assessmentId} scope="col">
+  1432→                    {fmtShortDate(c.completedAt)}
+  1433→                  </th>
+  1434→                ))}
+  1435→              </tr>
+  1436→            </thead>
+  1437→            <tbody>
+  1438→              {lines.map((line) => (
+  1439→                <tr key={line.code}>
+  1440→                  <th scope="row">
+  1441→                    {line.code} {line.name}
+  1442→                  </th>
+  1443→                  {line.scores.map((s, i) => (
+  1444→                    <td key={i}>{s === null ? "—" : s.toFixed(0)}</td>
+  1445→                  ))}
+  1446→                </tr>
+  1447→              ))}
+  1448→            </tbody>
+  1449→          </table>
+  1450→        </div>
+  1451→      </CardContent>
+  1452→    </Card>
+  1453→  );
+  1454→}
+  1455→
+  1456→// ─── Skeletons ──────────────────────────────────────────────────────────────
+  1457→
+  1458→function ResultadosSkeleton() {
+  1459→  return (
+  1460→    <div className="space-y-6" aria-hidden="true">
+  1461→      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-5">
+  1462→        {Array.from({ length: 5 }).map((_, i) => (
+  1463→          <Skeleton key={i} className="h-24" />
+  1464→        ))}
+  1465→      </div>
+  1466→      <Skeleton className="h-80" />
+  1467→      <Skeleton className="h-80" />
+  1468→      <Skeleton className="h-64" />
+  1469→      <Skeleton className="h-72" />
+  1470→    </div>
+  1471→  );
+  1472→}
+  1473→
+  1474→// ─── Main component ─────────────────────────────────────────────────────────
+  1475→
+  1476→export function ResultadosView() {
+  1477→  const go = useView((s) => s.go);
+  1478→  const assessmentId = useView((s) => s.assessmentId);
+  1479→
+  1480→  const [assessment, setAssessment] = useState<Assessment | null>(null);
+  1481→  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  1482→  const [trend, setTrend] = useState<CycleTrend[] | null>(null);
+  1483→  const [loading, setLoading] = useState(true);
+  1484→  const [error, setError] = useState<string | null>(null);
+  1485→  const [notCompleted, setNotCompleted] = useState(false);
+  1486→  const [refreshKey, setRefreshKey] = useState(0);
+  1487→
+  1488→  useEffect(() => {
+  1489→    if (!assessmentId) return;
+  1490→    let cancelled = false;
+  1491→
+  1492→    const run = async () => {
+  1493→      setLoading(true);
+  1494→      setError(null);
+  1495→      setNotCompleted(false);
+  1496→      try {
+  1497→        const a = await api.assessments.get(assessmentId);
+  1498→        if (cancelled) return;
+  1499→        setAssessment(a);
+  1500→
+  1501→        if (a.status !== "completed") {
+  1502→          setNotCompleted(true);
+  1503→          setDashboard(null);
+  1504→          setTrend(null);
+  1505→          setLoading(false);
+  1506→          return;
+  1507→        }
+  1508→
+  1509→        const [d, t] = await Promise.all([
+  1510→          api.assessments.dashboard(assessmentId),
+  1511→          a.companyId
+  1512→            ? api.assessments.trend(a.companyId).catch(
+  1513→                () => [] as CycleTrend[]
+  1514→              )
+  1515→            : Promise.resolve([] as CycleTrend[]),
+  1516→        ]);
+  1517→        if (cancelled) return;
+  1518→        setDashboard(d);
+  1519→        setTrend(t);
+  1520→        setLoading(false);
+  1521→      } catch (e) {
+  1522→        if (cancelled) return;
+  1523→        if (e instanceof ApiError && e.code === "ASSESSMENT_NOT_COMPLETED") {
+  1524→          setNotCompleted(true);
+  1525→          setDashboard(null);
+  1526→          setTrend(null);
+  1527→          setLoading(false);
+  1528→          return;
+  1529→        }
+  1530→        const msg =
+  1531→          e instanceof ApiError
+  1532→            ? e.message
+  1533→            : "Erro inesperado ao carregar os resultados.";
+  1534→        setError(msg);
+  1535→        setDashboard(null);
+  1536→        setTrend(null);
+  1537→        setLoading(false);
+  1538→      }
+  1539→    };
+  1540→
+  1541→    void run();
+  1542→
+  1543→    return () => {
+  1544→      cancelled = true;
+  1545→    };
+  1546→  }, [assessmentId, refreshKey]);
+  1547→
+  1548→  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  1549→
+  1550→  // Empty state: no assessment selected.
+  1551→  if (!assessmentId) {
+  1552→    return (
+  1553→      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+  1554→        <Card>
+  1555→          <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
+  1556→            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+  1557→              <BarChart3 className="h-6 w-6 text-muted-foreground" />
+  1558→            </div>
+  1559→            <div className="space-y-1">
+  1560→              <h2 className="text-lg font-semibold">Nenhuma avaliação selecionada</h2>
+  1561→              <p className="text-sm text-muted-foreground max-w-md">
+  1562→                Acesse uma avaliação concluída para visualizar os resultados
+  1563→                consolidados.
+  1564→              </p>
+  1565→            </div>
+  1566→            <Button onClick={() => go("painel")}>
+  1567→              <ChevronLeft className="h-4 w-4" />
+  1568→              Voltar ao painel
+  1569→            </Button>
+  1570→          </CardContent>
+  1571→        </Card>
+  1572→      </div>
+  1573→    );
+  1574→  }
+  1575→
+  1576→  const subtitle = loading
+  1577→    ? "Carregando…"
+  1578→    : assessment
+  1579→    ? assessment.title
+  1580→    : error
+  1581→    ? "Resultado"
+  1582→    : "—";
+  1583→
+  1584→  return (
+  1585→    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+  1586→      <TooltipProvider delayDuration={200}>
+  1587→        {/* Header */}
+  1588→        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+  1589→          <div className="flex items-start gap-2 min-w-0">
+  1590→            <Button
+  1591→              variant="ghost"
+  1592→              size="icon"
+  1593→              onClick={() => go("avaliacao", { assessmentId })}
+  1594→              aria-label="Voltar à avaliação"
+  1595→              className="shrink-0 -ml-2"
+  1596→            >
+  1597→              <ChevronLeft className="h-5 w-5" />
+  1598→            </Button>
+  1599→            <div className="min-w-0">
+  1600→              <h1 className="text-2xl font-semibold tracking-tight">Resultados</h1>
+  1601→              <p className="text-sm text-muted-foreground mt-0.5 truncate" title={subtitle}>
+  1602→                {subtitle}
+  1603→              </p>
+  1604→              <p className="text-xs text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
+  1605→                Linguagem não-clínica: usa &ldquo;fator de risco&rdquo;,
+  1606→                &ldquo;dimensão psicossocial&rdquo; e &ldquo;condições de
+  1607→                trabalho&rdquo; (nunca &ldquo;diagnóstico&rdquo;,
+  1608→                &ldquo;transtorno&rdquo; ou &ldquo;doença&rdquo;).
+  1609→              </p>
+  1610→            </div>
+  1611→          </div>
+  1612→          <Button
+  1613→            variant="outline"
+  1614→            size="sm"
+  1615→            onClick={refresh}
+  1616→            disabled={loading}
+  1617→            className="shrink-0"
+  1618→          >
+  1619→            {loading ? (
+  1620→              <Loader2 className="h-4 w-4 animate-spin" />
+  1621→            ) : (
+  1622→              <RefreshCw className="h-4 w-4" />
+  1623→            )}
+  1624→            Atualizar
+  1625→          </Button>
+  1626→        </header>
+  1627→
+  1628→        {error ? (
+  1629→          <Card className="border-destructive/50">
+  1630→            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
+  1631→              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+  1632→                <AlertCircle className="h-6 w-6 text-destructive" />
+  1633→              </div>
+  1634→              <div className="space-y-1">
+  1635→                <h2 className="text-lg font-semibold">
+  1636→                  Não foi possível carregar os resultados
+  1637→                </h2>
+  1638→                <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+  1639→              </div>
+  1640→              <div className="flex flex-wrap gap-2 justify-center">
+  1641→                <Button
+  1642→                  variant="outline"
+  1643→                  onClick={() => go("avaliacao", { assessmentId })}
+  1644→                >
+  1645→                  <ChevronLeft className="h-4 w-4" />
+  1646→                  Voltar à avaliação
+  1647→                </Button>
+  1648→                <Button onClick={refresh}>
+  1649→                  <RefreshCw className="h-4 w-4" />
+  1650→                  Tentar novamente
+  1651→                </Button>
+  1652→              </div>
+  1653→            </CardContent>
+  1654→          </Card>
+  1655→        ) : notCompleted ? (
+  1656→          <Card className="border-warning/40 bg-warning/5">
+  1657→            <CardContent className="flex flex-col items-center justify-center text-center py-12 gap-4">
+  1658→              <div className="h-12 w-12 rounded-full bg-warning/15 flex items-center justify-center">
+  1659→                <Lock className="h-6 w-6 text-warning" />
+  1660→              </div>
+  1661→              <div className="space-y-1">
+  1662→                <h2 className="text-lg font-semibold">Avaliação não concluída</h2>
+  1663→                <p className="text-sm text-muted-foreground max-w-md">
+  1664→                  Esta avaliação ainda não foi concluída. Encerre a coleta para
+  1665→                  visualizar os resultados.
+  1666→                </p>
+  1667→              </div>
+  1668→              <Button onClick={() => go("avaliacao", { assessmentId })}>
+  1669→                <ChevronLeft className="h-4 w-4" />
+  1670→                Voltar à avaliação
+  1671→              </Button>
+  1672→            </CardContent>
+  1673→          </Card>
+  1674→        ) : loading ? (
+  1675→          <ResultadosSkeleton />
+  1676→        ) : dashboard ? (
+  1677→          <div className="space-y-6">
+  1678→            <DashboardKpis kpis={dashboard.kpis} />
+  1679→            <HeatMap heatmap={dashboard.heatmap} />
+  1680→            <CompanyAvgBars companyAvg={dashboard.companyAvg} />
+  1681→            <DimensionRadar companyAvg={dashboard.companyAvg} />
+  1682→            <CriticalDimensionsTable
+  1683→              critical={dashboard.criticalDimensions}
+  1684→              heatmap={dashboard.heatmap}
+  1685→            />
+  1686→            <DimensionDetailCards companyAvg={dashboard.companyAvg} />
+  1687→            <CycleComparisonChart trend={trend ?? []} />
+  1688→          </div>
+  1689→        ) : null}
+  1690→      </TooltipProvider>
+  1691→    </div>
+  1692→  );
+  1693→}
+  1694→

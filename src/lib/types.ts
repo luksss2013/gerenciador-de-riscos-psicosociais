@@ -266,3 +266,25 @@ export interface AuditLogEntry {
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }
+
+export interface CompanyBreakdown {
+  companyId: string;
+  companyName: string;
+  cnpj: string;
+  city: string | null;
+  state: string | null;
+  assessmentsCount: number;
+  lastAssessmentStatus: AssessmentStatus | null;
+  lastAssessmentCompletedAt: string | null;
+  eligibleGhes: number;
+  totalRespondents: number;
+  atRiskGhes: number;
+  mediumRiskGhes: number;
+  dimensions: Array<{
+    code: DimensionCode;
+    weightedAvgRiskScore: number;
+    riskLevel: RiskLevel;
+  }>;
+  overallRiskScore: number;
+  overallRiskLevel: RiskLevel;
+}

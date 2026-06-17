@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useState } from "react";
 import {
+  BarChart3,
   Building2,
   LayoutDashboard,
   Loader2,
@@ -48,6 +49,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { view: "painel", label: "Painel", icon: LayoutDashboard },
+  { view: "consolidado", label: "Consolidado", icon: BarChart3 },
   { view: "empresas", label: "Empresas", icon: Building2 },
   { view: "configuracoes", label: "Configurações", icon: Settings },
 ];
@@ -97,6 +99,10 @@ function ViewMissingPlaceholder({ name }: { name: string }) {
   );
 }
 
+const ConsolidadoView = lazyView(
+  () => import("@/components/consolidado/consolidado-view"),
+  "Consolidado"
+);
 const EmpresasView = lazyView(
   () => import("@/components/empresas/empresas-view"),
   "Empresas"
@@ -139,6 +145,8 @@ function renderView(view: ViewName): React.ReactNode {
   switch (view) {
     case "painel":
       return <PainelView />;
+    case "consolidado":
+      return <ConsolidadoView />;
     case "configuracoes":
       return <ConfiguracoesView />;
     case "empresas":

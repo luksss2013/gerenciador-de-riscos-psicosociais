@@ -817,3 +817,100 @@ Task: Assessment duplication + session management UI
 4. **Webhook/email notifications** — notify the professional when an assessment reaches eligibility threshold (≥5 responses per GHE) or when the end date is approaching.
 5. **Assessment templates** — pre-configured assessment templates by company size/sector (e.g. "Indústria 50-200 funcionários") to speed up setup.
 6. **Bulk worker response simulation** — for demo/testing, a "Simular N respostas" button per GHE that mints + completes N tokens with realistic Likert distributions.
+
+---
+Task ID: 11-a
+Agent: full-stack-developer
+Task: Cross-company consolidated analytics view
+
+Work Log:
+- Read prior worklog (Task 8-a for the professional dashboard API aggregation pattern, Task 8-b for the painel structure + design system tokens, Task 10 for recent orchestrator notes + the "cross-company analytics" priority recommendation) and inspected `src/app/api/v1/professionals/me/dashboard/route.ts` (the consolidated aggregation reference — single `db.company.findMany` with nested `departments → assessments → departments → dimensionResults` includes + in-memory iteration; reused the `DimensionScoreResult` mapping pattern from COPSOQ_DIMENSIONS), `src/app/api/v1/companies/route.ts` (`buildCompanySummary` pattern — last assessment selected via `orderBy: { createdAt: "desc" }`), `src/lib/scoring.ts` (`companyWeightedAverage` Passo-6 helper, `classifyRiskScore`, `DimensionScoreResult` shape), `src/lib/copsoq-data.ts` (COPSOQ_DIMENSIONS, getDimension, DimensionCode), `src/lib/session.ts` (`requireProfessional`/`errorJson`/`jsonResponse` helpers), `src/lib/errors.ts` (ERROR_CODES + RISK_LEVEL_LABELS + ASSESSMENT_STATUS_LABELS), `src/lib/types.ts`, `src/lib/api.ts`, `src/lib/store.ts` (ViewName union + `go(view, { companyId })` SPA navigation), `src/components/shell/app-shell.tsx` (lazyView pattern + NAV_ITEMS + renderView switch), `src/components/resultados/resultados-view.tsx` (heat-map cell pattern with `riskScoreBg`/`riskScoreFg`, horizontal bar chart with reference lines at 33/66, KPI card component, sticky left column + sticky header), and `prisma/schema.prisma` (Company → assessments → departments → dimensionResults include chain confirmed).
+- Created `src/app/api/v1/professionals/me/companies-breakdown/route.ts` — single GET endpoint returning `{ data: CompanyBreakdownEntry[] }`. Per-company aggregation reuses the dashboard's single-query pattern (one `db.company.findMany` with nested `departments (where isActive)` + `assessments → departments → dimensionResults`), then iterates per-company:
+  - `assessmentsCount` = `company.assessments.length`.
+  - Last assessment = the one with the max `createdAt` (mirrors `buildCompanySummary`); serializes `status` + `completedAt` (ISO) or `null`.
+  - `eligibleGhes` = count of AssessmentDepartments where `isEligible=true` across ALL assessments (any status).
+  - `totalRespondents` = sum of `responseCount` across ALL AssessmentDepartments (any status).
+  - For each eligible AssessmentDepartment on a COMPLETED assessment: builds a `DimensionScoreResult[]` payload (defaulting missing DimensionResults to 0 / LOW), pushes it into `perDeptForAvg`, and tallies `atRiskGhes` (≥1 HIGH) / `mediumRiskGhes` (≥1 MEDIUM and no HIGH).
+  - `dimensions` = `companyWeightedAverage(perDeptForAvg)` mapped to `{ code, weightedAvgRiskScore, riskLevel }`.
+  - `overallRiskScore` = mean of all 11 dimension `weightedAvgRiskScore` (rounded to 2 decimals); `overallRiskLevel` = `classifyRiskScore(overallRiskScore)`.
+  - Companies ordered by `name ASC` so the heat-map table can render in original order; the frontend re-sorts for the chart + cards.
+  - Standard try/catch: UNAUTHORIZED → 401, everything else → INTERNAL_ERROR 500 + `console.error`.
+- Added `CompanyBreakdown` interface to `src/lib/types.ts` (matches the API response shape, reusing the `AssessmentStatus`/`DimensionCode`/`RiskLevel` union types already exported).
+- Added `companiesBreakdown: () => req<{ data: CompanyBreakdown[] }>("/professionals/me/companies-breakdown")` to the `me` object in `src/lib/api.ts` + the `CompanyBreakdown` import to the type import block.
+- Added `"consolidado"` to the `ViewName` union in `src/lib/store.ts` (positioned right after `"painel"` so it matches the nav ordering).
+- Wired the new view into `src/components/shell/app-shell.tsx`: imported `BarChart3` from lucide-react; added `{ view: "consolidado", label: "Consolidado", icon: BarChart3 }` to `NAV_ITEMS` BETWEEN "Painel" and "Empresas"; added `const ConsolidadoView = lazyView(() => import("@/components/consolidado/consolidado-view"), "Consolidado");`; added `case "consolidado": return <ConsolidadoView />;` to the `renderView` switch.
+- Created `src/components/consolidado/consolidado-view.tsx` — named export `ConsolidadoView` (no props), plus a default export alias for the lazy loader. Layout top-to-bottom inside the standard `px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full` page wrapper:
+  1. **Header** — `BarChart3` icon + "Análise Consolidada" h1 + "Comparação de risco psicossocial entre todos os clientes" subtitle, plus an "Atualizar" button (RefreshCw / Loader2-spin when refreshing) top-right.
+  2. **Summary KPIs** — 4-card responsive grid (2 cols mobile, 4 cols lg): Total de empresas (`data.length`), Empresas em risco alto (count `overallRiskLevel==="HIGH"`), Empresas em risco intermediário (count `MEDIUM`), Total de GHEs em risco (sum of `atRiskGhes`). Reuses the KpiCard sub-component (same shape as resultados): icon tile + label + big mono-numeric value + description; accent/tint/border classes use the brand/risk-* tokens.
+  3. **HeatmapTable** — companies × D1..D11 + sticky "Geral" column. Sticky left column (company name + CNPJ), sticky header (dimension code + short name), sticky right column ("Geral" — overall risk badge with score + level). Cell background via `riskScoreBg(score)` interpolation, foreground via `riskScoreFg(score)`, tooltip with full company + dimension + score + level, `aria-label` per cell. Rows are clickable (`onClick` + `Enter/Space` keyboard handler) → `go("empresa", { companyId })`. Color legend below (gradient bar 0/33/66/100 + Favorável/Intermediário/Desfavorável labels).
+  4. **RiskDistributionChart** — horizontal bar chart, companies sorted by `overallRiskScore` DESC. Each row: company name (left, truncated, with Building2 icon), bar fill colored by `overallRiskLevel` (`var(--risk-low|medium|high)`), score label (right, `font-mono-numeric`). Reference lines at 33% and 66% (dashed, with the score labels above the first row). Legend below with refs. Pure CSS/divs (no chart lib).
+  5. **CompanyDetailCards** — responsive grid (1/2/3 cols), one card per company (sorted by `overallRiskScore` DESC). Card content: header (company name + CNPJ + large overall-risk badge in the brand color), location row (MapPin icon + city/state), 3-col mini-stats (avaliações / GHEs elegíveis / respondentes), last assessment status + date (bordered top/bottom), top-3 highest-risk dimensions (Badge with code + truncated name + colored score), CardFooter "Acessar" button (ChevronRight icon) → `go("empresa", { companyId })`.
+- States: **Loading** renders 4 KPI skeletons + a tall heatmap skeleton + a chart skeleton + a 3-card detail skeleton. **Empty** (data.length === 0) renders a centered card with Building2 icon, "Nenhuma empresa cadastrada. Adicione seu primeiro cliente para visualizar a análise consolidada." + a "Cadastrar empresa" button → `go("empresas")`. **Error** renders a centered card with ShieldAlert + "Não foi possível carregar a análise consolidada" + a "Tentar novamente" button → `load()` retry. Data fetching on mount via `api.me.companiesBreakdown()`; silent refresh via the header button (`refreshing=true` keeps the existing data rendered while the request is in flight).
+- Accessibility: KPI cards have `aria-label` with label + value + description; heatmap cells have `aria-label` with company + dimension code + name + score + risk level; heatmap rows are keyboard-focusable with Enter/Space activation; chart bars have `role="img"` + `aria-label`; heatmap table has a sr-only `<caption>`; semantic HTML throughout (`<section>`, `<header>`, `<table>` with `<thead>`/`<tbody>`, `<ul>` for top-3 dimensions, `<main>` wrapper inherited from the shell).
+- Design-system conformance: NO indigo/blue, NO emojis, NO chart libraries, NO new npm packages. Reused the same `riskScoreBg`/`riskScoreFg` color interpolation as resultados for visual consistency. Tailwind theme tokens `risk-low`/`risk-medium`/`risk-high`/`brand`/`brand-light` (with `/opacity`), the `risk-low-bg`/`risk-medium-bg`/`risk-high-bg`/`card-hover`/`scroll-area`/`font-mono-numeric` CSS utilities, and CSS vars `--risk-low`/`--risk-medium`/`--risk-high` for inline bar fills (same pattern as the resultados CompanyAvgBars).
+- Verification: `bun run lint` → exit 0, 0 errors, 0 warnings. Did NOT restart the dev server (auto dev). Triggered a fresh GET `/` (HTTP 200, 2ms compile — cache hit) and GET `/api/v1/professionals/me/companies-breakdown` (HTTP 401 as expected with no session — proves the route compiles and the auth gate works). The transient "Module not found '@/components/consolidado/consolidado-view'" entries in dev.log were from the edit-to-app-shell window before the file was created; the most recent compile of the page succeeded.
+
+Stage Summary:
+- New top-level nav item "Consolidado" (BarChart3 icon) between Painel and Empresas — gives the professional a cross-company risk comparison view (the #1 priority recommendation from Task 10's orchestrator review).
+- New API: `GET /api/v1/professionals/me/companies-breakdown` — per-company risk metrics (assessments count, eligible/at-risk/medium GHE counts, total respondents, last-assessment status/date, 11 dimension weighted-avg scores, overall risk score + level). Single Prisma query (no N+1), in-memory aggregation mirroring the dashboard pattern but per-company instead of consolidated.
+- New frontend: `ConsolidadoView` with 5 sections (header, KPIs, heatmap, distribution chart, detail cards), all loading/empty/error states, full keyboard + screen-reader accessibility, responsive (mobile-first → 4-col KPIs / 3-col detail cards on lg).
+- Files created: `src/app/api/v1/professionals/me/companies-breakdown/route.ts`, `src/components/consolidado/consolidado-view.tsx`. Files modified: `src/lib/types.ts` (added `CompanyBreakdown`), `src/lib/api.ts` (added `me.companiesBreakdown` + import), `src/lib/store.ts` (added `"consolidado"` to `ViewName`), `src/components/shell/app-shell.tsx` (nav item + lazy view + renderView case).
+- Lint: `bun run lint` exit 0. Dev server: GET / 200, GET /api/v1/professionals/me/companies-breakdown 401 (auth gate works).
+
+---
+Task ID: 11
+Agent: orchestrator (cron review round 4)
+Task: Cross-company consolidated analytics view
+
+## Current project status assessment
+- App stable from round 3. `bun run lint` exit 0. Dev server HTTP 200.
+- QA via agent-browser confirmed: assessment duplication, session management UI, audit log with 21 action types all working. Dark mode verified on painel + resultados.
+- Mobile viewport basic check (375px) on painel: hamburger menu works, KPIs stack, content reflows.
+- Selected the #1 recommendation from round 3: cross-company consolidated analytics — a new top-level nav item for comparing risk across all client companies. This is the highest-value remaining feature for a multi-client SaaS.
+
+## Completed modifications (Task 11-a)
+
+### Backend (Task 11-a)
+- **NEW** `GET /api/v1/professionals/me/companies-breakdown/route.ts` — per-company risk breakdown: assessmentsCount, lastAssessmentStatus/completedAt, eligibleGhes, totalRespondents, atRiskGhes, mediumRiskGhes, 11-dimension weighted avg scores (from completed assessments via `companyWeightedAverage`), overallRiskScore (mean of 11 dims), overallRiskLevel. Single `db.company.findMany` with nested includes, in-memory aggregation mirroring the dashboard endpoint pattern.
+
+### API client + types
+- `src/lib/api.ts` — added `me.companiesBreakdown()`.
+- `src/lib/types.ts` — added `CompanyBreakdown` interface.
+
+### Frontend (Task 11-a)
+- **NEW** `src/components/consolidado/consolidado-view.tsx` — `ConsolidadoView` with 5 sections:
+  1. Header "Análise Consolidada" + subtitle + refresh button
+  2. 4 KPI cards (Total de empresas, Empresas em risco alto, Empresas em risco intermediário, GHEs em risco)
+  3. Cross-company dimension heatmap table (rows=companies, cols=D1-D11 + Geral, colored cells via `riskScoreBg` interpolation, sticky first column + header, clickable rows → `go("empresa", { companyId })`, color legend)
+  4. Risk distribution horizontal bar chart (overallRiskScore per company, sorted desc, reference lines at 33/66, pure CSS)
+  5. Company detail cards (responsive 1/2/3 grid: name + CNPJ + location, overall risk badge, mini stats, last assessment status, top 3 highest-risk dimensions, "Acessar" button)
+- `src/lib/store.ts` — added `"consolidado"` to `ViewName` union.
+- `src/components/shell/app-shell.tsx` — added `BarChart3` import, NAV_ITEMS entry (between Painel and Empresas), `lazyView` loader, `renderView` case.
+
+## Verification results
+- `bun run lint` → exit 0, 0 errors, 0 warnings.
+- Dev server: clean restart, HTTP 200.
+- agent-browser QA:
+  - ✅ "Consolidado" nav item appears between Painel and Empresas
+  - ✅ Header "Análise Consolidada" + subtitle renders
+  - ✅ 4 KPI cards: 1 empresa, 0 risco alto, 1 intermediário, 2 GHEs em risco
+  - ✅ Cross-company heatmap: company row with all 11 dimension scores (D1=49, D5=55, D8=52, etc.) + Geral=50, colored cells, aria-labels
+  - ✅ Risk distribution chart: horizontal bar showing "Indústria Brasileira...: 50" with reference lines 33/66
+  - ✅ Company detail card: overall risk badge "INTERMEDIÁRIO (50)", stats (2 avaliações, 2 GHEs elegíveis, 12 respondentes), top 3 risk dimensions, "Acessar" button
+  - ✅ Clickable heatmap row → navigates to company detail (verified: "Visão Geral" tab loaded)
+  - ✅ Mobile viewport (375px): hamburger menu works, KPIs stack, heatmap table has horizontal scroll with sticky columns
+- Screenshots: `/tmp/qa4-consolidado.png`, `/tmp/qa4-consolidado-full.png`, `/tmp/qa4-consolidado-mobile.png`, `/tmp/qa4-mobile-painel.png`.
+
+## Unresolved issues / risks
+- **Dark mode QA on inventário/plano/relatório** — still not screenshot-tested in dark mode (carried over from round 3). The report preview uses hardcoded `bg-white text-black` which is intentional for print.
+- **Responsive/mobile polish** — basic check passed (375px renders, tables scroll horizontally), but no deep audit of inventário table or resultados charts on mobile.
+- **Radix Calendar Popover** in create-assessment dialog still hard to drive in headless automation (carried over). Low priority.
+- **Report DOCX generation** still creates a status='ready' row without a real .docx binary (carried over).
+
+## Priority recommendations for next phase
+1. **Dark mode QA on remaining views** (inventário, plano, relatório) — screenshot each in dark mode; fix contrast issues.
+2. **Bulk worker response simulation** — a "Simular N respostas" button per GHE for demo/testing, minting + completing N tokens with realistic Likert distributions. Would make demos much faster.
+3. **Assessment templates** — pre-configured templates by company size/sector to speed up setup.
+4. **Webhook/email notifications** — notify when assessment reaches eligibility threshold or end date approaches.
+5. **Cross-company trend comparison** — extend the Consolidado view with a time-series chart comparing risk evolution across companies over multiple cycles.
+6. **Export consolidated report** — a "Exportar análise consolidada" button (PDF/CSV) on the Consolidado view for sharing with stakeholders.

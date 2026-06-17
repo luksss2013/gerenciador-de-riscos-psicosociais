@@ -3,6 +3,7 @@ import { create } from "zustand";
 
 export type ViewName =
   | "painel"
+  | "consolidado"
   | "empresas"
   | "empresa"
   | "avaliacao"
