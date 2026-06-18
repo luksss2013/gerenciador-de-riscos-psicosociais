@@ -1,11 +1,7 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import {
-  errorJson,
-  jsonResponse,
-  requireProfessional,
-} from "@/lib/session";
 import { runScoring } from "@/lib/scoring-service";
+import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 
 /**
  * POST /api/v1/system/run-pending-scoring

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAuth, useView } from "@/lib/store";
-import { api, ApiError } from "@/lib/api";
+import { Suspense, useEffect } from "react";
 import { AuthScreen } from "@/components/auth/auth-screen";
 import { AppShell } from "@/components/shell/app-shell";
 import { WorkerPortal } from "@/components/worker/worker-portal";
+import { api } from "@/lib/api";
+import { useAuth, useView } from "@/lib/store";
 
 function HomeContent() {
   const { professional, loading, set, setLoading } = useAuth();

@@ -6,7 +6,7 @@
 
 import { cookies } from "next/headers";
 import { db } from "./db";
-import { ApiError, ERROR_CODES, HTTP_STATUS, errorResponse } from "./errors";
+import { ApiError, ERROR_CODES, errorResponse, HTTP_STATUS } from "./errors";
 
 const SESSION_COOKIE = "nr1_session";
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -14,7 +14,9 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 function randomToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export async function createSessionCookie(professionalId: string): Promise<{
@@ -70,10 +72,7 @@ export async function requireProfessional() {
 
 export async function requireTenantOwnership(resourceProfessionalId: string, currentId: string) {
   if (resourceProfessionalId !== currentId) {
-    throw new ApiError(
-      ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS,
-      "Cross-tenant access denied"
-    );
+    throw new ApiError(ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS, "Cross-tenant access denied");
   }
 }
 
@@ -99,16 +98,20 @@ export async function hashPassword(password: string): Promise<string> {
     new TextEncoder().encode(password),
     "PBKDF2",
     false,
-    ["deriveBits"]
+    ["deriveBits"],
   );
   const derived = await crypto.subtle.deriveBits(
     { name: "PBKDF2", salt, iterations: ITER, hash: "SHA-256" },
     keyMaterial,
-    KEY_LEN * 8
+    KEY_LEN * 8,
   );
   const hashArr = new Uint8Array(derived);
-  const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
-  const hashHex = Array.from(hashArr).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const saltHex = Array.from(salt)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  const hashHex = Array.from(hashArr)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
   return `pbkdf2$${ITER}$${saltHex}$${hashHex}`;
 }
 
@@ -123,12 +126,12 @@ export async function verifyPassword(password: string, stored: string): Promise<
     new TextEncoder().encode(password),
     "PBKDF2",
     false,
-    ["deriveBits"]
+    ["deriveBits"],
   );
   const derived = await crypto.subtle.deriveBits(
     { name: "PBKDF2", salt: salt as any, iterations: iter, hash: "SHA-256" },
     keyMaterial,
-    KEY_LEN * 8
+    KEY_LEN * 8,
   );
   const actual = Array.from(new Uint8Array(derived))
     .map((b) => b.toString(16).padStart(2, "0"))
@@ -161,7 +164,11 @@ export function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
-export function errorJson(code: typeof ERROR_CODES[keyof typeof ERROR_CODES], message?: string, details?: Record<string, unknown>): Response {
+export function errorJson(
+  code: (typeof ERROR_CODES)[keyof typeof ERROR_CODES],
+  message?: string,
+  details?: Record<string, unknown>,
+): Response {
   const status = HTTP_STATUS[code];
   return jsonResponse(errorResponse(code, message, details), status);
 }
@@ -183,7 +190,7 @@ export function workerJsonResponse(data: unknown, status = 200): Response {
 }
 
 export function workerErrorJson(
-  code: typeof ERROR_CODES[keyof typeof ERROR_CODES],
+  code: (typeof ERROR_CODES)[keyof typeof ERROR_CODES],
   message?: string,
   details?: Record<string, unknown>,
 ): Response {

@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-
 interface LogoProps {
   className?: string;
   size?: number;
@@ -17,12 +15,7 @@ interface LogoProps {
  * small sprout above the head symbolizing well-being/growth. Pine + terracotta +
  * sage palette per the clinical-institutional design system.
  */
-export function Logo({
-  className,
-  size = 32,
-  withWordmark = false,
-  variant = "full",
-}: LogoProps) {
+export function Logo({ className, size = 32, withWordmark = false, variant = "full" }: LogoProps) {
   return (
     <span className={`inline-flex items-center gap-2.5 ${className ?? ""}`}>
       <svg
@@ -65,9 +58,7 @@ export function Logo({
             NR-1 Copsoq
           </span>
           {variant === "full" && (
-            <span className="text-[11px] text-muted-foreground block">
-              Riscos psicossociais
-            </span>
+            <span className="text-[11px] text-muted-foreground block">Riscos psicossociais</span>
           )}
         </span>
       )}

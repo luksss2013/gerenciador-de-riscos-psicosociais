@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
+import { runScoring } from "@/lib/scoring-service";
 import {
   errorJson,
   jsonResponse,
@@ -7,7 +8,6 @@ import {
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
-import { runScoring } from "@/lib/scoring-service";
 
 interface RouteCtx {
   params: Promise<{ id: string }>;
@@ -24,7 +24,10 @@ export async function POST(request: Request, { params }: RouteCtx) {
     await requireTenantOwnership(assessment.professionalId, professional.id);
 
     if (assessment.status !== "collecting") {
-      return errorJson(ERROR_CODES.ASSESSMENT_NOT_COLLECTING, "Assessment must be collecting to close");
+      return errorJson(
+        ERROR_CODES.ASSESSMENT_NOT_COLLECTING,
+        "Assessment must be collecting to close",
+      );
     }
 
     // Set to processing

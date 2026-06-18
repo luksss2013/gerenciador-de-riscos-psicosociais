@@ -1,17 +1,23 @@
 "use client";
 
+import {
+  AlertTriangle,
+  Building2,
+  ClipboardList,
+  ListChecks,
+  Loader2,
+  Search,
+  Users,
+} from "lucide-react";
 import * as React from "react";
-import { Search, Loader2, Building2, Users, ClipboardList, ListChecks, AlertTriangle } from "lucide-react";
-
-import { api } from "@/lib/api";
-import { useView } from "@/lib/store";
-import type { SearchResults } from "@/lib/types";
-import { formatCnpj } from "@/lib/cnpj";
-import { ASSESSMENT_STATUS_LABELS, ACTION_STATUS_LABELS } from "@/lib/errors";
-
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
+import { formatCnpj } from "@/lib/cnpj";
+import { ACTION_STATUS_LABELS, ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
+import { useView } from "@/lib/store";
+import type { SearchResults } from "@/lib/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -166,12 +172,16 @@ export function GlobalSearch() {
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}
-          <kbd
-            className="text-[10px] font-mono-numeric px-1.5 py-0.5 rounded border border-border text-muted-foreground cursor-pointer"
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setOpen(false)}
+            className="h-6 px-1.5 text-[10px] font-mono-numeric text-muted-foreground hover:text-foreground"
+            aria-label="Fechar busca"
           >
             ESC
-          </kbd>
+          </Button>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto scroll-area">
@@ -304,7 +314,10 @@ export function GlobalSearch() {
                       title={inv.hazardDescription}
                       subtitle={`${inv.companyName} · ${inv.assessmentTitle}${inv.mteFactorCode ? ` · ${inv.mteFactorCode}` : ""}`}
                       onSelect={() => {
-                        go("inventario", { assessmentId: inv.assessmentId, companyId: inv.companyId });
+                        go("inventario", {
+                          assessmentId: inv.assessmentId,
+                          companyId: inv.companyId,
+                        });
                         setOpen(false);
                         setQuery("");
                       }}

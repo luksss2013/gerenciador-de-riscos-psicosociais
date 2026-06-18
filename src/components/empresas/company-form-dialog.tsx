@@ -1,31 +1,10 @@
 "use client";
 
-import * as React from "react";
-import { useEffect, useState } from "react";
 import { Check, Loader2, Plus } from "lucide-react";
+import type * as React from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import type { CompanySummary } from "@/lib/types";
-import {
-  formatCnpj,
-  isValidCnpj,
-  maskCnpj,
-  sanitizeCnpj,
-} from "@/lib/cnpj";
-import {
-  FIELD_ERROR_CLASS,
-  FieldError,
-  maskNumber,
-  maskPhone,
-  validateEmail,
-  validateRequired,
-} from "@/lib/form-utils";
-import { BRAZILIAN_UFS } from "@/lib/errors";
-
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -41,6 +22,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ApiError, api } from "@/lib/api";
+import { formatCnpj, isValidCnpj, maskCnpj, sanitizeCnpj } from "@/lib/cnpj";
+import { BRAZILIAN_UFS } from "@/lib/errors";
+import {
+  FIELD_ERROR_CLASS,
+  FieldError,
+  maskNumber,
+  maskPhone,
+  validateEmail,
+  validateRequired,
+} from "@/lib/form-utils";
+import type { CompanySummary } from "@/lib/types";
 
 interface CompanyFormState {
   name: string;
@@ -68,11 +61,7 @@ const EMPTY_FORM: CompanyFormState = {
   dpoPoc: "",
 };
 
-type FieldKey =
-  | "name"
-  | "cnpj"
-  | "contactEmail"
-  | "employeeCount";
+type FieldKey = "name" | "cnpj" | "contactEmail" | "employeeCount";
 
 /**
  * CompanyFormDialog — reused for create AND edit. CNPJ field is disabled on
@@ -107,8 +96,7 @@ export function CompanyFormDialog({
         name: editing.name ?? "",
         cnpj: formatCnpj(editing.cnpj),
         cnaePrimary: editing.cnaePrimary ?? "",
-        employeeCount:
-          editing.employeeCount != null ? String(editing.employeeCount) : "",
+        employeeCount: editing.employeeCount != null ? String(editing.employeeCount) : "",
         city: editing.city ?? "",
         state: editing.state ?? "",
         contactName: editing.contactName ?? "",
@@ -126,18 +114,13 @@ export function CompanyFormDialog({
   const cnpjTouched = form.cnpj.length > 0;
   const showCnpjFmtError = cnpjTouched && !cnpjValid;
 
-  const set = <K extends keyof CompanyFormState>(
-    key: K,
-    value: CompanyFormState[K]
-  ) => {
+  const set = <K extends keyof CompanyFormState>(key: K, value: CompanyFormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     // Clear any inline error on the field the user is editing — both
     // front-side onBlur errors and backend-mapped errors.
     if (key === "name" || key === "cnpj" || key === "contactEmail") {
       const field = key as FieldKey;
-      setErrors((prev) =>
-        prev[field] ? { ...prev, [field]: undefined } : prev
-      );
+      setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
     }
   };
 
@@ -260,13 +243,12 @@ export function CompanyFormDialog({
                 onBlur={() => validateField("name")}
                 required
                 autoFocus
+                autoComplete="organization"
                 aria-invalid={!!errors.name}
                 aria-describedby={errors.name ? "emp-name-err" : undefined}
                 className={errors.name ? FIELD_ERROR_CLASS : ""}
               />
-              {errors.name ? (
-                <FieldError id="emp-name-err" message={errors.name} />
-              ) : null}
+              {errors.name ? <FieldError id="emp-name-err" message={errors.name} /> : null}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -282,20 +264,16 @@ export function CompanyFormDialog({
                     onChange={(e) => set("cnpj", maskCnpj(e.target.value))}
                     onBlur={() => validateField("cnpj")}
                     disabled={!!editing}
-                    aria-invalid={
-                      showCnpjFmtError || !!errors.cnpj
-                    }
+                    aria-invalid={showCnpjFmtError || !!errors.cnpj}
                     aria-describedby={
-                      showCnpjFmtError || errors.cnpj
-                        ? "emp-cnpj-feedback"
-                        : undefined
+                      showCnpjFmtError || errors.cnpj ? "emp-cnpj-feedback" : undefined
                     }
                     className={`font-mono-numeric pr-9 ${
                       showCnpjFmtError || errors.cnpj
                         ? FIELD_ERROR_CLASS
                         : cnpjValid
-                        ? "border-[var(--risk-low)] focus-visible:ring-[var(--risk-low)]/30"
-                        : ""
+                          ? "border-[var(--risk-low)] focus-visible:ring-[var(--risk-low)]/30"
+                          : ""
                     }`}
                   />
                   {cnpjValid && (
@@ -306,10 +284,7 @@ export function CompanyFormDialog({
                   )}
                 </div>
                 {(showCnpjFmtError || errors.cnpj) && (
-                  <FieldError
-                    id="emp-cnpj-feedback"
-                    message={errors.cnpj ?? "CNPJ inválido"}
-                  />
+                  <FieldError id="emp-cnpj-feedback" message={errors.cnpj ?? "CNPJ inválido"} />
                 )}
                 {editing && (
                   <p className="text-xs text-muted-foreground">
@@ -338,9 +313,7 @@ export function CompanyFormDialog({
                   inputMode="numeric"
                   placeholder="0"
                   value={form.employeeCount}
-                  onChange={(e) =>
-                    set("employeeCount", maskNumber(e.target.value, { min: 0 }))
-                  }
+                  onChange={(e) => set("employeeCount", maskNumber(e.target.value, { min: 0 }))}
                   className="font-mono-numeric"
                 />
               </div>
@@ -354,10 +327,7 @@ export function CompanyFormDialog({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="emp-state">UF</Label>
-                <Select
-                  value={form.state}
-                  onValueChange={(v) => set("state", v)}
-                >
+                <Select value={form.state} onValueChange={(v) => set("state", v)}>
                   <SelectTrigger id="emp-state" className="w-full">
                     <SelectValue placeholder="—" />
                   </SelectTrigger>
@@ -375,9 +345,7 @@ export function CompanyFormDialog({
 
           {/* Contato */}
           <fieldset className="space-y-4" disabled={submitting}>
-            <legend className="font-display text-sm font-medium text-foreground">
-              Contato
-            </legend>
+            <legend className="font-display text-sm font-medium text-foreground">Contato</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="emp-contact-name">Responsável</Label>
@@ -385,6 +353,7 @@ export function CompanyFormDialog({
                   id="emp-contact-name"
                   value={form.contactName}
                   onChange={(e) => set("contactName", e.target.value)}
+                  autoComplete="name"
                 />
               </div>
               <div className="space-y-1.5">
@@ -392,20 +361,17 @@ export function CompanyFormDialog({
                 <Input
                   id="emp-contact-email"
                   type="email"
+                  autoComplete="email"
+                  spellCheck={false}
                   value={form.contactEmail}
                   onChange={(e) => set("contactEmail", e.target.value)}
                   onBlur={() => validateField("contactEmail")}
                   aria-invalid={!!errors.contactEmail}
-                  aria-describedby={
-                    errors.contactEmail ? "emp-email-err" : undefined
-                  }
+                  aria-describedby={errors.contactEmail ? "emp-email-err" : undefined}
                   className={errors.contactEmail ? FIELD_ERROR_CLASS : ""}
                 />
                 {errors.contactEmail ? (
-                  <FieldError
-                    id="emp-email-err"
-                    message={errors.contactEmail}
-                  />
+                  <FieldError id="emp-email-err" message={errors.contactEmail} />
                 ) : null}
               </div>
               <div className="space-y-1.5">
@@ -416,9 +382,7 @@ export function CompanyFormDialog({
                   inputMode="tel"
                   placeholder="(11) 98765-4321"
                   value={form.contactPhone}
-                  onChange={(e) =>
-                    set("contactPhone", maskPhone(e.target.value))
-                  }
+                  onChange={(e) => set("contactPhone", maskPhone(e.target.value))}
                   className="font-mono-numeric"
                 />
               </div>

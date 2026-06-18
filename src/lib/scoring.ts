@@ -10,10 +10,9 @@
 import {
   COPSOQ_DIMENSIONS,
   COPSOQ_ITEMS,
-  DimensionCode,
-  Direction,
-  getDimension,
-  RiskLevel,
+  type DimensionCode,
+  type Direction,
+  type RiskLevel,
 } from "./copsoq-data";
 
 export const K_ANONYMITY_THRESHOLD = 5; // RB-10, §1.7
@@ -52,15 +51,15 @@ export function cronbachAlpha(itemScores: number[][]): number | null {
   for (const scores of itemScores) {
     if (scores.length !== N) return null;
     const mean = scores.reduce((a, b) => a + b, 0) / N;
-    const variance =
-      scores.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (N - 1);
+    const variance = scores.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (N - 1);
     itemVariances.push(variance);
-    scores.forEach((v, j) => (respondentSums[j] += v));
+    scores.forEach((v, j) => {
+      respondentSums[j] += v;
+    });
   }
 
   const sumMean = respondentSums.reduce((a, b) => a + b, 0) / N;
-  const sumVariance =
-    respondentSums.reduce((acc, v) => acc + (v - sumMean) ** 2, 0) / (N - 1);
+  const sumVariance = respondentSums.reduce((acc, v) => acc + (v - sumMean) ** 2, 0) / (N - 1);
 
   if (sumVariance === 0) return 0;
   const alpha = (k / (k - 1)) * (1 - itemVariances.reduce((a, b) => a + b, 0) / sumVariance);
@@ -87,7 +86,7 @@ export interface DimensionScoreResult {
  *  `answersByToken` = array of tokens, each = array of {itemIndex, likertValue}.
  *  Returns null when GHE ineligible (nResponses < k threshold). */
 export function scoreDepartment(
-  answersByToken: AnswerMatrixEntry[][]
+  answersByToken: AnswerMatrixEntry[][],
 ): DimensionScoreResult[] | null {
   const nResponses = answersByToken.length;
   if (nResponses < K_ANONYMITY_THRESHOLD) return null; // RB-10
@@ -106,9 +105,7 @@ export function scoreDepartment(
 
     // rawScore = mean over all item-scores × respondents
     const allScores = itemScores.flat();
-    const rawScore = allScores.length
-      ? allScores.reduce((a, b) => a + b, 0) / allScores.length
-      : 0;
+    const rawScore = allScores.length ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
 
     const riskScore = applyDirection(rawScore, dim.direction);
     const riskLevel = classifyRiskScore(riskScore);
@@ -130,7 +127,7 @@ export function scoreDepartment(
 
 /** Passo 6 — Company-level weighted average per dimension over eligible GHEs. */
 export function companyWeightedAverage(
-  perDept: { nResponses: number; results: DimensionScoreResult[] }[]
+  perDept: { nResponses: number; results: DimensionScoreResult[] }[],
 ): { code: DimensionCode; weightedAvg: number; riskLevel: RiskLevel }[] {
   const eligible = perDept.filter((d) => d.nResponses >= K_ANONYMITY_THRESHOLD);
   const totalWeight = eligible.reduce((s, d) => s + d.nResponses, 0) || 1;
@@ -151,7 +148,10 @@ export function companyWeightedAverage(
 }
 
 /** NR-1 inventory matrix (spec §1.5): P × S → LOW/MEDIUM/HIGH. */
-export function classifyInventoryRisk(probability: number, severity: number): {
+export function classifyInventoryRisk(
+  probability: number,
+  severity: number,
+): {
   level: RiskLevel;
   score: number;
 } {

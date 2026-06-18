@@ -1,12 +1,8 @@
 "use client";
 
-import * as React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
-  AlertTriangle,
-  ArrowRight,
   BarChart3,
   Building2,
   ChevronRight,
@@ -14,35 +10,20 @@ import {
   MapPin,
   RefreshCw,
   ShieldAlert,
-  ShieldCheck,
   TrendingUp,
-  Users,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useView } from "@/lib/store";
-import type { CompanyBreakdown, DimensionCode, RiskLevel } from "@/lib/types";
-import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
-import { ASSESSMENT_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
-import { formatCnpj } from "@/lib/cnpj";
-
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ApiError, api } from "@/lib/api";
+import { formatCnpj } from "@/lib/cnpj";
+import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
+import { ASSESSMENT_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
+import { useView } from "@/lib/store";
+import type { CompanyBreakdown, DimensionCode, RiskLevel } from "@/lib/types";
 
 // ─── Color helpers (muted sage → ochre → clay ramp) ──────────────────────────
 
@@ -63,19 +44,15 @@ function riskScoreFg(score: number): string {
 }
 
 function riskBg(level: RiskLevel): string {
-  return level === "HIGH"
-    ? "risk-high-bg"
-    : level === "MEDIUM"
-    ? "risk-medium-bg"
-    : "risk-low-bg";
+  return level === "HIGH" ? "risk-high-bg" : level === "MEDIUM" ? "risk-medium-bg" : "risk-low-bg";
 }
 
 function riskText(level: RiskLevel): string {
   return level === "HIGH"
     ? "text-risk-high"
     : level === "MEDIUM"
-    ? "text-risk-medium"
-    : "text-risk-low";
+      ? "text-risk-medium"
+      : "text-risk-low";
 }
 
 const DIM_SHORT_NAMES: Record<DimensionCode, string> = {
@@ -149,22 +126,13 @@ function SummaryKpis({ data }: { data: CompanyBreakdown[] }) {
     >
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border">
         {stats.map((s, i) => (
-          <div
-            key={i}
-            className={`px-3 sm:px-5 py-1 ${i === 0 ? "pl-0" : ""}`}
-            role="group"
-            aria-label={s.ariaLabel}
-          >
+          <div key={s.label} className={`px-3 sm:px-5 py-1 ${i === 0 ? "pl-0" : ""}`}>
             <div className="font-mono-numeric text-xl sm:text-2xl leading-none text-foreground">
               {s.value}
             </div>
-            <div className="text-xs text-muted-foreground mt-1.5">
-              {s.label}
-            </div>
+            <div className="text-xs text-muted-foreground mt-1.5">{s.label}</div>
             {s.secondary && (
-              <div className="text-[11px] text-muted-foreground/80 mt-0.5">
-                {s.secondary}
-              </div>
+              <div className="text-[11px] text-muted-foreground/80 mt-0.5">{s.secondary}</div>
             )}
           </div>
         ))}
@@ -187,16 +155,15 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
         <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
       </div>
       <p className="text-sm text-muted-foreground mb-5">
-        Escore médio ponderado (0 a 100) por dimensão COPSOQ II-BR para cada
-        cliente. Clique em uma linha para acessar o detalhe da empresa.
+        Escore médio ponderado (0 a 100) por dimensão COPSOQ II-BR para cada cliente. Clique em uma
+        linha para acessar o detalhe da empresa.
       </p>
 
       <div className="max-h-[32rem] overflow-auto scroll-area rounded-md border border-border">
-        <table className="w-full text-sm border-collapse" role="grid">
+        <table className="w-full text-sm border-collapse">
           <caption className="sr-only">
-            Mapa de calor dos escores médios ponderados de risco por empresa
-            (linha) e dimensão psicossocial D1 a D11 (coluna). A última
-            coluna apresenta o escore geral da empresa.
+            Mapa de calor dos escores médios ponderados de risco por empresa (linha) e dimensão
+            psicossocial D1 a D11 (coluna). A última coluna apresenta o escore geral da empresa.
           </caption>
           <thead className="sticky top-0 z-20">
             <TableRow>
@@ -228,9 +195,7 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
           </thead>
           <TableBody>
             {data.map((c) => {
-              const dimMap = new Map(
-                c.dimensions.map((d) => [d.code, d])
-              );
+              const dimMap = new Map(c.dimensions.map((d) => [d.code, d]));
               return (
                 <TableRow
                   key={c.companyId}
@@ -245,10 +210,7 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
                   }}
                 >
                   <TableCell className="sticky left-0 z-10 bg-card px-3 py-3 font-medium border-r border-b border-border shadow-[4px_0_8px_-4px_rgba(15,23,42,0.15)]">
-                    <div
-                      className="truncate max-w-[12rem]"
-                      title={c.companyName}
-                    >
+                    <div className="truncate max-w-[12rem]" title={c.companyName}>
                       {c.companyName}
                     </div>
                     <div className="text-xs text-muted-foreground font-normal font-mono-numeric">
@@ -260,8 +222,7 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
                     const score = dr?.weightedAvgRiskScore ?? 0;
                     const bg = riskScoreBg(score);
                     const fg = riskScoreFg(score);
-                    const level =
-                      dr?.riskLevel ?? ("LOW" as RiskLevel);
+                    const level = dr?.riskLevel ?? ("LOW" as RiskLevel);
                     const ariaLabel = `${c.companyName} — ${d.code} ${d.namePtBr}: risco ${score.toFixed(0)}, nível ${RISK_LEVEL_LABELS[level]}`;
                     const tooltipText = `${d.namePtBr} — ${c.companyName}: ${score.toFixed(0)} (${RISK_LEVEL_LABELS[level]})`;
                     return (
@@ -275,12 +236,12 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
                             <div
                               tabIndex={0}
                               role="gridcell"
-                              aria-label={ariaLabel}
                               className="flex items-center justify-center px-2 py-2.5 min-w-[3rem] min-h-[2.5rem] cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                             >
                               <span
                                 className="font-mono-numeric text-sm font-semibold"
-                                aria-hidden="true"
+                                role="img"
+                                aria-label={ariaLabel}
                               >
                                 {score.toFixed(0)}
                               </span>
@@ -291,15 +252,16 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
                       </TableCell>
                     );
                   })}
-                  <TableCell className="sticky right-0 z-10 bg-card px-3 py-3 text-center border-l border-b border-border shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]">
+                  <TableCell
+                    className="sticky right-0 z-10 bg-card px-3 py-3 text-center border-l border-b border-border shadow-[-4px_0_8px_-4px_rgba(15,23,42,0.15)]"
+                    aria-label={`${c.companyName} — Geral: ${c.overallRiskScore.toFixed(
+                      0,
+                    )}, nível ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`}
+                  >
                     <div
                       className={`inline-flex flex-col items-center gap-0.5 px-2 py-1 rounded-md ${riskBg(
-                        c.overallRiskLevel
+                        c.overallRiskLevel,
                       )}`}
-                      role="gridcell"
-                      aria-label={`${c.companyName} — Geral: ${c.overallRiskScore.toFixed(
-                        0
-                      )}, nível ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`}
                     >
                       <span className="font-mono-numeric text-sm font-semibold leading-none">
                         {c.overallRiskScore.toFixed(0)}
@@ -347,11 +309,8 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
 
 function RiskDistributionChart({ data }: { data: CompanyBreakdown[] }) {
   const sorted = useMemo(
-    () =>
-      [...data].sort(
-        (a, b) => b.overallRiskScore - a.overallRiskScore
-      ),
-    [data]
+    () => [...data].sort((a, b) => b.overallRiskScore - a.overallRiskScore),
+    [data],
   );
 
   return (
@@ -363,8 +322,8 @@ function RiskDistributionChart({ data }: { data: CompanyBreakdown[] }) {
         <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
       </div>
       <p className="text-sm text-muted-foreground mb-5">
-        Escore geral (0–100) por empresa, ordenado decrescente. Linhas de
-        referência em 33 (médio) e 66 (alto).
+        Escore geral (0–100) por empresa, ordenado decrescente. Linhas de referência em 33 (médio) e
+        66 (alto).
       </p>
 
       {sorted.length === 0 ? null : (
@@ -392,31 +351,23 @@ function RiskDistributionChart({ data }: { data: CompanyBreakdown[] }) {
               c.overallRiskLevel === "HIGH"
                 ? "var(--risk-high)"
                 : c.overallRiskLevel === "MEDIUM"
-                ? "var(--risk-medium)"
-                : "var(--risk-low)";
-            const width = Math.max(
-              2,
-              Math.min(100, c.overallRiskScore)
-            );
+                  ? "var(--risk-medium)"
+                  : "var(--risk-low)";
+            const width = Math.max(2, Math.min(100, c.overallRiskScore));
             const ariaLabel = `${c.companyName}: risco geral ${c.overallRiskScore.toFixed(
-              0
+              0,
             )} de 100, classificação ${RISK_LEVEL_LABELS[c.overallRiskLevel]}`;
             return (
               <div
                 key={c.companyId}
                 className="grid grid-cols-[8rem_1fr_2.5rem] sm:grid-cols-[16rem_1fr_3rem] items-center gap-2 sm:gap-3"
               >
-                <div
-                  className="text-sm flex items-center gap-1.5 min-w-0"
-                  title={c.companyName}
-                >
+                <div className="text-sm flex items-center gap-1.5 min-w-0" title={c.companyName}>
                   <Building2
                     className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                     aria-hidden="true"
                   />
-                  <span className="text-foreground truncate min-w-0">
-                    {c.companyName}
-                  </span>
+                  <span className="text-foreground truncate min-w-0">{c.companyName}</span>
                 </div>
                 <div
                   className="relative h-7 rounded-md bg-[var(--surface)] overflow-hidden"
@@ -481,10 +432,7 @@ function RiskDistributionChart({ data }: { data: CompanyBreakdown[] }) {
           {RISK_LEVEL_LABELS.HIGH}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span
-            className="inline-block w-px h-3 bg-foreground/40"
-            aria-hidden="true"
-          />
+          <span className="inline-block w-px h-3 bg-foreground/40" aria-hidden="true" />
           <span>refs. 33 / 66</span>
         </div>
       </div>
@@ -504,19 +452,20 @@ function CompanyRow({ c }: { c: CompanyBreakdown }) {
   const go = useView((s) => s.go);
   const top3 = topRiskDimensions(c, 3);
   const lastStatusLabel = c.lastAssessmentStatus
-    ? ASSESSMENT_STATUS_LABELS[c.lastAssessmentStatus] ?? c.lastAssessmentStatus
+    ? (ASSESSMENT_STATUS_LABELS[c.lastAssessmentStatus] ?? c.lastAssessmentStatus)
     : "Sem avaliação";
 
   const overallColor =
     c.overallRiskLevel === "HIGH"
       ? "var(--risk-high)"
       : c.overallRiskLevel === "MEDIUM"
-      ? "var(--risk-medium)"
-      : "var(--risk-low)";
+        ? "var(--risk-medium)"
+        : "var(--risk-low)";
 
   return (
-    <div
-      className="surface-hover py-5 -mx-2 px-2 rounded-sm cursor-pointer transition-colors"
+    <button
+      type="button"
+      className="surface-hover w-full text-left py-5 -mx-2 px-2 rounded-sm cursor-pointer transition-colors"
       onClick={() => go("empresa", { companyId: c.companyId })}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -524,8 +473,6 @@ function CompanyRow({ c }: { c: CompanyBreakdown }) {
           go("empresa", { companyId: c.companyId });
         }
       }}
-      tabIndex={0}
-      role="button"
       aria-label={`Acessar detalhe de ${c.companyName}. Risco geral ${c.overallRiskScore.toFixed(0)} — ${RISK_LEVEL_LABELS[c.overallRiskLevel]}.`}
     >
       <div className="flex flex-col lg:flex-row lg:items-start gap-4">
@@ -551,9 +498,7 @@ function CompanyRow({ c }: { c: CompanyBreakdown }) {
             {(c.city || c.state) && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
-                <span className="truncate">
-                  {[c.city, c.state].filter(Boolean).join(" — ")}
-                </span>
+                <span className="truncate">{[c.city, c.state].filter(Boolean).join(" — ")}</span>
               </div>
             )}
             <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border mt-3 pt-2">
@@ -565,11 +510,12 @@ function CompanyRow({ c }: { c: CompanyBreakdown }) {
           </div>
           {/* Overall risk badge */}
           <div
+            role="img"
             className={`inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-md shrink-0 ${riskBg(
-              c.overallRiskLevel
+              c.overallRiskLevel,
             )}`}
             aria-label={`Risco geral: ${RISK_LEVEL_LABELS[c.overallRiskLevel]} (${c.overallRiskScore.toFixed(
-              0
+              0,
             )})`}
           >
             <span className="font-mono-numeric text-base font-semibold leading-none">
@@ -622,25 +568,16 @@ function CompanyRow({ c }: { c: CompanyBreakdown }) {
                   key={d.code}
                   className="flex items-center gap-2 text-xs"
                   aria-label={`${d.code} ${dim.namePtBr}: risco ${d.weightedAvgRiskScore.toFixed(
-                    0
+                    0,
                   )}, nível ${RISK_LEVEL_LABELS[d.riskLevel]}`}
                 >
-                  <span
-                    className="font-mono-numeric text-[10px] px-1.5 py-0.5 rounded-sm border border-border shrink-0"
-                  >
+                  <span className="font-mono-numeric text-[10px] px-1.5 py-0.5 rounded-sm border border-border shrink-0">
                     {d.code}
                   </span>
-                  <span
-                    className="flex-1 truncate text-foreground"
-                    title={dim.namePtBr}
-                  >
+                  <span className="flex-1 truncate text-foreground" title={dim.namePtBr}>
                     {dim.namePtBr}
                   </span>
-                  <span
-                    className={`font-mono-numeric font-semibold ${riskText(
-                      d.riskLevel
-                    )}`}
-                  >
+                  <span className={`font-mono-numeric font-semibold ${riskText(d.riskLevel)}`}>
                     {d.weightedAvgRiskScore.toFixed(0)}
                   </span>
                 </li>
@@ -663,28 +600,21 @@ function CompanyRow({ c }: { c: CompanyBreakdown }) {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
 function CompanyDetailCards({ data }: { data: CompanyBreakdown[] }) {
   const sorted = useMemo(
-    () =>
-      [...data].sort(
-        (a, b) => b.overallRiskScore - a.overallRiskScore
-      ),
-    [data]
+    () => [...data].sort((a, b) => b.overallRiskScore - a.overallRiskScore),
+    [data],
   );
 
   return (
     <section aria-label="Detalhe por empresa" className="border-b border-border pb-4">
       <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-display text-xl tracking-tight text-foreground">
-          Detalhe por empresa
-        </h2>
-        <span className="text-xs text-muted-foreground">
-          Ordenado por risco geral decrescente
-        </span>
+        <h2 className="font-display text-xl tracking-tight text-foreground">Detalhe por empresa</h2>
+        <span className="text-xs text-muted-foreground">Ordenado por risco geral decrescente</span>
       </div>
       <div className="divide-y divide-border border-t border-border">
         {sorted.map((c) => (
@@ -724,18 +654,18 @@ function LoadingState() {
           <div className="flex border-b border-border bg-[var(--surface)]">
             <Skeleton className="h-9 flex-1 m-2" />
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-12 m-2" />
+              <Skeleton key={`skel-h-${i}`} className="h-9 w-12 m-2" />
             ))}
           </div>
           {/* Body rows */}
           {Array.from({ length: 6 }).map((_, r) => (
-            <div key={r} className="flex border-b border-border last:border-b-0">
+            <div key={`skel-r-${r}`} className="flex border-b border-border last:border-b-0">
               <div className="flex-1 flex items-center gap-2 p-2">
                 <Skeleton className="h-2 w-2 rounded-full" />
                 <Skeleton className="h-3.5 w-32" />
               </div>
               {Array.from({ length: 6 }).map((_, c) => (
-                <Skeleton key={c} className="h-7 w-12 m-2 rounded-sm" />
+                <Skeleton key={`skel-c-${c}`} className="h-7 w-12 m-2 rounded-sm" />
               ))}
             </div>
           ))}
@@ -751,7 +681,7 @@ function LoadingState() {
       {/* Company detail cards skeleton — 3 stacked cards */}
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="rounded-md border border-border p-5 space-y-3">
+          <div key={`skel-${i}`} className="rounded-md border border-border p-5 space-y-3">
             <div className="flex items-center justify-between">
               <Skeleton className="h-5 w-40" />
               <Skeleton className="h-3.5 w-20" />
@@ -781,8 +711,7 @@ function EmptyState() {
           Nenhuma empresa cadastrada
         </h3>
         <p className="text-sm text-muted-foreground max-w-md">
-          Adicione seu primeiro cliente para visualizar a análise
-          consolidada.
+          Adicione seu primeiro cliente para visualizar a análise consolidada.
         </p>
       </div>
       <Button onClick={() => go("empresas")}>
@@ -804,8 +733,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
           Não foi possível carregar a análise consolidada
         </h3>
         <p className="text-sm text-muted-foreground max-w-md">
-          Tente novamente em instantes. Se o erro persistir, verifique sua
-          conexão.
+          Tente novamente em instantes. Se o erro persistir, verifique sua conexão.
         </p>
       </div>
       <Button variant="outline" onClick={onRetry}>

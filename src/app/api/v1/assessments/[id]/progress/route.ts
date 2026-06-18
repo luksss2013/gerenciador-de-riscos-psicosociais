@@ -31,9 +31,8 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     const byDept = assessment.departments.map((ad) => {
       sumResponded += ad.responseCount;
       sumExpected += ad.expectedResponses;
-      const pct = ad.expectedResponses > 0
-        ? Math.round((ad.responseCount / ad.expectedResponses) * 100)
-        : 0;
+      const pct =
+        ad.expectedResponses > 0 ? Math.round((ad.responseCount / ad.expectedResponses) * 100) : 0;
       return {
         id: ad.id,
         departmentId: ad.departmentId,
@@ -45,9 +44,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
       };
     });
 
-    const globalAdesao = sumExpected > 0
-      ? Math.round((sumResponded / sumExpected) * 100)
-      : 0;
+    const globalAdesao = sumExpected > 0 ? Math.round((sumResponded / sumExpected) * 100) : 0;
 
     return jsonResponse({ globalAdesao, byDept });
   } catch (e) {

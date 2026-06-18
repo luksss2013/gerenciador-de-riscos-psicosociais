@@ -83,7 +83,7 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     if (!["draft", "collecting"].includes(assessment.status)) {
       return errorJson(
         ERROR_CODES.ASSESSMENT_NOT_DRAFT,
-        "Assessment cannot be edited in current status"
+        "Assessment cannot be edited in current status",
       );
     }
 
@@ -128,22 +128,23 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     }
     if (body.participationRegistration !== undefined) {
       data.participationRegistration =
-        typeof body.participationRegistration === "string" &&
-        body.participationRegistration.trim()
+        typeof body.participationRegistration === "string" && body.participationRegistration.trim()
           ? body.participationRegistration.trim()
           : null;
     }
 
     const updated = await db.assessment.update({ where: { id: assessment.id }, data });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "assessment.update",
-        resourceType: "assessment",
-        resourceId: updated.id,
-        metadataJson: JSON.stringify({ fields: Object.keys(body) }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "assessment.update",
+          resourceType: "assessment",
+          resourceId: updated.id,
+          metadataJson: JSON.stringify({ fields: Object.keys(body) }),
+        },
+      })
+      .catch(() => {});
     return jsonResponse({
       id: updated.id,
       companyId: updated.companyId,

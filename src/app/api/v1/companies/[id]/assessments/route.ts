@@ -48,7 +48,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     const professional = await requireProfessional();
     const { id } = await params;
     const company = await db.company.findUnique({ where: { id } });
-    if (!company || !company.isActive) {
+    if (!company?.isActive) {
       return errorJson(ERROR_CODES.COMPANY_NOT_FOUND, "Company not found");
     }
     await requireTenantOwnership(company.professionalId, professional.id);
@@ -83,7 +83,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
     const professional = await requireProfessional();
     const { id } = await params;
     const company = await db.company.findUnique({ where: { id } });
-    if (!company || !company.isActive) {
+    if (!company?.isActive) {
       return errorJson(ERROR_CODES.COMPANY_NOT_FOUND, "Company not found");
     }
     await requireTenantOwnership(company.professionalId, professional.id);
@@ -139,7 +139,10 @@ export async function POST(request: Request, { params }: RouteCtx) {
       select: { id: true },
     });
     if (ownedDepts.length !== deptIds.length) {
-      return errorJson(ERROR_CODES.VALIDATION_ERROR, "One or more departments are invalid for this company");
+      return errorJson(
+        ERROR_CODES.VALIDATION_ERROR,
+        "One or more departments are invalid for this company",
+      );
     }
 
     const assessment = await db.assessment.create({
@@ -160,20 +163,19 @@ export async function POST(request: Request, { params }: RouteCtx) {
       include: { departments: true },
     });
 
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "assessment.create",
-        resourceType: "assessment",
-        resourceId: assessment.id,
-        metadataJson: JSON.stringify({ title: assessment.title, deptCount: deptInputs.length }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "assessment.create",
+          resourceType: "assessment",
+          resourceId: assessment.id,
+          metadataJson: JSON.stringify({ title: assessment.title, deptCount: deptInputs.length }),
+        },
+      })
+      .catch(() => {});
 
-    return jsonResponse(
-      serializeAssessment(assessment),
-      201
-    );
+    return jsonResponse(serializeAssessment(assessment), 201);
   } catch (e) {
     const code = (e as { code?: string })?.code;
     if (code === ERROR_CODES.UNAUTHORIZED) {

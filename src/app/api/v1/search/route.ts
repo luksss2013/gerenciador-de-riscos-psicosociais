@@ -1,10 +1,6 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import {
-  errorJson,
-  jsonResponse,
-  requireProfessional,
-} from "@/lib/session";
+import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 
 /**
  * GET /api/v1/search?q=<query>
@@ -20,7 +16,13 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
     if (q.length < 2) {
-      return jsonResponse({ companies: [], assessments: [], departments: [], actionItems: [], inventoryItems: [] });
+      return jsonResponse({
+        companies: [],
+        assessments: [],
+        departments: [],
+        actionItems: [],
+        inventoryItems: [],
+      });
     }
 
     const pid = professional.id;
@@ -48,10 +50,7 @@ export async function GET(request: Request) {
       where: {
         isActive: true,
         company: { professionalId: pid, isActive: true },
-        OR: [
-          { name: { contains: q } },
-          { description: { contains: q } },
-        ],
+        OR: [{ name: { contains: q } }, { description: { contains: q } }],
       },
       take: 5,
       orderBy: { name: "asc" },
@@ -83,11 +82,7 @@ export async function GET(request: Request) {
     const actionItemsRaw = await db.actionItem.findMany({
       where: {
         actionPlan: { assessment: { professionalId: pid } },
-        OR: [
-          { what: { contains: q } },
-          { who: { contains: q } },
-          { why: { contains: q } },
-        ],
+        OR: [{ what: { contains: q } }, { who: { contains: q } }, { why: { contains: q } }],
       },
       take: 5,
       orderBy: { updatedAt: "desc" },
@@ -114,10 +109,7 @@ export async function GET(request: Request) {
     const inventoryItemsRaw = await db.riskInventoryItem.findMany({
       where: {
         assessment: { professionalId: pid },
-        OR: [
-          { hazardDescription: { contains: q } },
-          { possibleHarms: { contains: q } },
-        ],
+        OR: [{ hazardDescription: { contains: q } }, { possibleHarms: { contains: q } }],
       },
       take: 5,
       orderBy: { updatedAt: "desc" },

@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { addYears, format, isValid, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   AlertTriangle,
   Calendar,
@@ -21,11 +21,37 @@ import {
   User,
   XCircle,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { addYears, format, isValid, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
-
-import { api, ApiError } from "@/lib/api";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { ApiError, api } from "@/lib/api";
+import { formatCnpj } from "@/lib/cnpj";
+import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
+import { ASSESSMENT_STATUS_LABELS, PROFESSION_TYPE_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
 import { useAuth, useView } from "@/lib/store";
 import type {
   ActionPlan,
@@ -38,46 +64,6 @@ import type {
   RiskInventoryGroup,
   RiskLevel,
 } from "@/lib/types";
-import {
-  COPSOQ_DIMENSIONS,
-  getDimension,
-} from "@/lib/copsoq-data";
-import {
-  ASSESSMENT_STATUS_LABELS,
-  PROFESSION_TYPE_LABELS,
-  RISK_LEVEL_LABELS,
-} from "@/lib/errors";
-import { formatCnpj } from "@/lib/cnpj";
-
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Separator } from "@/components/ui/separator";
 
 // ─── Types & helpers ─────────────────────────────────────────────────────────
 
@@ -216,8 +202,8 @@ function EmptyState({ onBack }: { onBack: () => void }) {
         </div>
         <h2 className="font-display text-lg tracking-tight">Nenhuma avaliação selecionada</h2>
         <p className="text-sm text-muted-foreground max-w-md">
-          Selecione uma avaliação concluída para gerar o Relatório PGR
-          (Programa de Gerenciamento de Riscos Psicossociais).
+          Selecione uma avaliação concluída para gerar o Relatório PGR (Programa de Gerenciamento de
+          Riscos Psicossociais).
         </p>
         <Button onClick={onBack} variant="outline" className="mt-2">
           <ChevronLeft className="h-4 w-4" />
@@ -261,16 +247,11 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
   const allRequiredMet = requiredMet === requiredItems.length;
 
   return (
-    <section
-      aria-label="Pré-requisitos"
-      className="border-t border-border pt-5 pb-5"
-    >
+    <section aria-label="Pré-requisitos" className="border-t border-border pt-5 pb-5">
       <div className="flex items-start gap-2 mb-4">
         <ListChecks className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
-          <h2 className="font-display text-xl tracking-tight text-foreground">
-            Pré-requisitos
-          </h2>
+          <h2 className="font-display text-xl tracking-tight text-foreground">Pré-requisitos</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {allRequiredMet
               ? "Todos os pré-requisitos obrigatórios foram atendidos."
@@ -293,10 +274,7 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
               role="status"
               aria-label={`${item.met ? "Concluído" : "Pendente"}: ${item.label}`}
             >
-              <Icon
-                className={`h-5 w-5 shrink-0 mt-0.5 ${iconColor}`}
-                aria-hidden="true"
-              />
+              <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconColor}`} aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium">{item.label}</span>
@@ -309,13 +287,9 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {item.description}
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
               </div>
-              <span className="sr-only">
-                {item.met ? "Concluído" : "Pendente"}
-              </span>
+              <span className="sr-only">{item.met ? "Concluído" : "Pendente"}</span>
             </li>
           );
         })}
@@ -329,19 +303,12 @@ function PrerequisitesChecklist({ items }: { items: PrereqItem[] }) {
 function LowAdhesionWarning({ adesaoPct }: { adesaoPct: number }) {
   return (
     <Alert className="border-[var(--risk-medium)]/40 bg-[var(--surface)]">
-      <AlertTriangle
-        className="h-4 w-4 text-[var(--risk-medium)]"
-        aria-hidden="true"
-      />
-      <AlertTitle className="text-[var(--risk-medium)]">
-        Taxa de adesão baixa
-      </AlertTitle>
+      <AlertTriangle className="h-4 w-4 text-[var(--risk-medium)]" aria-hidden="true" />
+      <AlertTitle className="text-[var(--risk-medium)]">Taxa de adesão baixa</AlertTitle>
       <AlertDescription className="text-sm">
-        A taxa de adesão foi de{" "}
-        <strong className="font-mono-numeric">{adesaoPct}%</strong>. O relatório
-        incluirá nota de limitação interpretativa, pois resultados com adesão
-        inferior a 60% podem não representar adequadamente a percepção de toda a
-        população trabalhadora.
+        A taxa de adesão foi de <strong className="font-mono-numeric">{adesaoPct}%</strong>. O
+        relatório incluirá nota de limitação interpretativa, pois resultados com adesão inferior a
+        60% podem não representar adequadamente a percepção de toda a população trabalhadora.
       </AlertDescription>
     </Alert>
   );
@@ -364,10 +331,7 @@ interface ReportMetadataFormProps {
 
 function ReportMetadataForm({ values, onChange, disabled }: ReportMetadataFormProps) {
   return (
-    <section
-      aria-label="Dados do relatório"
-      className="border-t border-border pt-5 pb-5"
-    >
+    <section aria-label="Dados do relatório" className="border-t border-border pt-5 pb-5">
       <div className="flex items-start gap-2 mb-4">
         <User className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
@@ -375,8 +339,7 @@ function ReportMetadataForm({ values, onChange, disabled }: ReportMetadataFormPr
             Dados do relatório
           </h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Metadados que serão impressos no cabeçalho e na assinatura do
-            documento.
+            Metadados que serão impressos no cabeçalho e na assinatura do documento.
           </p>
         </div>
       </div>
@@ -386,9 +349,7 @@ function ReportMetadataForm({ values, onChange, disabled }: ReportMetadataFormPr
           <Input
             id="rep-responsible"
             value={values.responsibleName}
-            onChange={(e) =>
-              onChange({ ...values, responsibleName: e.target.value })
-            }
+            onChange={(e) => onChange({ ...values, responsibleName: e.target.value })}
             disabled={disabled}
             placeholder="Nome do responsável"
             aria-describedby="rep-responsible-help"
@@ -402,9 +363,7 @@ function ReportMetadataForm({ values, onChange, disabled }: ReportMetadataFormPr
           <Input
             id="rep-credential"
             value={values.credentialNumber}
-            onChange={(e) =>
-              onChange({ ...values, credentialNumber: e.target.value })
-            }
+            onChange={(e) => onChange({ ...values, credentialNumber: e.target.value })}
             disabled={disabled}
             placeholder="CRP / CREA / registro profissional"
             aria-describedby="rep-credential-help"
@@ -419,9 +378,7 @@ function ReportMetadataForm({ values, onChange, disabled }: ReportMetadataFormPr
             id="rep-date"
             type="date"
             value={values.reportDate}
-            onChange={(e) =>
-              onChange({ ...values, reportDate: e.target.value })
-            }
+            onChange={(e) => onChange({ ...values, reportDate: e.target.value })}
             disabled={disabled}
           />
         </div>
@@ -449,22 +406,13 @@ interface GenerateButtonsProps {
   onGenerate: (type: ReportType) => void;
 }
 
-function GenerateButtons({
-  disabled,
-  generatingType,
-  onGenerate,
-}: GenerateButtonsProps) {
+function GenerateButtons({ disabled, generatingType, onGenerate }: GenerateButtonsProps) {
   return (
-    <section
-      aria-label="Gerar relatório"
-      className="border-t border-border pt-5 pb-5"
-    >
+    <section aria-label="Gerar relatório" className="border-t border-border pt-5 pb-5">
       <div className="flex items-start gap-2 mb-4">
         <FileDown className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
-          <h2 className="font-display text-xl tracking-tight text-foreground">
-            Gerar relatório
-          </h2>
+          <h2 className="font-display text-xl tracking-tight text-foreground">Gerar relatório</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             {disabled
               ? "Atenda aos pré-requisitos obrigatórios para habilitar a geração."
@@ -531,14 +479,12 @@ const OUTLINE_SECTIONS: OutlineSection[] = [
   {
     num: "1",
     title: "Identificação",
-    description:
-      "Empresa, CNPJ, profissional responsável, período da avaliação e status.",
+    description: "Empresa, CNPJ, profissional responsável, período da avaliação e status.",
   },
   {
     num: "2",
     title: "Metodologia",
-    description:
-      "COPSOQ II-BR, 40 itens, 11 dimensões, escala Likert de 5 pontos.",
+    description: "COPSOQ II-BR, 40 itens, 11 dimensões, escala Likert de 5 pontos.",
   },
   {
     num: "3",
@@ -548,8 +494,7 @@ const OUTLINE_SECTIONS: OutlineSection[] = [
   {
     num: "4",
     title: "Avaliação de Riscos",
-    description:
-      "Heatmap GHE × dimensão, médias por dimensão e dimensões críticas.",
+    description: "Heatmap GHE × dimensão, médias por dimensão e dimensões críticas.",
   },
   {
     num: "5",
@@ -586,10 +531,7 @@ function ReportOutline() {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} asChild>
-      <section
-        aria-label="Estrutura do documento"
-        className="border-t border-border"
-      >
+      <section aria-label="Estrutura do documento" className="border-t border-border">
         <CollapsibleTrigger asChild>
           <button
             type="button"
@@ -619,10 +561,7 @@ function ReportOutline() {
           <div className="border-t border-border pt-4 pb-6 space-y-6">
             <ol className="space-y-1">
               {OUTLINE_SECTIONS.map((s) => (
-                <li
-                  key={s.num}
-                  className="flex items-start gap-3 py-2"
-                >
+                <li key={s.num} className="flex items-start gap-3 py-2">
                   <span
                     className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--surface)] text-[var(--brand)] text-xs font-mono-numeric border border-border"
                     aria-hidden="true"
@@ -630,10 +569,10 @@ function ReportOutline() {
                     {s.num}
                   </span>
                   <div className="min-w-0">
-                    <div className="font-display text-sm font-medium text-foreground">{s.title}</div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {s.description}
-                    </p>
+                    <div className="font-display text-sm font-medium text-foreground">
+                      {s.title}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{s.description}</p>
                   </div>
                 </li>
               ))}
@@ -645,10 +584,7 @@ function ReportOutline() {
               </p>
               <ol className="space-y-1">
                 {OUTLINE_APPENDICES.map((s) => (
-                  <li
-                    key={s.num}
-                    className="flex items-start gap-3 py-2"
-                  >
+                  <li key={s.num} className="flex items-start gap-3 py-2">
                     <span
                       className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-transparent text-muted-foreground text-xs font-mono-numeric border border-dashed border-border"
                       aria-hidden="true"
@@ -656,10 +592,10 @@ function ReportOutline() {
                       {s.num}
                     </span>
                     <div className="min-w-0">
-                      <div className="font-display text-sm font-medium text-foreground">{s.title}</div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {s.description}
-                      </p>
+                      <div className="font-display text-sm font-medium text-foreground">
+                        {s.title}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{s.description}</p>
                     </div>
                   </li>
                 ))}
@@ -690,10 +626,7 @@ function ReportsHistory({
   regeneratingId,
 }: ReportsHistoryProps) {
   return (
-    <section
-      aria-label="Histórico de relatórios"
-      className="border-t border-border pt-5"
-    >
+    <section aria-label="Histórico de relatórios" className="border-t border-border pt-5">
       <div className="flex items-start gap-2 mb-4">
         <RefreshCw className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
@@ -708,7 +641,7 @@ function ReportsHistory({
       {loading ? (
         <div className="space-y-2 border-t border-border pt-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+            <Skeleton key={`skel-${i}`} className="h-12 w-full" />
           ))}
         </div>
       ) : reports.length === 0 ? (
@@ -718,12 +651,10 @@ function ReportsHistory({
               className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2"
               aria-hidden="true"
             />
-            <p className="text-sm text-muted-foreground">
-              Nenhum relatório gerado ainda.
-            </p>
+            <p className="text-sm text-muted-foreground">Nenhum relatório gerado ainda.</p>
             <p className="text-xs text-muted-foreground mt-1">
-              Atenda aos pré-requisitos e clique em &ldquo;Gerar PDF&rdquo;,
-              &ldquo;Gerar DOCX&rdquo; ou &ldquo;Gerar HTML&rdquo; acima.
+              Atenda aos pré-requisitos e clique em &ldquo;Gerar PDF&rdquo;, &ldquo;Gerar
+              DOCX&rdquo; ou &ldquo;Gerar HTML&rdquo; acima.
             </p>
           </div>
         </div>
@@ -751,7 +682,10 @@ function ReportsHistory({
             </TableHeader>
             <TableBody>
               {reports.map((r) => (
-                <TableRow key={r.id} className="border-b border-border hover:bg-[var(--surface)] transition-colors">
+                <TableRow
+                  key={r.id}
+                  className="border-b border-border hover:bg-[var(--surface)] transition-colors"
+                >
                   <TableCell className="font-mono-numeric text-xs py-3">
                     {formatDateTime(r.generatedAt)}
                   </TableCell>
@@ -761,9 +695,7 @@ function ReportsHistory({
                     </Badge>
                   </TableCell>
                   <TableCell className="py-3">
-                    <Badge
-                      className={`border-transparent ${STATUS_BADGE_CLASS[r.status]}`}
-                    >
+                    <Badge className={`border-transparent ${STATUS_BADGE_CLASS[r.status]}`}>
                       {STATUS_LABELS[r.status]}
                     </Badge>
                   </TableCell>
@@ -868,14 +800,13 @@ function ReportPreviewDialog({
             Pré-visualização do Relatório PGR
           </DialogTitle>
           <DialogDescription id="report-preview-desc">
-            Pré-visualização em HTML do documento gerado. Use o botão
-            &ldquo;Imprimir / Salvar PDF&rdquo; para salvar como PDF no
-            navegador.
+            Pré-visualização em HTML do documento gerado. Use o botão &ldquo;Imprimir / Salvar
+            PDF&rdquo; para salvar como PDF no navegador.
           </DialogDescription>
         </DialogHeader>
 
         {report && (
-          <div
+          <section
             className="print-area bg-white text-[var(--foreground)] rounded-sm shadow-2xl px-6 sm:px-12 py-10 space-y-10 text-sm leading-relaxed"
             aria-label="Conteúdo do relatório PGR"
           >
@@ -890,8 +821,7 @@ function ReportPreviewDialog({
                     Programa de Gerenciamento de Riscos Psicossociais
                   </p>
                   <p className="text-[11px] mt-3 text-[var(--muted-foreground)]">
-                    Conforme NR-1 / Portaria MTE 1.419/2024 · Instrumento
-                    COPSOQ II-BR
+                    Conforme NR-1 / Portaria MTE 1.419/2024 · Instrumento COPSOQ II-BR
                   </p>
                 </div>
                 <div className="text-right text-xs">
@@ -916,9 +846,7 @@ function ReportPreviewDialog({
               <table className="w-full text-sm">
                 <tbody>
                   <tr>
-                    <td className="font-semibold w-1/3 py-1.5 align-top">
-                      Empresa
-                    </td>
+                    <td className="font-semibold w-1/3 py-1.5 align-top">Empresa</td>
                     <td className="py-1.5">{company?.name ?? "—"}</td>
                   </tr>
                   <tr>
@@ -953,18 +881,13 @@ function ReportPreviewDialog({
                     <td className="font-semibold py-1.5 align-top">Status</td>
                     <td className="py-1.5">
                       {assessment
-                        ? ASSESSMENT_STATUS_LABELS[assessment.status] ??
-                          assessment.status
+                        ? (ASSESSMENT_STATUS_LABELS[assessment.status] ?? assessment.status)
                         : "—"}
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1.5 align-top">
-                      Concluída em
-                    </td>
-                    <td className="py-1.5">
-                      {formatDateShort(assessment?.completedAt ?? null)}
-                    </td>
+                    <td className="font-semibold py-1.5 align-top">Concluída em</td>
+                    <td className="py-1.5">{formatDateShort(assessment?.completedAt ?? null)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -975,17 +898,11 @@ function ReportPreviewDialog({
               <table className="w-full text-sm">
                 <tbody>
                   <tr>
-                    <td className="font-semibold w-1/3 py-1.5 align-top">
-                      Profissional
-                    </td>
-                    <td className="py-1.5">
-                      {metadata?.responsibleName ?? "—"}
-                    </td>
+                    <td className="font-semibold w-1/3 py-1.5 align-top">Profissional</td>
+                    <td className="py-1.5">{metadata?.responsibleName ?? "—"}</td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1.5 align-top">
-                      Profissão
-                    </td>
+                    <td className="font-semibold py-1.5 align-top">Profissão</td>
                     <td className="py-1.5">
                       {professionalProfessionType
                         ? PROFESSION_TYPE_LABELS[professionalProfessionType]
@@ -993,9 +910,7 @@ function ReportPreviewDialog({
                     </td>
                   </tr>
                   <tr>
-                    <td className="font-semibold py-1.5 align-top">
-                      Registro
-                    </td>
+                    <td className="font-semibold py-1.5 align-top">Registro</td>
                     <td className="py-1.5 font-mono-numeric">
                       {metadata?.credentialNumber || "—"}
                     </td>
@@ -1015,20 +930,15 @@ function ReportPreviewDialog({
               </h2>
               <p className="text-sm leading-relaxed">
                 O presente relatório foi elaborado com base no instrumento{" "}
-                <strong>
-                  Copenhagen Psychosocial Questionnaire II-BR (COPSOQ II-BR)
-                </strong>
-                , versão brasileira validada por Gonçalves et al. (2021),
-                publicada na Revista de Saúde Pública (DOI:
-                10.11606/s1518-8787.2021055003123), sob licença CC BY-NC-ND
-                4.0.
+                <strong>Copenhagen Psychosocial Questionnaire II-BR (COPSOQ II-BR)</strong>, versão
+                brasileira validada por Gonçalves et al. (2021), publicada na Revista de Saúde
+                Pública (DOI: 10.11606/s1518-8787.2021055003123), sob licença CC BY-NC-ND 4.0.
               </p>
               <p className="text-sm leading-relaxed mt-3">
-                O instrumento é composto por <strong>40 itens</strong>{" "}
-                distribuídos em <strong>11 dimensões</strong> psicossociais,
-                respondidos em <strong>escala Likert de 5 pontos</strong> (1 =
-                Nunca / quase nunca a 5 = Sempre / quase sempre). A aplicação
-                segue o protocolo da NR-1 (Portaria MTE 1.419/2024) para
+                O instrumento é composto por <strong>40 itens</strong> distribuídos em{" "}
+                <strong>11 dimensões</strong> psicossociais, respondidos em{" "}
+                <strong>escala Likert de 5 pontos</strong> (1 = Nunca / quase nunca a 5 = Sempre /
+                quase sempre). A aplicação segue o protocolo da NR-1 (Portaria MTE 1.419/2024) para
                 identificação e avaliação de riscos psicossociais no trabalho.
               </p>
               <table className="w-full text-xs mt-5 border border-[var(--foreground)] border-collapse">
@@ -1057,19 +967,13 @@ function ReportPreviewDialog({
                       <td className="p-2 border border-[var(--foreground)] font-mono-numeric">
                         {dim.code}
                       </td>
-                      <td className="p-2 border border-[var(--foreground)]">
-                        {dim.namePtBr}
-                      </td>
-                      <td className="p-2 border border-[var(--foreground)]">
-                        {dim.groupName}
-                      </td>
+                      <td className="p-2 border border-[var(--foreground)]">{dim.namePtBr}</td>
+                      <td className="p-2 border border-[var(--foreground)]">{dim.groupName}</td>
                       <td className="p-2 border border-[var(--foreground)] text-center font-mono-numeric">
                         {dim.itemCount}
                       </td>
                       <td className="p-2 border border-[var(--foreground)]">
-                        {dim.mteFactorsCovered.length > 0
-                          ? dim.mteFactorsCovered.join(", ")
-                          : "—"}
+                        {dim.mteFactorsCovered.length > 0 ? dim.mteFactorsCovered.join(", ") : "—"}
                       </td>
                     </tr>
                   ))}
@@ -1083,10 +987,9 @@ function ReportPreviewDialog({
                 3. Identificação de Perigos
               </h2>
               <p className="text-sm leading-relaxed mb-4">
-                Inventário de riscos psicossociais elaborado a partir das
-                dimensões classificadas como Intermediário ou Desfavorável nos
-                GHES elegíveis, complementado por itens manuais registrados
-                pelo responsável técnico.
+                Inventário de riscos psicossociais elaborado a partir das dimensões classificadas
+                como Intermediário ou Desfavorável nos GHES elegíveis, complementado por itens
+                manuais registrados pelo responsável técnico.
               </p>
               {allInventoryItems.length > 0 ? (
                 <table className="w-full text-xs border border-[var(--foreground)] border-collapse">
@@ -1114,10 +1017,7 @@ function ReportPreviewDialog({
                   </thead>
                   <tbody>
                     {allInventoryItems.map((item) => {
-                      const level = classifyPS(
-                        item.probability,
-                        item.severity,
-                      );
+                      const level = classifyPS(item.probability, item.severity);
                       return (
                         <tr key={item.id} className="align-top">
                           <td className="p-2 border border-[var(--foreground)]">
@@ -1164,13 +1064,11 @@ function ReportPreviewDialog({
               {dashboard ? (
                 <>
                   <p className="text-sm leading-relaxed mb-4">
-                    A avaliação considera o escore de risco (0&ndash;100) por
-                    dimensão, classificado em três níveis:{" "}
-                    <strong>Favorável</strong> (0&ndash;39),{" "}
-                    <strong>Intermediário</strong> (40&ndash;69) e{" "}
-                    <strong>Desfavorável</strong> (70&ndash;100). A análise
-                    abrange {eligibleGhes.length} GHE(s) elegível(is) de um
-                    total de {dashboard.heatmap.length} GHE(s) cadastrado(s).
+                    A avaliação considera o escore de risco (0&ndash;100) por dimensão, classificado
+                    em três níveis: <strong>Favorável</strong> (0&ndash;39),{" "}
+                    <strong>Intermediário</strong> (40&ndash;69) e <strong>Desfavorável</strong>{" "}
+                    (70&ndash;100). A análise abrange {eligibleGhes.length} GHE(s) elegível(is) de
+                    um total de {dashboard.heatmap.length} GHE(s) cadastrado(s).
                   </p>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--foreground)] border border-[var(--foreground)] mb-5">
@@ -1242,9 +1140,7 @@ function ReportPreviewDialog({
                               </div>
                             </td>
                             {COPSOQ_DIMENSIONS.map((dim) => {
-                              const cell = row.dimensions?.find(
-                                (d) => d.code === dim.code,
-                              );
+                              const cell = row.dimensions?.find((d) => d.code === dim.code);
                               if (!cell) {
                                 return (
                                   <td
@@ -1366,8 +1262,8 @@ function ReportPreviewDialog({
                 </>
               ) : (
                 <p className="text-sm italic text-[var(--muted-foreground)]">
-                  Avaliação de riscos indisponível (a avaliação não foi
-                  concluída ou os escores não foram calculados).
+                  Avaliação de riscos indisponível (a avaliação não foi concluída ou os escores não
+                  foram calculados).
                 </p>
               )}
             </section>
@@ -1407,24 +1303,14 @@ function ReportPreviewDialog({
                   <tbody>
                     {actionPlan.actionItems.map((item) => (
                       <tr key={item.id} className="align-top">
-                        <td className="p-2 border border-[var(--foreground)]">
-                          {item.what}
-                        </td>
-                        <td className="p-2 border border-[var(--foreground)]">
-                          {item.why}
-                        </td>
-                        <td className="p-2 border border-[var(--foreground)]">
-                          {item.who}
-                        </td>
-                        <td className="p-2 border border-[var(--foreground)]">
-                          {item.where}
-                        </td>
+                        <td className="p-2 border border-[var(--foreground)]">{item.what}</td>
+                        <td className="p-2 border border-[var(--foreground)]">{item.why}</td>
+                        <td className="p-2 border border-[var(--foreground)]">{item.who}</td>
+                        <td className="p-2 border border-[var(--foreground)]">{item.where}</td>
                         <td className="p-2 border border-[var(--foreground)] font-mono-numeric">
                           {formatDateShort(item.whenDate)}
                         </td>
-                        <td className="p-2 border border-[var(--foreground)]">
-                          {item.how}
-                        </td>
+                        <td className="p-2 border border-[var(--foreground)]">{item.how}</td>
                         <td className="p-2 border border-[var(--foreground)] text-right font-mono-numeric">
                           {formatBRL(item.estimatedCost)}
                         </td>
@@ -1445,33 +1331,24 @@ function ReportPreviewDialog({
                 6. Monitoramento e Revisão
               </h2>
               <p className="text-sm leading-relaxed">
-                Conforme a NR-1, o Programa de Gerenciamento de Riscos (PGR)
-                deve ser revisado:
+                Conforme a NR-1, o Programa de Gerenciamento de Riscos (PGR) deve ser revisado:
               </p>
               <ul className="text-sm list-disc pl-6 mt-3 space-y-1.5">
                 <li>
-                  No máximo a cada <strong>2 (dois) anos</strong> para riscos
-                  psicossociais;
+                  No máximo a cada <strong>2 (dois) anos</strong> para riscos psicossociais;
                 </li>
+                <li>Em caso de mudança significativa nos processos ou estrutura organizacional;</li>
                 <li>
-                  Em caso de mudança significativa nos processos ou estrutura
-                  organizacional;
+                  Após acidentes ou incidentes relacionados à saúde mental ou adoecimento
+                  ocupacional;
                 </li>
-                <li>
-                  Após acidentes ou incidentes relacionados à saúde mental ou
-                  adoecimento ocupacional;
-                </li>
-                <li>
-                  Quando da identificação de novas fontes de risco psicossocial.
-                </li>
+                <li>Quando da identificação de novas fontes de risco psicossocial.</li>
               </ul>
               {assessment?.completedAt && (
                 <p className="text-sm mt-4">
                   <strong>Próximo ciclo recomendado:</strong>{" "}
                   <span className="font-mono-numeric">
-                    {formatDateShort(
-                      addYears(parseISO(assessment.completedAt), 2).toISOString(),
-                    )}
+                    {formatDateShort(addYears(parseISO(assessment.completedAt), 2).toISOString())}
                   </span>
                 </p>
               )}
@@ -1484,12 +1361,11 @@ function ReportPreviewDialog({
               </h2>
               <ul className="text-sm list-disc pl-6 space-y-1.5">
                 <li>
-                  <strong>Apêndice A — Escores completos por GHE:</strong>{" "}
-                  detalhados no heatmap da Seção 4.
+                  <strong>Apêndice A — Escores completos por GHE:</strong> detalhados no heatmap da
+                  Seção 4.
                 </li>
                 <li>
-                  <strong>Apêndice B — Heatmap consolidado:</strong> apresentado
-                  na Seção 4.
+                  <strong>Apêndice B — Heatmap consolidado:</strong> apresentado na Seção 4.
                 </li>
                 <li>
                   <strong>Apêndice C — Assinatura:</strong> abaixo.
@@ -1502,9 +1378,7 @@ function ReportPreviewDialog({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
                   <div className="border-t border-[var(--foreground)] pt-3 text-center text-xs">
-                    <p className="font-semibold">
-                      {metadata?.responsibleName ?? "—"}
-                    </p>
+                    <p className="font-semibold">{metadata?.responsibleName ?? "—"}</p>
                     <p className="mt-0.5">
                       {professionalProfessionType
                         ? PROFESSION_TYPE_LABELS[professionalProfessionType]
@@ -1530,10 +1404,10 @@ function ReportPreviewDialog({
             {/* Notes */}
             {metadata?.notes && (
               <section className="mt-8 pt-4 border-t border-[var(--foreground)]">
-                <h3 className="font-display text-sm font-semibold mb-2 text-[var(--foreground)]">Observações</h3>
-                <p className="text-xs whitespace-pre-wrap">
-                  {metadata.notes}
-                </p>
+                <h3 className="font-display text-sm font-semibold mb-2 text-[var(--foreground)]">
+                  Observações
+                </h3>
+                <p className="text-xs whitespace-pre-wrap">{metadata.notes}</p>
               </section>
             )}
 
@@ -1541,29 +1415,23 @@ function ReportPreviewDialog({
             {lowAdesao && globalAdesao != null && (
               <section className="mt-4 p-3 border border-[var(--risk-medium)]/50 bg-[var(--surface)] text-[var(--foreground)]">
                 <p className="text-xs">
-                  <strong>Nota de limitação interpretativa:</strong> A taxa de
-                  adesão à pesquisa foi de{" "}
-                  <span className="font-mono-numeric">{globalAdesao}%</span>,
-                  abaixo do mínimo recomendado de 60%. Os resultados devem ser
-                  interpretados com cautela, pois podem não representar
-                  adequadamente a percepção de toda a população trabalhadora.
+                  <strong>Nota de limitação interpretativa:</strong> A taxa de adesão à pesquisa foi
+                  de <span className="font-mono-numeric">{globalAdesao}%</span>, abaixo do mínimo
+                  recomendado de 60%. Os resultados devem ser interpretados com cautela, pois podem
+                  não representar adequadamente a percepção de toda a população trabalhadora.
                 </p>
               </section>
             )}
 
             <footer className="pt-4 border-t border-[var(--foreground)] text-[10px] text-[var(--muted-foreground)] text-center">
-              Documento gerado em {formatDateTime(report.generatedAt)} pelo
-              sistema NR-1 Copsoq · Conforme NR-1 / Portaria MTE 1.419/2024 ·
-              Instrumento COPSOQ II-BR (CC BY-NC-ND 4.0)
+              Documento gerado em {formatDateTime(report.generatedAt)} pelo sistema NR-1 Copsoq ·
+              Conforme NR-1 / Portaria MTE 1.419/2024 · Instrumento COPSOQ II-BR (CC BY-NC-ND 4.0)
             </footer>
-          </div>
+          </section>
         )}
 
         <DialogFooter className="no-print">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
           </Button>
           <Button onClick={handlePrint}>
@@ -1620,7 +1488,7 @@ export function RelatorioView() {
         credentialNumber: prev.credentialNumber || professional.credentialNumber || "",
       }));
     }
-  }, [professional, metadata.responsibleName, metadata.credentialNumber]);
+  }, [professional, metadata.responsibleName]);
 
   // Initial parallel fetch
   const fetchInitial = useCallback(async () => {
@@ -1660,7 +1528,10 @@ export function RelatorioView() {
 
     // Second batch: company + dashboard (if completed)
     const secondBatch: Promise<unknown>[] = [
-      api.companies.get(ass.companyId).then(setCompany).catch(() => undefined),
+      api.companies
+        .get(ass.companyId)
+        .then(setCompany)
+        .catch(() => undefined),
     ];
     if (ass.status === "completed") {
       secondBatch.push(
@@ -1696,9 +1567,7 @@ export function RelatorioView() {
       assessment?.participationRegistration &&
       assessment.participationRegistration.trim().length > 0
     );
-    const eligibleDepts = (assessment?.departments ?? []).filter(
-      (d) => d.isEligible,
-    );
+    const eligibleDepts = (assessment?.departments ?? []).filter((d) => d.isEligible);
     const hasEligible = eligibleDepts.length >= 1;
     const inventoryCount = inventory
       ? inventory.autoItems.length + inventory.manualItems.length
@@ -1747,19 +1616,16 @@ export function RelatorioView() {
       {
         id: "action-plan",
         label: "Plano de ação criado",
-        description:
-          hasActionPlan
-            ? `${actionPlan!.actionItems.length} ação(ões) registrada(s).`
-            : "Crie ao menos uma ação 5W2H no plano de ação para complementar o relatório.",
+        description: hasActionPlan
+          ? `${actionPlan!.actionItems.length} ação(ões) registrada(s).`
+          : "Crie ao menos uma ação 5W2H no plano de ação para complementar o relatório.",
         met: hasActionPlan,
         required: false,
       },
     ];
   }, [assessment, inventory, actionPlan]);
 
-  const allRequiredMet = prereqItems
-    .filter((i) => i.required)
-    .every((i) => i.met);
+  const allRequiredMet = prereqItems.filter((i) => i.required).every((i) => i.met);
 
   const globalAdesao = progress?.globalAdesao ?? null;
   const lowAdesao = globalAdesao != null && globalAdesao < 60;
@@ -1789,9 +1655,7 @@ export function RelatorioView() {
         // Refresh history
         await refreshReports();
         // Open preview — find the new report by id in the refreshed list
-        const newReport = (
-          await api.reports.list(assessmentId)
-        ).data
+        const newReport = (await api.reports.list(assessmentId)).data
           .map((r) => normalizeReport(r as RawReport))
           .find((r) => r.id === result.reportId);
         if (newReport) {
@@ -1801,13 +1665,9 @@ export function RelatorioView() {
       } catch (e) {
         if (e instanceof ApiError) {
           if (e.code === "REPORT_PREREQUISITES_UNMET") {
-            const details = e.details as
-              | { failedChecks?: string[] }
-              | undefined;
+            const details = e.details as { failedChecks?: string[] } | undefined;
             const failed = details?.failedChecks ?? [];
-            const labels = failed.map(
-              (c) => FAILED_CHECK_LABELS[c] ?? c,
-            );
+            const labels = failed.map((c) => FAILED_CHECK_LABELS[c] ?? c);
             toast.error("Pré-requisitos não atendidos", {
               description:
                 labels.length > 0
@@ -1839,8 +1699,7 @@ export function RelatorioView() {
           type: report.type,
           metadata: {
             responsibleName: meta?.responsibleName ?? metadata.responsibleName.trim(),
-            credentialNumber:
-              meta?.credentialNumber ?? metadata.credentialNumber.trim(),
+            credentialNumber: meta?.credentialNumber ?? metadata.credentialNumber.trim(),
             reportDate: meta?.reportDate ?? metadata.reportDate,
             ...(meta?.notes || metadata.notes.trim()
               ? { notes: (meta?.notes ?? metadata.notes).trim() }
@@ -1855,13 +1714,9 @@ export function RelatorioView() {
       } catch (e) {
         if (e instanceof ApiError) {
           if (e.code === "REPORT_PREREQUISITES_UNMET") {
-            const details = e.details as
-              | { failedChecks?: string[] }
-              | undefined;
+            const details = e.details as { failedChecks?: string[] } | undefined;
             const failed = details?.failedChecks ?? [];
-            const labels = failed.map(
-              (c) => FAILED_CHECK_LABELS[c] ?? c,
-            );
+            const labels = failed.map((c) => FAILED_CHECK_LABELS[c] ?? c);
             toast.error("Pré-requisitos não atendidos", {
               description:
                 labels.length > 0
@@ -1918,10 +1773,7 @@ export function RelatorioView() {
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
         <section className="border border-dashed border-[var(--risk-high)]/30 rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-3">
           <div className="h-12 w-12 rounded-full risk-high-bg flex items-center justify-center">
-            <AlertTriangle
-              className="h-6 w-6"
-              aria-hidden="true"
-            />
+            <AlertTriangle className="h-6 w-6" aria-hidden="true" />
           </div>
           <h2 className="font-display text-lg tracking-tight">Falha ao carregar</h2>
           <p className="text-sm text-muted-foreground max-w-md">{error}</p>
@@ -1949,6 +1801,7 @@ export function RelatorioView() {
       {/* Print-only CSS — hides everything except .print-area while preview is open */}
       {previewOpen && (
         <style
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static CSS, no user content
           dangerouslySetInnerHTML={{
             __html: `
             @media print {
@@ -1999,10 +1852,7 @@ export function RelatorioView() {
             </Button>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <ShieldCheck
-                  className="h-5 w-5 text-[var(--brand)] shrink-0"
-                  aria-hidden="true"
-                />
+                <ShieldCheck className="h-5 w-5 text-[var(--brand)] shrink-0" aria-hidden="true" />
                 <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground truncate">
                   Relatório PGR
                 </h1>
@@ -2010,8 +1860,7 @@ export function RelatorioView() {
               <p className="text-sm text-muted-foreground mt-1 truncate">
                 {assessment?.title ?? "—"} ·{" "}
                 {assessment
-                  ? (ASSESSMENT_STATUS_LABELS[assessment.status] ??
-                    assessment.status)
+                  ? (ASSESSMENT_STATUS_LABELS[assessment.status] ?? assessment.status)
                   : "—"}
               </p>
             </div>
@@ -2029,9 +1878,7 @@ export function RelatorioView() {
         <PrerequisitesChecklist items={prereqItems} />
 
         {/* Low adhesion warning */}
-        {lowAdesao && globalAdesao != null && (
-          <LowAdhesionWarning adesaoPct={globalAdesao} />
-        )}
+        {lowAdesao && globalAdesao != null && <LowAdhesionWarning adesaoPct={globalAdesao} />}
 
         {/* Metadata form */}
         <ReportMetadataForm

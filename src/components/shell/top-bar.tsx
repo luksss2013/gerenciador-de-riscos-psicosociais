@@ -1,19 +1,12 @@
 "use client";
 
+import { Loader2, LogOut, Menu, Settings, X } from "lucide-react";
 import * as React from "react";
 import { useState } from "react";
-import {
-  Loader2,
-  LogOut,
-  Menu,
-  Settings,
-  X,
-} from "lucide-react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useAuth, useView } from "@/lib/store";
-
+import { SidebarContent } from "@/components/shell/app-shell";
+import { GlobalSearch } from "@/components/shell/global-search";
+import { Logo } from "@/components/shell/logo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,15 +17,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,9 +27,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Logo } from "@/components/shell/logo";
-import { GlobalSearch } from "@/components/shell/global-search";
-import { SidebarContent } from "@/components/shell/app-shell";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { api } from "@/lib/api";
+import { useAuth, useView } from "@/lib/store";
 
 // ─── Top bar (desktop + mobile) ─────────────────────────────────────────────
 
@@ -72,7 +58,22 @@ export function TopBar() {
     if (!professional?.name) return "?";
     const parts = professional.name.trim().split(/\s+/);
     // Skip honorifics
-    const HONORIFICS = new Set(["dr", "dra", "sr", "sra", "srta", "prof", "profa", "dr.", "dra.", "sr.", "sra.", "srta.", "prof.", "profa."]);
+    const HONORIFICS = new Set([
+      "dr",
+      "dra",
+      "sr",
+      "sra",
+      "srta",
+      "prof",
+      "profa",
+      "dr.",
+      "dra.",
+      "sr.",
+      "sra.",
+      "srta.",
+      "prof.",
+      "profa.",
+    ]);
     const realParts = parts.filter((p) => !HONORIFICS.has(p.toLowerCase()));
     const useParts = realParts.length > 0 ? realParts : parts;
     if (useParts.length === 1) return useParts[0].slice(0, 2).toUpperCase();
@@ -91,7 +92,7 @@ export function TopBar() {
               aria-label="Abrir menu de navegação"
               className="lg:hidden"
             >
-              <Menu className="h-5 w-5" />
+              <Menu className="h-5 w-5" aria-hidden="true" />
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-72 p-0">
@@ -119,9 +120,7 @@ export function TopBar() {
             <span className="font-display font-semibold text-[15px] text-foreground block">
               NR-1 Copsoq
             </span>
-            <span className="text-[11px] text-muted-foreground block">
-              Riscos psicossociais
-            </span>
+            <span className="text-[11px] text-muted-foreground block">Riscos psicossociais</span>
           </span>
         </button>
 
@@ -134,7 +133,10 @@ export function TopBar() {
         <div className="flex items-center gap-2 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--surface)] cursor-pointer transition-colors text-left">
+              <button
+                type="button"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--surface)] cursor-pointer transition-colors text-left"
+              >
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-[var(--sidebar-accent)] text-[var(--brand)] text-xs">
                     {initials}
@@ -153,18 +155,12 @@ export function TopBar() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium">
-                    {professional?.name ?? "—"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {professional?.email ?? ""}
-                  </span>
+                  <span className="text-sm font-medium">{professional?.name ?? "—"}</span>
+                  <span className="text-xs text-muted-foreground">{professional?.email ?? ""}</span>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => go("configuracoes")}
-              >
+              <DropdownMenuItem onClick={() => go("configuracoes")}>
                 <Settings className="h-4 w-4" />
                 Configurações
               </DropdownMenuItem>
@@ -193,12 +189,9 @@ export function TopBar() {
       <AlertDialog open={signOutOpen} onOpenChange={setSignOutOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-display text-xl">
-              Encerrar sessão?
-            </AlertDialogTitle>
+            <AlertDialogTitle className="font-display text-xl">Encerrar sessão?</AlertDialogTitle>
             <AlertDialogDescription>
-              Você sairá da plataforma e precisará informar suas credenciais
-              novamente para acessar.
+              Você sairá da plataforma e precisará informar suas credenciais novamente para acessar.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

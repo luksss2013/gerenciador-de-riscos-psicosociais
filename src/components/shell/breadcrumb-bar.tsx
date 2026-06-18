@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useView, type ViewName } from "@/lib/store";
-import { api } from "@/lib/api";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,6 +9,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { api } from "@/lib/api";
+import { useView, type ViewName } from "@/lib/store";
 
 // ─── Module-level name caches ───────────────────────────────────────────────
 // Populated on-demand by the breadcrumb bar so repeated renders don't refetch.
@@ -19,11 +19,14 @@ import {
 const companyNameCache = new Map<string, string>();
 const assessmentTitleCache = new Map<string, string>();
 
-type GoFn = (view: ViewName, opts?: {
-  companyId?: string | null;
-  assessmentId?: string | null;
-  workerToken?: string | null;
-}) => void;
+type GoFn = (
+  view: ViewName,
+  opts?: {
+    companyId?: string | null;
+    assessmentId?: string | null;
+    workerToken?: string | null;
+  },
+) => void;
 
 interface Crumb {
   label: string;
@@ -69,10 +72,7 @@ function buildTrail(opts: {
       return [inicio, { label: "Configurações", current: true }];
 
     case "empresa": {
-      const crumbs: Crumb[] = [
-        inicio,
-        { label: "Empresas", onNavigate: () => go("empresas") },
-      ];
+      const crumbs: Crumb[] = [inicio, { label: "Empresas", onNavigate: () => go("empresas") }];
       crumbs.push({
         label: companyName ?? "Empresa",
         current: true,
@@ -91,9 +91,7 @@ function buildTrail(opts: {
         { label: "Empresas", onNavigate: () => go("empresas") },
         {
           label: companyName ?? "Empresa",
-          onNavigate: companyId
-            ? () => go("empresa", { companyId })
-            : undefined,
+          onNavigate: companyId ? () => go("empresa", { companyId }) : undefined,
         },
       ];
 
@@ -102,9 +100,7 @@ function buildTrail(opts: {
       } else {
         crumbs.push({
           label: title,
-          onNavigate: assessmentId
-            ? () => go("avaliacao", { assessmentId })
-            : undefined,
+          onNavigate: assessmentId ? () => go("avaliacao", { assessmentId }) : undefined,
         });
         crumbs.push({ label: LEAF_LABEL[view] ?? "Detalhe", current: true });
       }
@@ -124,11 +120,11 @@ export function BreadcrumbBar() {
   const assessmentId = useView((s) => s.assessmentId);
   const go = useView((s) => s.go);
 
-  const [companyName, setCompanyName] = React.useState<string | null>(
-    () => (companyId ? companyNameCache.get(companyId) ?? null : null)
+  const [companyName, setCompanyName] = React.useState<string | null>(() =>
+    companyId ? (companyNameCache.get(companyId) ?? null) : null,
   );
-  const [assessmentTitle, setAssessmentTitle] = React.useState<string | null>(
-    () => (assessmentId ? assessmentTitleCache.get(assessmentId) ?? null : null)
+  const [assessmentTitle, setAssessmentTitle] = React.useState<string | null>(() =>
+    assessmentId ? (assessmentTitleCache.get(assessmentId) ?? null) : null,
   );
 
   // Fetch company name on-demand when an id is present and not yet cached.
@@ -195,9 +191,8 @@ export function BreadcrumbBar() {
   if (trail.length === 0) return null;
 
   return (
-    <div
+    <nav
       className="border-b border-border bg-background px-4 sm:px-6 lg:px-8 py-3 text-sm"
-      role="navigation"
       aria-label="Trilha de navegação"
     >
       <Breadcrumb>
@@ -205,7 +200,7 @@ export function BreadcrumbBar() {
           {trail.map((crumb, idx) => {
             const isLast = idx === trail.length - 1;
             return (
-              <React.Fragment key={`${crumb.label}-${idx}`}>
+              <React.Fragment key={crumb.label}>
                 <BreadcrumbItem>
                   {crumb.current ? (
                     <BreadcrumbPage className="font-semibold text-foreground">
@@ -216,11 +211,7 @@ export function BreadcrumbBar() {
                       asChild
                       className="cursor-pointer text-muted-foreground hover:text-foreground hover:underline"
                     >
-                      <button
-                        type="button"
-                        onClick={crumb.onNavigate}
-                        className="text-left"
-                      >
+                      <button type="button" onClick={crumb.onNavigate} className="text-left">
                         {crumb.label}
                       </button>
                     </BreadcrumbLink>
@@ -232,6 +223,6 @@ export function BreadcrumbBar() {
           })}
         </BreadcrumbList>
       </Breadcrumb>
-    </div>
+    </nav>
   );
 }

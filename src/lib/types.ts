@@ -1,19 +1,30 @@
 // Shared frontend types (DTOs) — mirror of API responses.
 
 export type DimensionCode =
-  | "D1" | "D2" | "D3" | "D4" | "D5" | "D6"
-  | "D7" | "D8" | "D9" | "D10" | "D11";
+  | "D1"
+  | "D2"
+  | "D3"
+  | "D4"
+  | "D5"
+  | "D6"
+  | "D7"
+  | "D8"
+  | "D9"
+  | "D10"
+  | "D11";
 
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
-export type AssessmentStatus =
-  | "draft" | "collecting" | "processing" | "completed" | "archived";
+export type AssessmentStatus = "draft" | "collecting" | "processing" | "completed" | "archived";
 
 export type ActionStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
 export type ProfessionType =
-  | "psychologist" | "sst_engineer" | "sst_technician"
-  | "occupational_physician" | "other";
+  | "psychologist"
+  | "sst_engineer"
+  | "sst_technician"
+  | "occupational_physician"
+  | "other";
 
 export interface Professional {
   id: string;

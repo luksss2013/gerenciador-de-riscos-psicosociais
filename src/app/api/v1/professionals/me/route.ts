@@ -1,10 +1,6 @@
 import { db } from "@/lib/db";
-import { ERROR_CODES, PROFESSION_TYPES, ProfessionType } from "@/lib/errors";
-import {
-  errorJson,
-  jsonResponse,
-  requireProfessional,
-} from "@/lib/session";
+import { ERROR_CODES, PROFESSION_TYPES, type ProfessionType } from "@/lib/errors";
+import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 
 function publicProfessional(p: {
   id: string;
@@ -87,10 +83,7 @@ export async function PATCH(request: Request) {
     }
 
     if (body.phone !== undefined) {
-      data.phone =
-        typeof body.phone === "string" && body.phone.trim()
-          ? body.phone.trim()
-          : null;
+      data.phone = typeof body.phone === "string" && body.phone.trim() ? body.phone.trim() : null;
     }
 
     const updated = await db.professional.update({

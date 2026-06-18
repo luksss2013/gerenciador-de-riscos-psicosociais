@@ -1,16 +1,13 @@
+import { COPSOQ_DIMENSIONS } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
+import { companyWeightedAverage, type DimensionScoreResult } from "@/lib/scoring";
 import {
   errorJson,
   jsonResponse,
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
-import {
-  companyWeightedAverage,
-  DimensionScoreResult,
-} from "@/lib/scoring";
-import { COPSOQ_DIMENSIONS, DimensionCode } from "@/lib/copsoq-data";
 
 /**
  * GET /api/v1/reports/:reportId/download
@@ -160,8 +157,7 @@ function buildReportHtml(
 ): string {
   const a = report.assessment;
   const c = a.company;
-  const fmtDate = (d: Date | null) =>
-    d ? d.toLocaleDateString("pt-BR") : "—";
+  const fmtDate = (d: Date | null) => (d ? d.toLocaleDateString("pt-BR") : "—");
 
   // Company-level weighted averages
   const perDeptForAvg: { nResponses: number; results: DimensionScoreResult[] }[] = [];

@@ -101,15 +101,17 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
       data,
       include: { department: { select: { name: true } } },
     });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "inventory.update",
-        resourceType: "inventory",
-        resourceId: updated.id,
-        metadataJson: JSON.stringify({ fields: Object.keys(body) }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "inventory.update",
+          resourceType: "inventory",
+          resourceId: updated.id,
+          metadataJson: JSON.stringify({ fields: Object.keys(body) }),
+        },
+      })
+      .catch(() => {});
     return jsonResponse({
       id: updated.id,
       assessmentId: updated.assessmentId,
@@ -153,15 +155,17 @@ export async function DELETE(_request: Request, { params }: RouteCtx) {
       return errorJson(ERROR_CODES.ITEM_NOT_MANUAL, "Automatic items cannot be deleted");
     }
     await db.riskInventoryItem.delete({ where: { id: item.id } });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "inventory.delete",
-        resourceType: "inventory",
-        resourceId: item.id,
-        metadataJson: JSON.stringify({}),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "inventory.delete",
+          resourceType: "inventory",
+          resourceId: item.id,
+          metadataJson: JSON.stringify({}),
+        },
+      })
+      .catch(() => {});
     return jsonResponse({ ok: true });
   } catch (e) {
     const code = (e as { code?: string })?.code;

@@ -1,7 +1,7 @@
+import { COPSOQ_DIMENSIONS, COPSOQ_ITEMS } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
 import { errorJson, jsonResponse } from "@/lib/session";
-import { COPSOQ_DIMENSIONS, COPSOQ_ITEMS } from "@/lib/copsoq-data";
 
 // Idempotent: if items already seeded, returns counts without re-inserting.
 export async function POST() {

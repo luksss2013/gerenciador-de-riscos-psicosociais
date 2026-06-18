@@ -1,16 +1,13 @@
+import { COPSOQ_DIMENSIONS, type DimensionCode } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
+import { companyWeightedAverage, type DimensionScoreResult } from "@/lib/scoring";
 import {
   errorJson,
   jsonResponse,
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
-import {
-  companyWeightedAverage,
-  DimensionScoreResult,
-} from "@/lib/scoring";
-import { COPSOQ_DIMENSIONS, DimensionCode } from "@/lib/copsoq-data";
 
 interface RouteCtx {
   params: Promise<{ id: string }>;
@@ -40,7 +37,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     if (assessment.status !== "completed") {
       return errorJson(
         ERROR_CODES.ASSESSMENT_NOT_COMPLETED,
-        "Assessment must be completed to view dashboard"
+        "Assessment must be completed to view dashboard",
       );
     }
 
@@ -50,16 +47,14 @@ export async function GET(_request: Request, { params }: RouteCtx) {
       deptName: string;
       nResponses: number;
       isEligible: boolean;
-      dimensions:
-        | Array<{
-            code: string;
-            rawScore: number;
-            riskScore: number;
-            riskLevel: string;
-            cronbachAlpha: number | null;
-            nResponses: number;
-          }>
-        | null;
+      dimensions: Array<{
+        code: string;
+        rawScore: number;
+        riskScore: number;
+        riskLevel: string;
+        cronbachAlpha: number | null;
+        nResponses: number;
+      }> | null;
     }> = [];
 
     const perDeptForAvg: { nResponses: number; results: DimensionScoreResult[] }[] = [];
@@ -124,9 +119,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
       });
     }
 
-    const globalAdesao = sumExpected > 0
-      ? Math.round((sumResponded / sumExpected) * 100)
-      : 0;
+    const globalAdesao = sumExpected > 0 ? Math.round((sumResponded / sumExpected) * 100) : 0;
 
     const companyAvgRaw = companyWeightedAverage(perDeptForAvg);
     const companyAvg = companyAvgRaw.map((r) => ({
@@ -142,9 +135,11 @@ export async function GET(_request: Request, { params }: RouteCtx) {
       .map((c) => {
         const dim = COPSOQ_DIMENSIONS.find((d) => d.code === c.code)!;
         const affectedDepts = assessment.departments
-          .filter((ad) => ad.isEligible && ad.dimensionResults.some(
-            (r) => r.dimensionCode === c.code && r.riskLevel === "HIGH"
-          ))
+          .filter(
+            (ad) =>
+              ad.isEligible &&
+              ad.dimensionResults.some((r) => r.dimensionCode === c.code && r.riskLevel === "HIGH"),
+          )
           .map((ad) => ad.id);
         return {
           code: c.code,

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Inter, IBM_Plex_Mono, Source_Serif_4 } from "next/font/google";
+import { IBM_Plex_Mono, Inter, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -26,15 +26,7 @@ export const metadata: Metadata = {
   title: "NR-1 Copsoq · Gestão de Riscos Psicossociais",
   description:
     "Plataforma SaaS multi-tenant para gerenciamento de Riscos Ocupacionais Psicossociais conforme NR-1, utilizando o instrumento canônico COPSOQ II-BR.",
-  keywords: [
-    "NR-1",
-    "COPSOQ II-BR",
-    "FRPRT",
-    "Riscos Psicossociais",
-    "PGR",
-    "SST",
-    "LGPD",
-  ],
+  keywords: ["NR-1", "COPSOQ II-BR", "FRPRT", "Riscos Psicossociais", "PGR", "SST", "LGPD"],
   authors: [{ name: "NR-1 Copsoq Platform" }],
   icons: {
     icon: "/logo.svg",

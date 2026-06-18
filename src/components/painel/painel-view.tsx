@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { useCallback, useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -13,21 +11,16 @@ import {
   Plus,
   RefreshCw,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useView } from "@/lib/store";
-import { ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
-import type {
-  AssessmentStatus,
-  CompanySummary,
-  ProfessionalDashboard,
-} from "@/lib/types";
-import { formatCnpj } from "@/lib/cnpj";
-
+import { type NrStatus, NrStatusBadge } from "@/components/shell/nr-status-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { NrStatusBadge, type NrStatus } from "@/components/shell/nr-status-badge";
+import { ApiError, api } from "@/lib/api";
+import { formatCnpj } from "@/lib/cnpj";
+import { ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
+import { useView } from "@/lib/store";
+import type { AssessmentStatus, CompanySummary, ProfessionalDashboard } from "@/lib/types";
 
 const TWO_YEARS_MS = 1000 * 60 * 60 * 24 * 365 * 2;
 
@@ -68,9 +61,6 @@ function statusAccentClass(status: NrStatus): string {
       return "var(--brand-light)";
     case "review_recommended":
       return "var(--risk-medium)";
-    case "draft":
-    case "archived":
-    case "no_assessment":
     default:
       return "var(--muted-foreground)";
   }
@@ -91,12 +81,10 @@ export function PainelView() {
     try {
       // Fetch companies + dashboard in parallel. A dashboard failure shouldn't
       // block the whole page — degrade gracefully with a null dashboard.
-      const companiesPromise: Promise<CompanySummary[]> = api
-        .companies
+      const companiesPromise: Promise<CompanySummary[]> = api.companies
         .list({ limit: 100 })
         .then((res) => res.data);
-      const dashboardPromise: Promise<ProfessionalDashboard | null> = api
-        .me
+      const dashboardPromise: Promise<ProfessionalDashboard | null> = api.me
         .dashboard()
         .then((d) => d as ProfessionalDashboard | null)
         .catch(() => null);
@@ -152,7 +140,7 @@ export function PainelView() {
             <p className="text-sm text-muted-foreground mt-1">{error}</p>
           </div>
           <Button variant="outline" onClick={() => void load()}>
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
             Tentar novamente
           </Button>
         </section>
@@ -216,10 +204,7 @@ export function PainelView() {
 
 function HeroHeader({ onAddCompany }: { onAddCompany: () => void }) {
   return (
-    <header
-      className="border-b border-border pb-6 mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
-      aria-label="Cabeçalho do painel"
-    >
+    <header className="border-b border-border pb-6 mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
       <div className="min-w-0">
         <h1 className="font-display text-xl sm:text-2xl tracking-tight text-foreground">
           Painel de conformidade
@@ -287,18 +272,11 @@ function KpiRow({ dashboard }: { dashboard: ProfessionalDashboard | null }) {
     >
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-border">
         {stats.map((s, i) => (
-          <div
-            key={i}
-            className={`px-3 sm:px-5 py-1 ${i === 0 ? "pl-0" : ""}`}
-            role="group"
-            aria-label={s.ariaLabel}
-          >
+          <div key={s.label} className={`px-3 sm:px-5 py-1 ${i === 0 ? "pl-0" : ""}`}>
             <div className="font-mono-numeric text-xl sm:text-2xl leading-none text-foreground">
               {s.value}
             </div>
-            <div className="text-xs text-muted-foreground mt-1.5">
-              {s.label}
-            </div>
+            <div className="text-xs text-muted-foreground mt-1.5">{s.label}</div>
             {s.secondary && (
               <div className="text-[11px] text-muted-foreground/80 mt-0.5 font-mono-numeric">
                 {s.secondary}
@@ -313,13 +291,7 @@ function KpiRow({ dashboard }: { dashboard: ProfessionalDashboard | null }) {
 
 // ─── Company list-row (full-width row, not a card) ──────────────────────────
 
-function CompanyRow({
-  company,
-  onOpen,
-}: {
-  company: CompanySummary;
-  onOpen: () => void;
-}) {
+function CompanyRow({ company, onOpen }: { company: CompanySummary; onOpen: () => void }) {
   const status = deriveStatus(company);
   const accent = statusAccentClass(status);
   const location =
@@ -348,7 +320,9 @@ function CompanyRow({
               <span>{formatCnpj(company.cnpj)}</span>
               {location && (
                 <>
-                  <span className="text-muted-foreground/40" aria-hidden="true">·</span>
+                  <span className="text-muted-foreground/40" aria-hidden="true">
+                    ·
+                  </span>
                   <span className="inline-flex items-center gap-1 align-middle">
                     <MapPin className="h-3 w-3" aria-hidden="true" />
                     {location}
@@ -357,7 +331,9 @@ function CompanyRow({
               )}
               {company.cnaePrimary && (
                 <>
-                  <span className="text-muted-foreground/40" aria-hidden="true">·</span>
+                  <span className="text-muted-foreground/40" aria-hidden="true">
+                    ·
+                  </span>
                   <span className="inline-flex items-center gap-1 align-middle">
                     <ClipboardList className="h-3 w-3" aria-hidden="true" />
                     CNAE {company.cnaePrimary}
@@ -372,8 +348,8 @@ function CompanyRow({
         <div className="flex items-center justify-between gap-4 sm:shrink-0 pl-5 sm:pl-0">
           <div className="text-xs text-muted-foreground font-mono-numeric">
             {company.summary.departmentsCount} GHE
-            {company.summary.departmentsCount !== 1 ? "s" : ""} ·{" "}
-            {company.summary.assessmentsCount} avalia
+            {company.summary.departmentsCount !== 1 ? "s" : ""} · {company.summary.assessmentsCount}{" "}
+            avalia
             {company.summary.assessmentsCount !== 1 ? "ções" : "ção"}
           </div>
           <Button
@@ -404,7 +380,6 @@ function statusDotColor(status: AssessmentStatus): string {
       return "var(--risk-low)";
     case "archived":
       return "var(--muted-foreground)";
-    case "draft":
     default:
       return "var(--muted-foreground)";
   }
@@ -425,7 +400,9 @@ function RecentAssessmentsSidebar({
         <h2 className="font-display text-base sm:text-lg tracking-tight text-foreground">
           Avaliações recentes
         </h2>
-        <span className="text-xs text-muted-foreground">{top.length} recente{top.length !== 1 ? "s" : ""}</span>
+        <span className="text-xs text-muted-foreground">
+          {top.length} recente{top.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       {top.length === 0 ? (
@@ -435,11 +412,11 @@ function RecentAssessmentsSidebar({
       ) : (
         <ol className="divide-y divide-border border-y border-border">
           {top.map((a) => {
-            const statusLabel =
-              ASSESSMENT_STATUS_LABELS[a.status] ?? a.status;
+            const statusLabel = ASSESSMENT_STATUS_LABELS[a.status] ?? a.status;
             return (
               <li key={a.id}>
                 <button
+                  type="button"
                   onClick={() => onPick(a)}
                   className="w-full text-left flex gap-2.5 py-3 px-1 -mx-1 cursor-pointer rounded-sm transition-colors hover:bg-[var(--surface)]"
                 >
@@ -453,14 +430,10 @@ function RecentAssessmentsSidebar({
                       <span className="font-medium truncate block text-foreground">
                         {a.companyName}
                       </span>
-                      <span className="text-muted-foreground truncate block">
-                        {a.title}
-                      </span>
+                      <span className="text-muted-foreground truncate block">{a.title}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[11px] text-muted-foreground">
-                        {statusLabel}
-                      </span>
+                      <span className="text-[11px] text-muted-foreground">{statusLabel}</span>
                       <span className="text-[11px] text-muted-foreground/70">
                         · {relativeTime(a.updatedAt)}
                       </span>
@@ -488,9 +461,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         <h2 className="font-display text-xl tracking-tight text-foreground">
           Nenhuma empresa cadastrada
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Adicione a primeira para começar.
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">Adicione a primeira para começar.</p>
       </div>
       <Button onClick={onAdd}>
         <Plus className="h-4 w-4" />

@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import {
   BarChart3,
   Building2,
@@ -9,15 +8,13 @@ import {
   Settings,
   ShieldCheck,
 } from "lucide-react";
-
-import { useView, type ViewName } from "@/lib/store";
-
-import { Button } from "@/components/ui/button";
-import { PainelView } from "@/components/painel/painel-view";
+import * as React from "react";
 import { ConfiguracoesView } from "@/components/configuracoes/configuracoes-view";
+import { PainelView } from "@/components/painel/painel-view";
 import { BreadcrumbBar } from "@/components/shell/breadcrumb-bar";
-import { TopBar } from "@/components/shell/top-bar";
 import { Logo } from "@/components/shell/logo";
+import { TopBar } from "@/components/shell/top-bar";
+import { useView, type ViewName } from "@/lib/store";
 
 // ─── View router ────────────────────────────────────────────────────────────
 
@@ -61,7 +58,7 @@ type AnyViewComponent = React.ComponentType<Record<string, never>>;
  */
 function lazyView(
   loader: () => Promise<unknown>,
-  displayName: string
+  displayName: string,
 ): React.ComponentType<Record<string, never>> {
   return React.lazy(async () => {
     try {
@@ -72,9 +69,7 @@ function lazyView(
       if (!Resolved) throw new Error("module missing default export");
       return { default: Resolved };
     } catch {
-      const Placeholder: AnyViewComponent = () => (
-        <ViewMissingPlaceholder name={displayName} />
-      );
+      const Placeholder: AnyViewComponent = () => <ViewMissingPlaceholder name={displayName} />;
       return { default: Placeholder };
     }
   });
@@ -88,8 +83,8 @@ function ViewMissingPlaceholder({ name }: { name: string }) {
       </div>
       <h2 className="text-lg font-semibold">{name}</h2>
       <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-        Este módulo ainda está sendo carregado ou implementado por outra
-        equipe. Tente novamente em instantes.
+        Este módulo ainda está sendo carregado ou implementado por outra equipe. Tente novamente em
+        instantes.
       </p>
     </div>
   );
@@ -97,36 +92,27 @@ function ViewMissingPlaceholder({ name }: { name: string }) {
 
 const ConsolidadoView = lazyView(
   () => import("@/components/consolidado/consolidado-view"),
-  "Consolidado"
+  "Consolidado",
 );
-const EmpresasView = lazyView(
-  () => import("@/components/empresas/empresas-view"),
-  "Empresas"
-);
+const EmpresasView = lazyView(() => import("@/components/empresas/empresas-view"), "Empresas");
 const EmpresaDetailView = lazyView(
   () => import("@/components/empresas/empresa-detail-view"),
-  "Detalhe da empresa"
+  "Detalhe da empresa",
 );
 const AvaliacaoDetailView = lazyView(
   () => import("@/components/avaliacoes/avaliacao-detail-view"),
-  "Detalhe da avaliação"
+  "Detalhe da avaliação",
 );
 const ResultadosView = lazyView(
   () => import("@/components/resultados/resultados-view"),
-  "Resultados"
+  "Resultados",
 );
 const InventarioView = lazyView(
   () => import("@/components/inventario/inventario-view"),
-  "Inventário de Riscos"
+  "Inventário de Riscos",
 );
-const PlanoView = lazyView(
-  () => import("@/components/plano/plano-view"),
-  "Plano de Ação"
-);
-const RelatorioView = lazyView(
-  () => import("@/components/relatorio/relatorio-view"),
-  "Relatório"
-);
+const PlanoView = lazyView(() => import("@/components/plano/plano-view"), "Plano de Ação");
+const RelatorioView = lazyView(() => import("@/components/relatorio/relatorio-view"), "Relatório");
 
 function ViewLoader() {
   return (
@@ -204,6 +190,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
                 return (
                   <li key={item.view}>
                     <button
+                      type="button"
                       onClick={() => {
                         go(item.view);
                         onNavigate?.();
@@ -244,9 +231,7 @@ function AppFooter() {
           <ShieldCheck className="h-3.5 w-3.5 text-[var(--brand)]" />
           <span className="font-medium text-foreground">NR-1 Copsoq</span>
           <span className="opacity-50">·</span>
-          <span>
-            COPSOQ II-BR (CC BY-NC-ND 4.0) · Conforme NR-1 / Portaria MTE 1.419/2024
-          </span>
+          <span>COPSOQ II-BR (CC BY-NC-ND 4.0) · Conforme NR-1 / Portaria MTE 1.419/2024</span>
         </div>
         <div className="opacity-70">
           © {new Date().getFullYear()} · Dados do trabalhador anonimizados por design (LGPD)
@@ -277,10 +262,14 @@ export function AppShell() {
 
         <div className="flex flex-col flex-1 min-w-0">
           <BreadcrumbBar />
-          <main className="flex-1 min-w-0">
-            <React.Suspense fallback={<ViewLoader />}>
-              {renderView(view)}
-            </React.Suspense>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--brand)] focus:text-white focus:rounded-md focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--brand)]"
+          >
+            Pular para o conteúdo
+          </a>
+          <main id="main-content" className="flex-1 min-w-0">
+            <React.Suspense fallback={<ViewLoader />}>{renderView(view)}</React.Suspense>
           </main>
         </div>
       </div>

@@ -24,9 +24,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
 
     const body = (await request.json()) as AnswerBody;
     const itemIndex =
-      typeof body.itemIndex === "number" && Number.isInteger(body.itemIndex)
-        ? body.itemIndex
-        : NaN;
+      typeof body.itemIndex === "number" && Number.isInteger(body.itemIndex) ? body.itemIndex : NaN;
     const likertValue =
       typeof body.likertValue === "number" && Number.isInteger(body.likertValue)
         ? body.likertValue

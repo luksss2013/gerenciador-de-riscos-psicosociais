@@ -1,16 +1,13 @@
+import { COPSOQ_DIMENSIONS, type DimensionCode } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
+import { companyWeightedAverage, type DimensionScoreResult } from "@/lib/scoring";
 import {
   errorJson,
   jsonResponse,
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
-import { COPSOQ_DIMENSIONS, DimensionCode } from "@/lib/copsoq-data";
-import {
-  companyWeightedAverage,
-  DimensionScoreResult,
-} from "@/lib/scoring";
 
 interface RouteCtx {
   params: Promise<{ id: string }>;

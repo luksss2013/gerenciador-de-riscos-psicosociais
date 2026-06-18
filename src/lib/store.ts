@@ -31,11 +31,14 @@ interface ViewState {
   // Inventory prefill
   inventoryPrefill: { mteFactorCode?: string } | null;
   // Setters
-  go: (view: ViewName, opts?: {
-    companyId?: string | null;
-    assessmentId?: string | null;
-    workerToken?: string | null;
-  }) => void;
+  go: (
+    view: ViewName,
+    opts?: {
+      companyId?: string | null;
+      assessmentId?: string | null;
+      workerToken?: string | null;
+    },
+  ) => void;
   setActionItemPrefill: (p: ViewState["actionItemPrefill"]) => void;
   setInventoryPrefill: (p: ViewState["inventoryPrefill"]) => void;
   openWorker: (token: string) => void;
@@ -53,8 +56,7 @@ export const useView = create<ViewState>((set) => ({
     set((s) => ({
       view,
       companyId: opts.companyId !== undefined ? opts.companyId : s.companyId,
-      assessmentId:
-        opts.assessmentId !== undefined ? opts.assessmentId : s.assessmentId,
+      assessmentId: opts.assessmentId !== undefined ? opts.assessmentId : s.assessmentId,
       workerToken: opts.workerToken !== undefined ? opts.workerToken : s.workerToken,
     })),
   setActionItemPrefill: (p) => set({ actionItemPrefill: p }),

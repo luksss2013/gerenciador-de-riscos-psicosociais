@@ -71,7 +71,11 @@ export class ApiError extends Error {
   }
 }
 
-export function errorResponse(code: ErrorCode, message?: string, details?: Record<string, unknown>) {
+export function errorResponse(
+  code: ErrorCode,
+  message?: string,
+  details?: Record<string, unknown>,
+) {
   return {
     error: {
       code,
@@ -99,8 +103,33 @@ export const PROFESSION_TYPE_LABELS: Record<ProfessionType, string> = {
 };
 
 export const BRAZILIAN_UFS = [
-  "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB",
-  "PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO",
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
 ];
 
 export const ASSESSMENT_STATUS_LABELS: Record<string, string> = {

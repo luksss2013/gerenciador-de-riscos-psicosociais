@@ -33,8 +33,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
     await requireTenantOwnership(assessment.professionalId, professional.id);
 
     const body = (await request.json()) as GenBody;
-    const type =
-      typeof body.type === "string" && VALID_TYPES.includes(body.type) ? body.type : "";
+    const type = typeof body.type === "string" && VALID_TYPES.includes(body.type) ? body.type : "";
     if (!type) {
       return errorJson(ERROR_CODES.VALIDATION_ERROR, "type must be pdf|docx|html");
     }
@@ -50,30 +49,26 @@ export async function POST(request: Request, { params }: RouteCtx) {
     const credentialNumber =
       typeof metadata.credentialNumber === "string" && metadata.credentialNumber.trim()
         ? metadata.credentialNumber.trim()
-        : professional.credentialNumber ?? "";
+        : (professional.credentialNumber ?? "");
     const reportDate =
       typeof metadata.reportDate === "string" && metadata.reportDate
         ? metadata.reportDate
         : new Date().toISOString().slice(0, 10);
     const notes =
-      typeof metadata.notes === "string" && metadata.notes.trim()
-        ? metadata.notes.trim()
-        : null;
+      typeof metadata.notes === "string" && metadata.notes.trim() ? metadata.notes.trim() : null;
 
     // RB-04 prerequisite checks
     const failed: string[] = [];
     if (assessment.status !== "completed") failed.push("ASSESSMENT_NOT_COMPLETED");
-    if (!assessment.participationRegistration || !assessment.participationRegistration.trim()) {
+    if (!assessment.participationRegistration?.trim()) {
       failed.push("PARTICIPATION_NOT_REGISTERED");
     }
     const eligibleDepts = assessment.departments.filter((d) => d.isEligible);
     if (eligibleDepts.length < 1) failed.push("NO_ELIGIBLE_DEPARTMENTS");
     if (failed.length > 0) {
-      return errorJson(
-        ERROR_CODES.REPORT_PREREQUISITES_UNMET,
-        "Report prerequisites unmet",
-        { failedChecks: failed }
-      );
+      return errorJson(ERROR_CODES.REPORT_PREREQUISITES_UNMET, "Report prerequisites unmet", {
+        failedChecks: failed,
+      });
     }
 
     const metadataJson = JSON.stringify({
@@ -104,8 +99,13 @@ export async function POST(request: Request, { params }: RouteCtx) {
     });
 
     return jsonResponse(
-      { reportId: report.id, status: report.status, type: report.type, storageKey: report.storageKey },
-      201
+      {
+        reportId: report.id,
+        status: report.status,
+        type: report.type,
+        storageKey: report.storageKey,
+      },
+      201,
     );
   } catch (e) {
     const code = (e as { code?: string })?.code;

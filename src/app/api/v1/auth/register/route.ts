@@ -1,12 +1,7 @@
 import { db } from "@/lib/db";
-import { ERROR_CODES, PROFESSION_TYPES } from "@/lib/errors";
-import {
-  createSessionCookie,
-  errorJson,
-  hashPassword,
-  jsonResponse,
-} from "@/lib/session";
 import type { ProfessionType } from "@/lib/errors";
+import { ERROR_CODES, PROFESSION_TYPES } from "@/lib/errors";
+import { createSessionCookie, errorJson, hashPassword, jsonResponse } from "@/lib/session";
 
 interface RegisterBody {
   name?: unknown;
@@ -57,8 +52,7 @@ export async function POST(request: Request) {
       typeof body.credentialNumber === "string" && body.credentialNumber.trim()
         ? body.credentialNumber.trim()
         : null;
-    const phone =
-      typeof body.phone === "string" && body.phone.trim() ? body.phone.trim() : null;
+    const phone = typeof body.phone === "string" && body.phone.trim() ? body.phone.trim() : null;
     const acceptedTerms = body.acceptedTerms === true;
 
     if (!name || name.length < 2) {
@@ -96,16 +90,13 @@ export async function POST(request: Request) {
     });
 
     const cookie = await createSessionCookie(professional.id);
-    return new Response(
-      JSON.stringify({ professional: publicProfessional(professional) }),
-      {
-        status: 201,
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Set-Cookie": `${cookie.name}=${cookie.value}; HttpOnly; Path=/; Max-Age=${cookie.maxAge}; SameSite=Strict`,
-        },
-      }
-    );
+    return new Response(JSON.stringify({ professional: publicProfessional(professional) }), {
+      status: 201,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Set-Cookie": `${cookie.name}=${cookie.value}; HttpOnly; Path=/; Max-Age=${cookie.maxAge}; SameSite=Strict`,
+      },
+    });
   } catch (e) {
     console.error("[register]", e);
     return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");

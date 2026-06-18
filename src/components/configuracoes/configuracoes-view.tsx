@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { useCallback, useEffect, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -29,47 +27,9 @@ import {
   Trash2,
   User,
 } from "lucide-react";
+import type * as React from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useAuth } from "@/lib/store";
-import {
-  PROFESSION_TYPES,
-  PROFESSION_TYPE_LABELS,
-} from "@/lib/errors";
-import {
-  FIELD_ERROR_CLASS,
-  FieldError,
-  maskPhone,
-  validateRequired,
-} from "@/lib/form-utils";
-import type {
-  AuditLogEntry,
-  ProfessionType,
-  Professional,
-} from "@/lib/types";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableCell,
-} from "@/components/ui/table";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,7 +41,33 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ApiError, api } from "@/lib/api";
+import { PROFESSION_TYPE_LABELS, PROFESSION_TYPES } from "@/lib/errors";
+import { FIELD_ERROR_CLASS, FieldError, maskPhone, validateRequired } from "@/lib/form-utils";
+import { useAuth } from "@/lib/store";
+import type { AuditLogEntry, Professional, ProfessionType } from "@/lib/types";
 
 const APP_VERSION = "1.0.0-sandbox";
 
@@ -96,9 +82,7 @@ export function ConfiguracoesView() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-4xl mx-auto w-full">
       <header className="border-b border-border pb-6 mb-2">
-        <h1 className="font-display text-2xl sm:text-3xl tracking-tight">
-          Configurações
-        </h1>
+        <h1 className="font-display text-2xl sm:text-3xl tracking-tight">Configurações</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Gerencie seu perfil, conta e preferências de segurança.
         </p>
@@ -132,9 +116,7 @@ function SectionHeading({
         <Icon className="h-4 w-4" aria-hidden="true" />
         <span className="text-xs uppercase tracking-[0.14em]">{title}</span>
       </div>
-      {description ? (
-        <p className="text-sm text-muted-foreground">{description}</p>
-      ) : null}
+      {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
     </div>
   );
 }
@@ -195,19 +177,13 @@ function ProfileSection() {
   };
 
   return (
-    <section
-      aria-labelledby="cfg-profile-title"
-      className="border-b border-border py-8"
-    >
+    <section aria-labelledby="cfg-profile-title" className="border-b border-border py-8">
       <SectionHeading
         icon={User}
         title="Perfil profissional"
         description="Informações exibidas nos relatórios oficiais de conformidade NR-1."
       />
-      <h2
-        id="cfg-profile-title"
-        className="font-display text-xl mt-3 mb-6"
-      >
+      <h2 id="cfg-profile-title" className="font-display text-xl mt-3 mb-6">
         Perfil profissional
       </h2>
 
@@ -228,22 +204,19 @@ function ProfileSection() {
             }}
             disabled={saving}
             required
+            autoComplete="name"
             aria-invalid={!!nameError}
             aria-describedby={nameError ? "cfg-name-err" : undefined}
             className={`bg-[var(--card)] ${nameError ? FIELD_ERROR_CLASS : ""}`}
           />
-          {nameError ? (
-            <FieldError id="cfg-name-err" message={nameError} />
-          ) : null}
+          {nameError ? <FieldError id="cfg-name-err" message={nameError} /> : null}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="cfg-profession">Categoria profissional</Label>
             <Select
               value={form.professionType}
-              onValueChange={(v) =>
-                setForm({ ...form, professionType: v as ProfessionType })
-              }
+              onValueChange={(v) => setForm({ ...form, professionType: v as ProfessionType })}
               disabled={saving}
             >
               <SelectTrigger id="cfg-profession" className="w-full bg-[var(--card)]">
@@ -264,9 +237,7 @@ function ProfileSection() {
               id="cfg-credential"
               placeholder="CRP 06/123456"
               value={form.credentialNumber}
-              onChange={(e) =>
-                setForm({ ...form, credentialNumber: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, credentialNumber: e.target.value })}
               disabled={saving}
               className="bg-[var(--card)]"
             />
@@ -280,9 +251,7 @@ function ProfileSection() {
             inputMode="tel"
             placeholder="(11) 99999-9999"
             value={form.phone}
-            onChange={(e) =>
-              setForm({ ...form, phone: maskPhone(e.target.value) })
-            }
+            onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })}
             disabled={saving}
             className="bg-[var(--card)] font-mono-numeric"
           />
@@ -318,7 +287,7 @@ function ProfileSection() {
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
-              <span tabIndex={0} className="inline-flex">
+              <span className="inline-flex">
                 <Button
                   variant="outline"
                   size="sm"
@@ -369,8 +338,7 @@ function SecuritySection() {
     {
       icon: ShieldCheck,
       title: "Sessão com expiração automática",
-      description:
-        "Cookies httpOnly, SameSite=Strict, expiram em 7 dias por inatividade.",
+      description: "Cookies httpOnly, SameSite=Strict, expiram em 7 dias por inatividade.",
     },
     {
       icon: Cookie,
@@ -387,25 +355,18 @@ function SecuritySection() {
     {
       icon: BadgeInfo,
       title: "Conformidade LGPD",
-      description:
-        "Dados do profissional e da empresa são tratados conforme a Lei 13.709/2018.",
+      description: "Dados do profissional e da empresa são tratados conforme a Lei 13.709/2018.",
     },
   ];
 
   return (
-    <section
-      aria-labelledby="cfg-security-title"
-      className="border-b border-border py-8"
-    >
+    <section aria-labelledby="cfg-security-title" className="border-b border-border py-8">
       <SectionHeading
         icon={ShieldCheck}
         title="Segurança & LGPD"
         description="Como a plataforma protege dados do profissional e do trabalhador."
       />
-      <h2
-        id="cfg-security-title"
-        className="font-display text-xl mt-3 mb-6"
-      >
+      <h2 id="cfg-security-title" className="font-display text-xl mt-3 mb-6">
         Segurança & LGPD
       </h2>
 
@@ -413,17 +374,12 @@ function SecuritySection() {
         {items.map((it) => {
           const Icon = it.icon;
           return (
-            <li
-              key={it.title}
-              className="py-4 flex gap-3"
-            >
+            <li key={it.title} className="py-4 flex gap-3">
               <div className="h-8 w-8 rounded-md bg-[var(--sidebar-accent)] flex items-center justify-center shrink-0">
                 <Icon className="h-4 w-4 text-[var(--brand)]" />
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-medium text-foreground">
-                  {it.title}
-                </div>
+                <div className="text-sm font-medium text-foreground">{it.title}</div>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                   {it.description}
                 </p>
@@ -502,9 +458,7 @@ function SessionSection() {
     try {
       const res = await api.sessions.revokeOthers();
       const n = res.revoked;
-      toast.success(
-        `${n} sessão${n === 1 ? "" : "ões"} encerrada${n === 1 ? "" : "s"}.`,
-      );
+      toast.success(`${n} sessão${n === 1 ? "" : "ões"} encerrada${n === 1 ? "" : "s"}.`);
       setBulkOpen(false);
       await load();
     } catch (e) {
@@ -534,10 +488,7 @@ function SessionSection() {
             title="Sessões ativas"
             description="Gerencie os dispositivos conectados à sua conta. Você pode encerrar sessões individuais ou todas as outras."
           />
-          <h2
-            id="cfg-sessions-title"
-            className="font-display text-xl mt-3"
-          >
+          <h2 id="cfg-sessions-title" className="font-display text-xl mt-3">
             Sessões ativas
           </h2>
         </div>
@@ -552,9 +503,7 @@ function SessionSection() {
                 aria-label="Encerrar todas as outras sessões"
               >
                 <ShieldOff className="h-3.5 w-3.5" />
-                <span className="ml-1.5 hidden sm:inline">
-                  Encerrar todas as outras
-                </span>
+                <span className="ml-1.5 hidden sm:inline">Encerrar todas as outras</span>
                 <span className="ml-1.5 sm:hidden">Encerrar outras</span>
               </Button>
             </AlertDialogTrigger>
@@ -564,15 +513,12 @@ function SessionSection() {
                   Encerrar todas as outras sessões?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Tem certeza? Todas as outras sessões serão encerradas
-                  imediatamente. Esta ação não pode ser desfeita. A sessão
-                  atual será mantida.
+                  Tem certeza? Todas as outras sessões serão encerradas imediatamente. Esta ação não
+                  pode ser desfeita. A sessão atual será mantida.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={revokingOthers}>
-                  Cancelar
-                </AlertDialogCancel>
+                <AlertDialogCancel disabled={revokingOthers}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={(e) => {
                     e.preventDefault();
@@ -687,7 +633,7 @@ function SessionRowItem({
         {session.isCurrent ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span tabIndex={0} className="inline-flex">
+              <span className="inline-flex">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -700,9 +646,7 @@ function SessionRowItem({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent>
-              Não é possível encerrar a sessão atual — use Sair
-            </TooltipContent>
+            <TooltipContent>Não é possível encerrar a sessão atual — use Sair</TooltipContent>
           </Tooltip>
         ) : (
           <AlertDialog>
@@ -728,9 +672,8 @@ function SessionRowItem({
                   Encerrar esta sessão?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  A sessão selecionada será encerrada imediatamente e o
-                  dispositivo correspondente precisará autenticar-se
-                  novamente. Esta ação não pode ser desfeita.
+                  A sessão selecionada será encerrada imediatamente e o dispositivo correspondente
+                  precisará autenticar-se novamente. Esta ação não pode ser desfeita.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -760,7 +703,7 @@ function SessionListSkeleton() {
     <ul className="border-t border-border" aria-hidden="true">
       {Array.from({ length: 3 }).map((_, i) => (
         <li
-          key={i}
+          key={`skel-${i}`}
           className="border-b border-border py-4 px-1 flex flex-col sm:flex-row sm:items-center gap-3"
         >
           <div className="flex-1 min-w-0 space-y-1.5">
@@ -844,9 +787,7 @@ function formatDateTime(iso: string): string {
   }
 }
 
-function summarizeMetadata(
-  metadata: Record<string, unknown> | null,
-): string {
+function summarizeMetadata(metadata: Record<string, unknown> | null): string {
   if (!metadata) return "—";
   const entries = Object.entries(metadata);
   if (entries.length === 0) return "—";
@@ -916,8 +857,7 @@ function AuditLogSection() {
   };
 
   const onPrevPage = () => setPage((p) => Math.max(1, p - 1));
-  const onNextPage = () =>
-    setPage((p) => Math.min(meta?.pages ?? 1, p + 1));
+  const onNextPage = () => setPage((p) => Math.min(meta?.pages ?? 1, p + 1));
 
   const hasFilters = actionFilter !== "" || resourceFilter !== "";
 
@@ -957,20 +897,14 @@ function AuditLogSection() {
         title="Registro de Auditoria"
         description="Trilha de ações realizadas na sua conta."
       />
-      <h2
-        id="cfg-audit-title"
-        className="font-display text-xl mt-3 mb-6"
-      >
+      <h2 id="cfg-audit-title" className="font-display text-xl mt-3 mb-6">
         Registro de Auditoria
       </h2>
 
       {/* Filter row */}
       <div className="flex flex-wrap items-end gap-3 mb-5">
         <div className="space-y-1.5">
-          <Label
-            htmlFor="audit-filter-resource"
-            className="text-xs text-muted-foreground"
-          >
+          <Label htmlFor="audit-filter-resource" className="text-xs text-muted-foreground">
             Recurso
           </Label>
           <Select
@@ -1000,10 +934,7 @@ function AuditLogSection() {
         </div>
 
         <div className="space-y-1.5">
-          <Label
-            htmlFor="audit-filter-action"
-            className="text-xs text-muted-foreground"
-          >
+          <Label htmlFor="audit-filter-action" className="text-xs text-muted-foreground">
             Ação
           </Label>
           <Select
@@ -1101,8 +1032,8 @@ function AuditLogSection() {
           <Table>
             <TableCaption className="sr-only">
               Registro de auditoria — {meta?.total ?? data.length} entrada(s)
-              {hasFilters ? " com filtros aplicados" : ""}. Página{" "}
-              {meta?.page ?? page} de {meta?.pages ?? 1}.
+              {hasFilters ? " com filtros aplicados" : ""}. Página {meta?.page ?? page} de{" "}
+              {meta?.pages ?? 1}.
             </TableCaption>
             <TableHeader className="sticky top-0 bg-[var(--surface)] z-10">
               <TableRow className="border-b border-border hover:bg-transparent">
@@ -1125,14 +1056,9 @@ function AuditLogSection() {
                 const Icon = actionIcon(entry.action);
                 const details = summarizeMetadata(entry.metadata);
                 const fullDetails =
-                  entry.metadata != null
-                    ? JSON.stringify(entry.metadata, null, 2)
-                    : null;
+                  entry.metadata != null ? JSON.stringify(entry.metadata, null, 2) : null;
                 return (
-                  <TableRow
-                    key={entry.id}
-                    className="border-b border-border"
-                  >
+                  <TableRow key={entry.id} className="border-b border-border">
                     <TableCell className="font-mono-numeric text-xs text-muted-foreground py-3">
                       {formatDateTime(entry.createdAt)}
                     </TableCell>
@@ -1161,9 +1087,7 @@ function AuditLogSection() {
                       {fullDetails ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span className="cursor-help truncate block max-w-xs">
-                              {details}
-                            </span>
+                            <span className="cursor-help truncate block max-w-xs">{details}</span>
                           </TooltipTrigger>
                           <TooltipContent
                             side="top"
@@ -1235,7 +1159,7 @@ function AuditLogSkeleton() {
         {/* Body rows — icon block + action label, badge, details text */}
         {Array.from({ length: 6 }).map((_, i) => (
           <div
-            key={i}
+            key={`skel-${i}`}
             className="flex items-center gap-3 border-b border-border py-3 px-3"
           >
             <Skeleton className="h-3.5 w-32" />
@@ -1256,28 +1180,20 @@ function AuditLogSkeleton() {
 
 function AboutSection() {
   return (
-    <section
-      aria-labelledby="cfg-about-title"
-      className="py-8"
-    >
+    <section aria-labelledby="cfg-about-title" className="py-8">
       <SectionHeading
         icon={BookOpen}
         title="Sobre a plataforma"
         description="Versão, embasamento normativo e licença do instrumento."
       />
-      <h2
-        id="cfg-about-title"
-        className="font-display text-xl mt-3 mb-6"
-      >
+      <h2 id="cfg-about-title" className="font-display text-xl mt-3 mb-6">
         Sobre a plataforma
       </h2>
 
       <dl className="divide-y divide-border border-t border-b border-border">
         <div className="flex items-center justify-between gap-3 py-4">
           <dt className="text-sm text-muted-foreground">Versão</dt>
-          <dd className="font-mono-numeric font-medium text-sm text-foreground">
-            {APP_VERSION}
-          </dd>
+          <dd className="font-mono-numeric font-medium text-sm text-foreground">{APP_VERSION}</dd>
         </div>
         <div className="py-4 space-y-2">
           <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
@@ -1286,44 +1202,35 @@ function AboutSection() {
           <dd>
             <ul className="space-y-1.5 text-sm text-foreground">
               <li>
-                <span className="font-medium">NR-1</span> — Disposições gerais e
-                gerenciamento de riscos ocupacionais.
+                <span className="font-medium">NR-1</span> — Disposições gerais e gerenciamento de
+                riscos ocupacionais.
               </li>
               <li>
-                <span className="font-medium">Portaria MTE 1.419/2024</span> —
-                Anexo III: Riscos Psicossociais.
+                <span className="font-medium">Portaria MTE 1.419/2024</span> — Anexo III: Riscos
+                Psicossociais.
               </li>
               <li>
-                <span className="font-medium">Portaria MTE 765/2025</span> —
-                Atualizações do FRPRT.
+                <span className="font-medium">Portaria MTE 765/2025</span> — Atualizações do FRPRT.
               </li>
             </ul>
           </dd>
         </div>
         <div className="py-4 space-y-2">
-          <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-            Instrumento
-          </dt>
+          <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Instrumento</dt>
           <dd>
             <p className="text-sm leading-relaxed text-foreground">
-              COPSOQ II-BR — versão brasileira do Copenhagen Psychosocial
-              Questionnaire II. Adaptado e validado por{" "}
-              <span className="font-medium">
-                Gonçalves et al. (2021)
-              </span>
-              .
+              COPSOQ II-BR — versão brasileira do Copenhagen Psychosocial Questionnaire II. Adaptado
+              e validado por <span className="font-medium">Gonçalves et al. (2021)</span>.
             </p>
           </dd>
         </div>
         <div className="py-4 space-y-2">
-          <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-            Licença
-          </dt>
+          <dt className="text-xs uppercase tracking-[0.14em] text-muted-foreground">Licença</dt>
           <dd>
             <p className="text-sm text-foreground">
               O instrumento COPSOQ II-BR é distribuído sob licença{" "}
-              <span className="font-medium">CC BY-NC-ND 4.0</span> (Atribuição ·
-              Não comercial · Sem derivados).
+              <span className="font-medium">CC BY-NC-ND 4.0</span> (Atribuição · Não comercial · Sem
+              derivados).
             </p>
           </dd>
         </div>

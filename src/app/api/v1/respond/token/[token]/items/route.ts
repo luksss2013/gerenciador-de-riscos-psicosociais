@@ -1,6 +1,6 @@
+import { COPSOQ_ITEMS, LIKERT_SCALE } from "@/lib/copsoq-data";
 import { ERROR_CODES } from "@/lib/errors";
 import { workerErrorJson, workerJsonResponse } from "@/lib/session";
-import { COPSOQ_ITEMS, LIKERT_SCALE } from "@/lib/copsoq-data";
 
 interface RouteCtx {
   params: Promise<{ token: string }>;

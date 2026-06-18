@@ -1,11 +1,7 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import {
-  errorJson,
-  jsonResponse,
-  requireProfessional,
-} from "@/lib/session";
 import { runScoring } from "@/lib/scoring-service";
+import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 
 /**
  * POST /api/v1/system/close-expired
@@ -41,7 +37,14 @@ export async function POST() {
       select: { id: true, title: true },
     });
 
-    const results: Array<{ id: string; title: string; status: string; eligibleDepts: number; totalDimensions: number; error?: string }> = [];
+    const results: Array<{
+      id: string;
+      title: string;
+      status: string;
+      eligibleDepts: number;
+      totalDimensions: number;
+      error?: string;
+    }> = [];
 
     for (const a of expired) {
       try {
@@ -66,10 +69,12 @@ export async function POST() {
         });
       } catch (err) {
         // If scoring fails, revert to collecting so it can be retried.
-        await db.assessment.update({
-          where: { id: a.id },
-          data: { status: "collecting" },
-        }).catch(() => {});
+        await db.assessment
+          .update({
+            where: { id: a.id },
+            data: { status: "collecting" },
+          })
+          .catch(() => {});
         results.push({
           id: a.id,
           title: a.title,

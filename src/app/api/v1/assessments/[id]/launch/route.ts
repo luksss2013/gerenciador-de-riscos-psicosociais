@@ -33,10 +33,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (!assessment.endDate || assessment.endDate.getTime() < today.getTime()) {
-      return errorJson(
-        ERROR_CODES.VALIDATION_ERROR,
-        "endDate must be today or later to launch"
-      );
+      return errorJson(ERROR_CODES.VALIDATION_ERROR, "endDate must be today or later to launch");
     }
 
     // Generate tokens: N = ceil(expected * 1.5)
@@ -61,8 +58,8 @@ export async function POST(request: Request, { params }: RouteCtx) {
         db.assessmentDepartment.update({
           where: { id: u.id },
           data: { tokenCount: u.tokenCount },
-        })
-      )
+        }),
+      ),
     );
 
     await db.assessment.update({

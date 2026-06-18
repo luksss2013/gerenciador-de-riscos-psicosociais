@@ -4,20 +4,14 @@
 // Anonymous, one-question-per-screen COPSOQ II-BR questionnaire.
 // No back button. No analytics. No PII collected.
 
+import { AlertTriangle, Loader2, Lock, LogOut, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Loader2,
-  Lock,
-  LogOut,
-  ShieldCheck,
-} from "lucide-react";
-import { api, ApiError } from "@/lib/api";
-import type { CopsoqItemDTO } from "@/lib/types";
-import { LIKERT_SCALE } from "@/lib/copsoq-data";
-import { useView } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { ApiError, api } from "@/lib/api";
+import { LIKERT_SCALE } from "@/lib/copsoq-data";
+import { useView } from "@/lib/store";
+import type { CopsoqItemDTO } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Screen = "welcome" | "questions" | "thanks" | "error";
@@ -28,8 +22,7 @@ const ADVANCE_DELAY_MS = 300;
 
 const ERROR_MESSAGES: Record<string, string> = {
   TOKEN_INVALID: "Este link é inválido ou não existe.",
-  TOKEN_ALREADY_USED:
-    "Este link já foi utilizado. Cada link pode ser usado apenas uma vez.",
+  TOKEN_ALREADY_USED: "Este link já foi utilizado. Cada link pode ser usado apenas uma vez.",
   TOKEN_ASSESSMENT_CLOSED: "Esta pesquisa está encerrada.",
   RATE_LIMIT_EXCEEDED: "Muitas tentativas. Aguarde alguns minutos.",
 };
@@ -66,16 +59,10 @@ function getStoredAnswers(token: string): Record<number, number> {
   return {};
 }
 
-function saveStoredAnswers(
-  token: string,
-  answers: Record<number, number>
-): void {
+function saveStoredAnswers(token: string, answers: Record<number, number>): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(
-      ANSWERS_STORAGE_PREFIX + token,
-      JSON.stringify(answers)
-    );
+    window.localStorage.setItem(ANSWERS_STORAGE_PREFIX + token, JSON.stringify(answers));
   } catch {
     // storage unavailable / quota — fail silently (offline-tolerant)
   }
@@ -86,7 +73,7 @@ function saveStoredAnswers(
 // and union with localStorage entries (in case of prior offline answers).
 function firstUnansweredIndex(
   localAnswers: Record<number, number>,
-  serverAnsweredCount: number
+  serverAnsweredCount: number,
 ): number {
   for (let i = 1; i <= TOTAL_ITEMS; i++) {
     const serverAnswered = i <= serverAnsweredCount;
@@ -137,15 +124,13 @@ export function WorkerPortal({ token }: { token: string }) {
         setCurrentIndex(Math.min(Math.max(startIdx, 1), TOTAL_ITEMS));
         setInfoMsg(
           "Identificamos que nem todas as respostas foram registradas. " +
-            "Por favor, continue a partir da questão atual."
+            "Por favor, continue a partir da questão atual.",
         );
         setSelectedValue(null);
         setScreen("questions");
         return;
       }
-      setErrorMsg(
-        "Não foi possível finalizar a pesquisa. Tente novamente em instantes."
-      );
+      setErrorMsg("Não foi possível finalizar a pesquisa. Tente novamente em instantes.");
       setScreen("error");
     }
   }, [token]);
@@ -211,7 +196,7 @@ export function WorkerPortal({ token }: { token: string }) {
           }
         } else {
           setErrorMsg(
-            "Não foi possível carregar a pesquisa. Verifique sua conexão e tente novamente."
+            "Não foi possível carregar a pesquisa. Verifique sua conexão e tente novamente.",
           );
         }
         setScreen("error");
@@ -271,21 +256,16 @@ export function WorkerPortal({ token }: { token: string }) {
       // Non-fatal: stay on current question, allow retry.
       setSelectedValue(null);
       setSubmitting(false);
-      setInfoMsg(
-        "Não foi possível registrar sua resposta. Toque novamente para tentar."
-      );
+      setInfoMsg("Não foi possível registrar sua resposta. Toque novamente para tentar.");
     }
   };
 
   const currentItem = useMemo(
     () => items.find((i) => i.index === currentIndex) ?? null,
-    [items, currentIndex]
+    [items, currentIndex],
   );
 
-  const progressPct = Math.min(
-    100,
-    Math.round((currentIndex / TOTAL_ITEMS) * 100)
-  );
+  const progressPct = Math.min(100, Math.round((currentIndex / TOTAL_ITEMS) * 100));
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -351,10 +331,7 @@ export function WorkerPortal({ token }: { token: string }) {
       {/* Discreet footer */}
       <footer className="mt-auto border-t border-border">
         <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-3 flex items-center justify-center gap-2">
-          <Lock
-            className="h-3.5 w-3.5 text-muted-foreground shrink-0"
-            aria-hidden="true"
-          />
+          <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
           <p className="text-xs text-muted-foreground text-center">
             Pesquisa confidencial — suas respostas são anônimas
           </p>
@@ -373,10 +350,7 @@ function WorkerLoader({ label }: { label: string }) {
       role="status"
       aria-live="polite"
     >
-      <Loader2
-        className="h-7 w-7 animate-spin text-[var(--brand)]"
-        aria-hidden="true"
-      />
+      <Loader2 className="h-7 w-7 animate-spin text-[var(--brand)]" aria-hidden="true" />
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
   );
@@ -400,9 +374,9 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
         </h1>
         <div className="space-y-4 text-sm sm:text-base text-muted-foreground leading-relaxed max-w-2xl">
           <p>
-            Esta pesquisa tem como objetivo conhecer as condições de trabalho
-            no seu setor. Sua opinião é fundamental para identificar fatores
-            que afetam a saúde e o bem-estar dos trabalhadores.
+            Esta pesquisa tem como objetivo conhecer as condições de trabalho no seu setor. Sua
+            opinião é fundamental para identificar fatores que afetam a saúde e o bem-estar dos
+            trabalhadores.
           </p>
           <ul className="space-y-3">
             <li className="flex gap-3">
@@ -411,10 +385,8 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
                 aria-hidden="true"
               />
               <span>
-                <strong className="text-foreground font-medium">
-                  Participação voluntária
-                </strong>{" "}
-                — você pode interromper a qualquer momento.
+                <strong className="text-foreground font-medium">Participação voluntária</strong> —
+                você pode interromper a qualquer momento.
               </span>
             </li>
             <li className="flex gap-3">
@@ -423,11 +395,8 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
                 aria-hidden="true"
               />
               <span>
-                <strong className="text-foreground font-medium">
-                  Respostas anônimas
-                </strong>{" "}
-                — não coletamos nome, e-mail ou qualquer dado que identifique
-                você.
+                <strong className="text-foreground font-medium">Respostas anônimas</strong> — não
+                coletamos nome, e-mail ou qualquer dado que identifique você.
               </span>
             </li>
             <li className="flex gap-3">
@@ -436,10 +405,8 @@ function WorkerWelcome({ onStart }: { onStart: () => void }) {
                 aria-hidden="true"
               />
               <span>
-                <strong className="text-foreground font-medium">
-                  Duração aproximada
-                </strong>{" "}
-                de 15 minutos, em 40 questões de múltipla escolha.
+                <strong className="text-foreground font-medium">Duração aproximada</strong> de 15
+                minutos, em 40 questões de múltipla escolha.
               </span>
             </li>
           </ul>
@@ -481,10 +448,7 @@ function WorkerQuestionItem({
   onSelect,
 }: WorkerQuestionItemProps) {
   return (
-    <section
-      className="flex-1 flex flex-col gap-6 sm:gap-8"
-      aria-labelledby="question-title"
-    >
+    <section className="flex-1 flex flex-col gap-6 sm:gap-8" aria-labelledby="question-title">
       {/* Progress — pine */}
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -525,10 +489,9 @@ function WorkerQuestionItem({
         ) : null}
 
         {/* Likert options — refined radio tiles */}
-        <div
-          role="group"
+        <fieldset
           aria-label="Opções de resposta"
-          className="flex flex-col gap-2.5"
+          className="flex flex-col gap-2.5 border-0 p-0 m-0"
         >
           {LIKERT_SCALE.map((opt) => {
             const isSelected = selectedValue === opt.value;
@@ -546,7 +509,7 @@ function WorkerQuestionItem({
                   "disabled:cursor-not-allowed disabled:pointer-events-none",
                   isSelected
                     ? "bg-[var(--sidebar-accent)] border-[var(--brand)]"
-                    : "border-border bg-[var(--card)] hover:bg-[var(--surface)]"
+                    : "border-border bg-[var(--card)] hover:bg-[var(--surface)]",
                 )}
               >
                 <span
@@ -554,7 +517,7 @@ function WorkerQuestionItem({
                     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold font-mono-numeric transition-colors",
                     isSelected
                       ? "border-[var(--brand)] bg-[var(--brand)] text-[var(--accent-foreground)]"
-                      : "border-border bg-[var(--surface)] text-muted-foreground group-hover:border-[var(--brand-light)] group-hover:text-foreground"
+                      : "border-border bg-[var(--surface)] text-muted-foreground group-hover:border-[var(--brand-light)] group-hover:text-foreground",
                   )}
                   aria-hidden="true"
                 >
@@ -566,13 +529,10 @@ function WorkerQuestionItem({
               </button>
             );
           })}
-        </div>
+        </fieldset>
 
         {submitting ? (
-          <p
-            className="flex items-center gap-2 text-xs text-muted-foreground"
-            aria-live="polite"
-          >
+          <p className="flex items-center gap-2 text-xs text-muted-foreground" aria-live="polite">
             <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
             Registrando resposta…
           </p>
@@ -595,28 +555,19 @@ function WorkerThanks() {
         <ShieldCheck className="h-7 w-7" />
       </span>
       <div className="space-y-3 max-w-md">
-        <h1
-          id="thanks-title"
-          className="font-display text-3xl sm:text-4xl text-foreground"
-        >
+        <h1 id="thanks-title" className="font-display text-3xl sm:text-4xl text-foreground">
           Obrigado pela sua participação
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-          Suas respostas foram registradas. Agradecemos o tempo dedicado a
-          contribuir com a melhoria das condições de trabalho.
+          Suas respostas foram registradas. Agradecemos o tempo dedicado a contribuir com a melhoria
+          das condições de trabalho.
         </p>
       </div>
     </section>
   );
 }
 
-function WorkerError({
-  message,
-  onClose,
-}: {
-  message: string;
-  onClose: () => void;
-}) {
+function WorkerError({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <section
       className="flex-1 flex flex-col items-center justify-center text-center gap-6 py-12"
@@ -633,9 +584,7 @@ function WorkerError({
         <h1 className="font-display text-2xl sm:text-3xl text-foreground">
           Não é possível continuar
         </h1>
-        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-          {message}
-        </p>
+        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">{message}</p>
       </div>
       <Button
         type="button"

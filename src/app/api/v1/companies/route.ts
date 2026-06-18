@@ -1,6 +1,6 @@
+import { formatCnpj, isValidCnpj, sanitizeCnpj } from "@/lib/cnpj";
 import { db } from "@/lib/db";
-import { ERROR_CODES, BRAZILIAN_UFS } from "@/lib/errors";
-import { isValidCnpj, sanitizeCnpj, formatCnpj } from "@/lib/cnpj";
+import { BRAZILIAN_UFS, ERROR_CODES } from "@/lib/errors";
 import {
   errorJson,
   jsonResponse,
@@ -73,10 +73,7 @@ export async function GET(request: Request) {
       isActive: true,
       ...(q
         ? {
-            OR: [
-              { name: { contains: q } },
-              { cnpj: { contains: sanitizeCnpj(q) } },
-            ],
+            OR: [{ name: { contains: q } }, { cnpj: { contains: sanitizeCnpj(q) } }],
           }
         : {}),
     };
@@ -95,7 +92,7 @@ export async function GET(request: Request) {
       companies.map(async (c) => ({
         ...serializeCompany(c),
         summary: await buildCompanySummary(c.id),
-      }))
+      })),
     );
 
     const pages = Math.max(1, Math.ceil(total / limit));
@@ -151,14 +148,14 @@ export async function POST(request: Request) {
         ? body.cnaePrimary.trim()
         : null;
     const employeeCount =
-      typeof body.employeeCount === "number" && Number.isInteger(body.employeeCount) && body.employeeCount > 0
+      typeof body.employeeCount === "number" &&
+      Number.isInteger(body.employeeCount) &&
+      body.employeeCount > 0
         ? body.employeeCount
         : null;
-    const city =
-      typeof body.city === "string" && body.city.trim() ? body.city.trim() : null;
+    const city = typeof body.city === "string" && body.city.trim() ? body.city.trim() : null;
     const state =
-      typeof body.state === "string" &&
-      BRAZILIAN_UFS.includes(body.state.toUpperCase())
+      typeof body.state === "string" && BRAZILIAN_UFS.includes(body.state.toUpperCase())
         ? body.state.toUpperCase()
         : null;
     const contactName =
@@ -174,9 +171,7 @@ export async function POST(request: Request) {
         ? body.contactPhone.trim()
         : null;
     const dpoPoc =
-      typeof body.dpoPoc === "string" && body.dpoPoc.trim()
-        ? body.dpoPoc.trim()
-        : null;
+      typeof body.dpoPoc === "string" && body.dpoPoc.trim() ? body.dpoPoc.trim() : null;
 
     const company = await db.company.create({
       data: {
@@ -206,7 +201,7 @@ export async function POST(request: Request) {
 
     return jsonResponse(
       { ...serializeCompany(company), summary: await buildCompanySummary(company.id) },
-      201
+      201,
     );
   } catch (e) {
     const code = (e as { code?: string })?.code;

@@ -1,11 +1,6 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import {
-  errorJson,
-  jsonResponse,
-  parsePagination,
-  requireProfessional,
-} from "@/lib/session";
+import { errorJson, jsonResponse, parsePagination, requireProfessional } from "@/lib/session";
 
 interface AuditLogRow {
   id: string;

@@ -40,8 +40,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
         : "";
     const hazardDescription =
       typeof body.hazardDescription === "string" ? body.hazardDescription.trim() : "";
-    const possibleHarms =
-      typeof body.possibleHarms === "string" ? body.possibleHarms.trim() : "";
+    const possibleHarms = typeof body.possibleHarms === "string" ? body.possibleHarms.trim() : "";
     const probability =
       typeof body.probability === "number" &&
       Number.isInteger(body.probability) &&
@@ -75,9 +74,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
         ? body.assessmentDepartmentId
         : null;
     const departmentId =
-      typeof body.departmentId === "string" && body.departmentId
-        ? body.departmentId
-        : null;
+      typeof body.departmentId === "string" && body.departmentId ? body.departmentId : null;
     const existingControls =
       typeof body.existingControls === "string" && body.existingControls.trim()
         ? body.existingControls.trim()
@@ -94,7 +91,10 @@ export async function POST(request: Request, { params }: RouteCtx) {
         select: { assessmentId: true, departmentId: true },
       });
       if (!ad || ad.assessmentId !== assessment.id) {
-        return errorJson(ERROR_CODES.VALIDATION_ERROR, "assessmentDepartmentId invalid for this assessment");
+        return errorJson(
+          ERROR_CODES.VALIDATION_ERROR,
+          "assessmentDepartmentId invalid for this assessment",
+        );
       }
     }
 
@@ -115,15 +115,20 @@ export async function POST(request: Request, { params }: RouteCtx) {
       include: { department: { select: { name: true } } },
     });
 
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "inventory.create",
-        resourceType: "inventory",
-        resourceId: item.id,
-        metadataJson: JSON.stringify({ mteFactorCode: item.mteFactorCode, dimensionCode: item.dimensionCode }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "inventory.create",
+          resourceType: "inventory",
+          resourceId: item.id,
+          metadataJson: JSON.stringify({
+            mteFactorCode: item.mteFactorCode,
+            dimensionCode: item.dimensionCode,
+          }),
+        },
+      })
+      .catch(() => {});
 
     return jsonResponse(
       {
@@ -144,7 +149,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
       },
-      201
+      201,
     );
   } catch (e) {
     const code = (e as { code?: string })?.code;

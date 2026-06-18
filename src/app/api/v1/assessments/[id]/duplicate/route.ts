@@ -132,10 +132,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
       return errorJson(ERROR_CODES.UNAUTHORIZED, "Session required");
     }
     if (code === ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS) {
-      return errorJson(
-        ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS,
-        "Cross-tenant access denied",
-      );
+      return errorJson(ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS, "Cross-tenant access denied");
     }
     console.error("[assessment duplicate]", e);
     return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");

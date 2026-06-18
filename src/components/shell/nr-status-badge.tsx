@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -18,10 +17,7 @@ interface NrStatusBadgeProps {
   className?: string;
 }
 
-const NR_STATUS_CONFIG: Record<
-  NrStatus,
-  { label: string; className: string }
-> = {
+const NR_STATUS_CONFIG: Record<NrStatus, { label: string; className: string }> = {
   no_assessment: {
     label: "Sem avaliação",
     className: "bg-muted text-muted-foreground border-transparent",
@@ -55,10 +51,7 @@ const NR_STATUS_CONFIG: Record<
 export function NrStatusBadge({ status, className }: NrStatusBadgeProps) {
   const config = NR_STATUS_CONFIG[status] ?? NR_STATUS_CONFIG.no_assessment;
   return (
-    <Badge
-      className={cn(config.className, className)}
-      aria-label={`Status: ${config.label}`}
-    >
+    <Badge className={cn(config.className, className)} aria-label={`Status: ${config.label}`}>
       {config.label}
     </Badge>
   );

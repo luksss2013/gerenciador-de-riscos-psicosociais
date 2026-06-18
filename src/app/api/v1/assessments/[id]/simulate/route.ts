@@ -1,5 +1,5 @@
-import { randomUUID } from "crypto";
-
+import { randomUUID } from "node:crypto";
+import { COPSOQ_DIMENSIONS, COPSOQ_ITEMS, type Direction } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
 import {
@@ -8,11 +8,6 @@ import {
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
-import {
-  COPSOQ_DIMENSIONS,
-  COPSOQ_ITEMS,
-  type Direction,
-} from "@/lib/copsoq-data";
 
 interface RouteCtx {
   params: Promise<{ id: string }>;
@@ -51,9 +46,7 @@ function biasedLikert(direction: Direction, bias: Bias): number {
 const ITEM_DIRECTIONS: Direction[] = COPSOQ_ITEMS.map((item) => {
   const dim = COPSOQ_DIMENSIONS.find((d) => d.code === item.dimensionCode);
   if (!dim) {
-    throw new Error(
-      `Missing dimension ${item.dimensionCode} for item ${item.index}`,
-    );
+    throw new Error(`Missing dimension ${item.dimensionCode} for item ${item.index}`);
   }
   return dim.direction;
 });
@@ -92,8 +85,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
     }
 
     const providedDeptId =
-      typeof body.assessmentDeptId === "string" &&
-      body.assessmentDeptId.trim().length > 0
+      typeof body.assessmentDeptId === "string" && body.assessmentDeptId.trim().length > 0
         ? body.assessmentDeptId.trim()
         : null;
 
@@ -101,12 +93,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
     let count = 5;
     if (body.count !== undefined) {
       const n = typeof body.count === "number" ? body.count : NaN;
-      if (
-        !Number.isFinite(n) ||
-        !Number.isInteger(n) ||
-        n < 1 ||
-        n > 50
-      ) {
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1 || n > 50) {
         return errorJson(
           ERROR_CODES.VALIDATION_ERROR,
           "count must be an integer between 1 and 50",
@@ -121,16 +108,10 @@ export async function POST(request: Request, { params }: RouteCtx) {
     // Validate bias: low | medium | high, default medium.
     let bias: Bias = "medium";
     if (body.bias !== undefined && body.bias !== null) {
-      if (
-        body.bias !== "low" &&
-        body.bias !== "medium" &&
-        body.bias !== "high"
-      ) {
-        return errorJson(
-          ERROR_CODES.VALIDATION_ERROR,
-          'bias must be "low", "medium", or "high"',
-          { field: "bias" },
-        );
+      if (body.bias !== "low" && body.bias !== "medium" && body.bias !== "high") {
+        return errorJson(ERROR_CODES.VALIDATION_ERROR, 'bias must be "low", "medium", or "high"', {
+          field: "bias",
+        });
       }
       bias = body.bias as Bias;
     }
@@ -138,10 +119,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
     // Determine target GHEs.
     const allDepts = assessment.departments;
     if (allDepts.length === 0) {
-      return errorJson(
-        ERROR_CODES.VALIDATION_ERROR,
-        "Assessment has no GHEs to simulate",
-      );
+      return errorJson(ERROR_CODES.VALIDATION_ERROR, "Assessment has no GHEs to simulate");
     }
 
     let targetDepts = allDepts;
@@ -195,10 +173,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
           const answerRows = COPSOQ_ITEMS.map((item) => ({
             tokenId: token.id,
             itemIndex: item.index,
-            likertValue: biasedLikert(
-              ITEM_DIRECTIONS[item.index - 1],
-              bias,
-            ),
+            likertValue: biasedLikert(ITEM_DIRECTIONS[item.index - 1], bias),
           }));
           await tx.responseAnswer.createMany({ data: answerRows });
 
@@ -254,10 +229,7 @@ export async function POST(request: Request, { params }: RouteCtx) {
       return errorJson(ERROR_CODES.UNAUTHORIZED, "Session required");
     }
     if (code === ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS) {
-      return errorJson(
-        ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS,
-        "Cross-tenant access denied",
-      );
+      return errorJson(ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS, "Cross-tenant access denied");
     }
     console.error("[simulate POST]", e);
     return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");

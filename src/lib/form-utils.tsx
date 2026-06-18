@@ -7,7 +7,6 @@
 //
 // Pure presentation — no business logic / API / data-flow changes.
 
-import * as React from "react";
 import { AlertCircle } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -47,10 +46,7 @@ export function maskPhone(input: string): string {
  *
  * Empty input returns "" — callers decide whether "" is valid for their field.
  */
-export function maskNumber(
-  input: string,
-  opts?: { min?: number; max?: number }
-): string {
+export function maskNumber(input: string, opts?: { min?: number; max?: number }): string {
   const s = input.replace(/\D/g, "");
   if (s === "") return "";
   let n = Number(s);
@@ -118,13 +114,7 @@ export function validateRequired(value: string, minLen?: number): boolean {
  *
  * Includes `role="alert"` for screen readers and a small `AlertCircle` glyph.
  */
-export function FieldError({
-  id,
-  message,
-}: {
-  id?: string;
-  message: string;
-}) {
+export function FieldError({ id, message }: { id?: string; message: string }) {
   return (
     <p
       id={id}
@@ -194,16 +184,11 @@ export function DateRangeField({
     <fieldset className="space-y-1.5">
       <legend className="text-sm font-medium leading-none">
         {groupLabel}
-        {required ? (
-          <span className="text-[var(--risk-high)]"> *</span>
-        ) : null}
+        {required ? <span className="text-[var(--risk-high)]"> *</span> : null}
       </legend>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
         <div className="space-y-1.5">
-          <Label
-            htmlFor={startId}
-            className="text-xs text-muted-foreground font-normal"
-          >
+          <Label htmlFor={startId} className="text-xs text-muted-foreground font-normal">
             {startLabel}
           </Label>
           <Input
@@ -215,22 +200,15 @@ export function DateRangeField({
               recompute(e.target.value, endValue);
             }}
             disabled={disabled}
-            className={`font-mono-numeric ${
-              error ? FIELD_ERROR_CLASS : ""
-            }`}
+            className={`font-mono-numeric ${error ? FIELD_ERROR_CLASS : ""}`}
             aria-invalid={!!error}
             aria-describedby={error ? errorId : undefined}
           />
         </div>
         <div className="space-y-1.5">
-          <Label
-            htmlFor={endId}
-            className="text-xs text-muted-foreground font-normal"
-          >
+          <Label htmlFor={endId} className="text-xs text-muted-foreground font-normal">
             {endLabel}
-            {required ? (
-              <span className="text-[var(--risk-high)]"> *</span>
-            ) : null}
+            {required ? <span className="text-[var(--risk-high)]"> *</span> : null}
           </Label>
           <Input
             id={endId}
@@ -241,9 +219,7 @@ export function DateRangeField({
               recompute(startValue, e.target.value);
             }}
             disabled={disabled}
-            className={`font-mono-numeric ${
-              error ? FIELD_ERROR_CLASS : ""
-            }`}
+            className={`font-mono-numeric ${error ? FIELD_ERROR_CLASS : ""}`}
             aria-invalid={!!error}
             aria-describedby={error ? errorId : undefined}
           />

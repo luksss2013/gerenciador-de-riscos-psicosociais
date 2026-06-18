@@ -1,17 +1,13 @@
+import { COPSOQ_DIMENSIONS, type DimensionCode, INVENTORY_TEMPLATES } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
+import { defaultInventoryPS } from "@/lib/scoring";
 import {
   errorJson,
   jsonResponse,
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
-import {
-  INVENTORY_TEMPLATES,
-  DimensionCode,
-  COPSOQ_DIMENSIONS,
-} from "@/lib/copsoq-data";
-import { defaultInventoryPS } from "@/lib/scoring";
 
 interface RouteCtx {
   params: Promise<{ id: string }>;
@@ -86,7 +82,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     const existingKey = new Set(
       existingAuto
         .filter((e) => e.assessmentDepartmentId && e.dimensionCode)
-        .map((e) => `${e.assessmentDepartmentId}|${e.dimensionCode}`)
+        .map((e) => `${e.assessmentDepartmentId}|${e.dimensionCode}`),
     );
 
     const toCreate: {

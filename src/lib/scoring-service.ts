@@ -1,14 +1,9 @@
 // Scoring service — orchestrates per-GHE scoring + persistence (spec §3.8, RB-06).
 // Idempotent: deletes & re-inserts DimensionResult rows on each run.
 
+import { COPSOQ_DIMENSIONS } from "./copsoq-data";
 import { db } from "./db";
-import {
-  AnswerMatrixEntry,
-  DimensionScoreResult,
-  K_ANONYMITY_THRESHOLD,
-  scoreDepartment,
-} from "./scoring";
-import { COPSOQ_DIMENSIONS, DimensionCode } from "./copsoq-data";
+import { type AnswerMatrixEntry, type DimensionScoreResult, scoreDepartment } from "./scoring";
 
 export interface RunScoringResult {
   eligibleDepts: number;
@@ -25,9 +20,7 @@ export interface RunScoringResult {
  * 6. Else → upsert DimensionResult rows, mark isEligible=true.
  * 7. Return { eligibleDepts, totalDimensions }.
  */
-export async function runScoring(
-  assessmentId: string
-): Promise<RunScoringResult> {
+export async function runScoring(assessmentId: string): Promise<RunScoringResult> {
   const assessmentDepartments = await db.assessmentDepartment.findMany({
     where: { assessmentId },
     include: {
@@ -42,17 +35,15 @@ export async function runScoring(
   const totalDimensions = COPSOQ_DIMENSIONS.length;
 
   for (const ad of assessmentDepartments) {
-    const answersByToken: AnswerMatrixEntry[][] = ad.responseTokens.map(
-      (tok) =>
-        tok.answers.map((a) => ({
-          itemIndex: a.itemIndex,
-          likertValue: a.likertValue,
-        }))
+    const answersByToken: AnswerMatrixEntry[][] = ad.responseTokens.map((tok) =>
+      tok.answers.map((a) => ({
+        itemIndex: a.itemIndex,
+        likertValue: a.likertValue,
+      })),
     );
 
     const nResponses = answersByToken.length;
-    const results: DimensionScoreResult[] | null =
-      scoreDepartment(answersByToken);
+    const results: DimensionScoreResult[] | null = scoreDepartment(answersByToken);
 
     if (results === null) {
       // Ineligible: nResponses < K_ANONYMITY_THRESHOLD

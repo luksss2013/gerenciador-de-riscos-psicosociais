@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -17,49 +15,9 @@ import {
   ShieldAlert,
   Trash2,
 } from "lucide-react";
+import type * as React from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useView } from "@/lib/store";
-import type {
-  Assessment,
-  DimensionCode,
-  RiskInventoryItem,
-  RiskLevel,
-} from "@/lib/types";
-import {
-  COPSOQ_DIMENSIONS,
-  MTE_FACTORS,
-  getDimension,
-} from "@/lib/copsoq-data";
-import { classifyInventoryRisk } from "@/lib/scoring";
-import { RISK_LEVEL_LABELS } from "@/lib/errors";
-import {
-  FIELD_ERROR_CLASS,
-  FieldError,
-  maskNumber,
-  validateRequired,
-} from "@/lib/form-utils";
-
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +29,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -78,19 +48,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ApiError, api } from "@/lib/api";
+import { COPSOQ_DIMENSIONS, getDimension, MTE_FACTORS } from "@/lib/copsoq-data";
+import { RISK_LEVEL_LABELS } from "@/lib/errors";
+import { FIELD_ERROR_CLASS, FieldError, maskNumber, validateRequired } from "@/lib/form-utils";
+import { classifyInventoryRisk } from "@/lib/scoring";
+import { useView } from "@/lib/store";
+import type { Assessment, DimensionCode, RiskInventoryItem, RiskLevel } from "@/lib/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -130,7 +105,6 @@ function riskLevelClass(level: RiskLevel): string {
       return "risk-low-bg";
     case "MEDIUM":
       return "risk-medium-bg";
-    case "HIGH":
     default:
       return "risk-high-bg";
   }
@@ -138,20 +112,15 @@ function riskLevelClass(level: RiskLevel): string {
 
 // ─── RiskLevelCell ──────────────────────────────────────────────────────────
 
-function RiskLevelCell({
-  probability,
-  severity,
-}: {
-  probability: number;
-  severity: number;
-}) {
+function RiskLevelCell({ probability, severity }: { probability: number; severity: number }) {
   const { level, score } = classifyInventoryRisk(probability, severity);
   const label = RISK_LEVEL_LABELS[level] ?? level;
   return (
     <span
       className={`inline-flex items-center justify-center min-w-[2.75rem] px-2 py-0.5 rounded text-[11px] font-semibold font-mono-numeric ${riskLevelClass(level)}`}
-      aria-label={`Nível de risco: ${label}, pontuação ${score}`}
       title={`${label} · P${probability} × S${severity} = ${score}`}
+      role="img"
+      aria-label={`Nível de risco: ${label}, pontuação ${score}`}
     >
       {label}
     </span>
@@ -230,23 +199,15 @@ function EditableTextCell({
       aria-label={ariaLabel}
     >
       {value && value.trim().length > 0 ? (
-        <span className="whitespace-pre-wrap break-words flex-1 leading-relaxed">
-          {value}
-        </span>
+        <span className="whitespace-pre-wrap break-words flex-1 leading-relaxed">{value}</span>
       ) : (
         <span className="text-muted-foreground italic flex-1">{placeholder}</span>
       )}
       <span className="flex items-center shrink-0 mt-0.5">
         {isSaving ? (
-          <Loader2
-            className="h-3 w-3 animate-spin text-muted-foreground"
-            aria-label="Salvando"
-          />
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-label="Salvando" />
         ) : isSaved ? (
-          <Check
-            className="h-3 w-3 text-[var(--risk-low)]"
-            aria-label="Salvo"
-          />
+          <Check className="h-3 w-3 text-[var(--risk-low)]" aria-label="Salvo" />
         ) : (
           <Pencil
             className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
@@ -328,15 +289,9 @@ function EditableSelectCell({
     >
       <span className="font-mono-numeric font-medium">{currentLabel}</span>
       {isSaving ? (
-        <Loader2
-          className="h-3 w-3 animate-spin text-muted-foreground"
-          aria-label="Salvando"
-        />
+        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-label="Salvando" />
       ) : isSaved ? (
-        <Check
-          className="h-3 w-3 text-[var(--risk-low)]"
-          aria-label="Salvo"
-        />
+        <Check className="h-3 w-3 text-[var(--risk-low)]" aria-label="Salvo" />
       ) : (
         <Pencil
           className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
@@ -392,10 +347,7 @@ function InventoryTable({
   }, [items]);
 
   return (
-    <section
-      aria-label="Itens do inventário"
-      className="border-t border-border"
-    >
+    <section aria-label="Itens do inventário" className="border-t border-border">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 pt-4 pb-4">
         <div className="min-w-0">
           <h2 className="font-display text-xl tracking-tight text-foreground flex items-center gap-2">
@@ -403,18 +355,17 @@ function InventoryTable({
             Itens do inventário
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {items.length} item(ns) no inventário. Clique em uma célula para
-            editar — as alterações são salvas automaticamente.
+            {items.length} item(ns) no inventário. Clique em uma célula para editar — as alterações
+            são salvas automaticamente.
           </p>
         </div>
       </div>
       <div className="overflow-x-auto scroll-area border-t border-border">
         <Table className="min-w-[1280px]">
           <caption className="sr-only">
-            Inventário de riscos psicossociais. Colunas: tipo (automático ou
-            manual), GHE, fator FRPRT MTE, dimensão COPSOQ, perigo
-            identificado, possíveis danos, probabilidade, severidade, nível de
-            risco calculado, controles existentes, medidas propostas, ações.
+            Inventário de riscos psicossociais. Colunas: tipo (automático ou manual), GHE, fator
+            FRPRT MTE, dimensão COPSOQ, perigo identificado, possíveis danos, probabilidade,
+            severidade, nível de risco calculado, controles existentes, medidas propostas, ações.
           </caption>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border">
@@ -506,9 +457,7 @@ function InventoryTable({
                       >
                         <span className="font-semibold">{mte.code}</span>
                         <span className="text-muted-foreground font-sans">·</span>
-                        <span className="font-sans font-normal truncate">
-                          {mte.name}
-                        </span>
+                        <span className="font-sans font-normal truncate">{mte.name}</span>
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
@@ -522,9 +471,7 @@ function InventoryTable({
                       >
                         <span className="font-semibold">{dim.code}</span>
                         <span className="text-muted-foreground font-sans">·</span>
-                        <span className="font-sans font-normal truncate">
-                          {dim.namePtBr}
-                        </span>
+                        <span className="font-sans font-normal truncate">{dim.namePtBr}</span>
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
@@ -591,10 +538,7 @@ function InventoryTable({
                     />
                   </TableCell>
                   <TableCell className="py-3 align-top">
-                    <RiskLevelCell
-                      probability={item.probability}
-                      severity={item.severity}
-                    />
+                    <RiskLevelCell probability={item.probability} severity={item.severity} />
                   </TableCell>
                   <TableCell className="py-3 align-top">
                     <EditableTextCell
@@ -628,8 +572,7 @@ function InventoryTable({
                         draft={draft}
                         setDraft={setDraft}
                       />
-                      {item.proposedMeasures &&
-                      item.proposedMeasures.trim().length > 0 ? (
+                      {item.proposedMeasures && item.proposedMeasures.trim().length > 0 ? (
                         <button
                           type="button"
                           onClick={() => onCreateAction(item)}
@@ -661,8 +604,7 @@ function InventoryTable({
                               Excluir item do inventário?
                             </AlertDialogTitle>
                             <AlertDialogDescription>
-                              Esta ação remove o risco manual do inventário
-                              e não pode ser desfeita.
+                              Esta ação remove o risco manual do inventário e não pode ser desfeita.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -688,7 +630,7 @@ function InventoryTable({
                     ) : (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span tabIndex={0} className="inline-flex">
+                          <span className="inline-flex">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -700,9 +642,7 @@ function InventoryTable({
                             </Button>
                           </span>
                         </TooltipTrigger>
-                        <TooltipContent>
-                          Itens automáticos não podem ser excluídos
-                        </TooltipContent>
+                        <TooltipContent>Itens automáticos não podem ser excluídos</TooltipContent>
                       </Tooltip>
                     )}
                   </TableCell>
@@ -711,7 +651,7 @@ function InventoryTable({
             })}
           </TableBody>
         </Table>
-        </div>
+      </div>
     </section>
   );
 }
@@ -742,9 +682,8 @@ function ManualRiskForm({
             Adicionar Risco Manual
           </DialogTitle>
           <DialogDescription>
-            Inclua um fator de risco psicossocial identificado por observação
-            direta ou apontamento do GHE, não coberto automaticamente pela
-            pesquisa COPSOQ II-BR.
+            Inclua um fator de risco psicossocial identificado por observação direta ou apontamento
+            do GHE, não coberto automaticamente pela pesquisa COPSOQ II-BR.
           </DialogDescription>
         </DialogHeader>
         {open ? (
@@ -792,10 +731,8 @@ function ManualRiskFormContents({
     e.preventDefault();
     const errs: Partial<Record<string, string>> = {};
     if (!mteFactorCode) errs.mteFactorCode = "Selecione um fator FRPRT MTE.";
-    if (!validateRequired(hazardDescription, 3))
-      errs.hazardDescription = "Mínimo de 3 caracteres.";
-    if (!validateRequired(possibleHarms, 3))
-      errs.possibleHarms = "Mínimo de 3 caracteres.";
+    if (!validateRequired(hazardDescription, 3)) errs.hazardDescription = "Mínimo de 3 caracteres.";
+    if (!validateRequired(possibleHarms, 3)) errs.possibleHarms = "Mínimo de 3 caracteres.";
     if (!probability) errs.probability = "Selecione a probabilidade.";
     if (!severity) errs.severity = "Selecione a severidade.";
     if (Object.keys(errs).length > 0) {
@@ -812,13 +749,10 @@ function ManualRiskFormContents({
         probability: Number(probability),
         severity: Number(severity),
       };
-      if (assessmentDepartmentId)
-        body.assessmentDepartmentId = assessmentDepartmentId;
+      if (assessmentDepartmentId) body.assessmentDepartmentId = assessmentDepartmentId;
       if (dimensionCode) body.dimensionCode = dimensionCode;
-      if (existingControls.trim())
-        body.existingControls = existingControls.trim();
-      if (proposedMeasures.trim())
-        body.proposedMeasures = proposedMeasures.trim();
+      if (existingControls.trim()) body.existingControls = existingControls.trim();
+      if (proposedMeasures.trim()) body.proposedMeasures = proposedMeasures.trim();
       await onSubmit(body);
     } catch (e) {
       let msg = "Erro ao adicionar risco manual.";
@@ -876,15 +810,8 @@ function ManualRiskFormContents({
 
       <div className="space-y-1.5">
         <Label htmlFor="manual-ghe">GHE</Label>
-        <Select
-          value={assessmentDepartmentId}
-          onValueChange={setAssessmentDepartmentId}
-        >
-          <SelectTrigger
-            id="manual-ghe"
-            className="w-full"
-            aria-label="Selecionar GHE"
-          >
+        <Select value={assessmentDepartmentId} onValueChange={setAssessmentDepartmentId}>
+          <SelectTrigger id="manual-ghe" className="w-full" aria-label="Selecionar GHE">
             <SelectValue placeholder="Selecionar GHE (opcional)" />
           </SelectTrigger>
           <SelectContent>
@@ -910,9 +837,7 @@ function ManualRiskFormContents({
             className={`w-full ${errors.mteFactorCode ? FIELD_ERROR_CLASS : ""}`}
             aria-label="Selecionar fator FRPRT MTE"
             aria-invalid={!!errors.mteFactorCode}
-            aria-describedby={
-              errors.mteFactorCode ? "manual-mte-err" : undefined
-            }
+            aria-describedby={errors.mteFactorCode ? "manual-mte-err" : undefined}
           >
             <SelectValue placeholder="Selecionar fator" />
           </SelectTrigger>
@@ -932,11 +857,7 @@ function ManualRiskFormContents({
       <div className="space-y-1.5">
         <Label htmlFor="manual-dim">Dimensão COPSOQ (opcional)</Label>
         <Select value={dimensionCode} onValueChange={setDimensionCode}>
-          <SelectTrigger
-            id="manual-dim"
-            className="w-full"
-            aria-label="Selecionar dimensão COPSOQ"
-          >
+          <SelectTrigger id="manual-dim" className="w-full" aria-label="Selecionar dimensão COPSOQ">
             <SelectValue placeholder="Selecionar dimensão" />
           </SelectTrigger>
           <SelectContent>
@@ -965,16 +886,11 @@ function ManualRiskFormContents({
           placeholder="Descreva o perigo identificado (mínimo 3 caracteres)…"
           rows={2}
           aria-invalid={!!errors.hazardDescription}
-          aria-describedby={
-            errors.hazardDescription ? "manual-hazard-err" : undefined
-          }
+          aria-describedby={errors.hazardDescription ? "manual-hazard-err" : undefined}
           className={errors.hazardDescription ? FIELD_ERROR_CLASS : ""}
         />
         {errors.hazardDescription ? (
-          <FieldError
-            id="manual-hazard-err"
-            message={errors.hazardDescription}
-          />
+          <FieldError id="manual-hazard-err" message={errors.hazardDescription} />
         ) : null}
       </div>
 
@@ -987,16 +903,13 @@ function ManualRiskFormContents({
           value={possibleHarms}
           onChange={(e) => {
             setPossibleHarms(e.target.value);
-            if (errors.possibleHarms)
-              setErrors((p) => ({ ...p, possibleHarms: undefined }));
+            if (errors.possibleHarms) setErrors((p) => ({ ...p, possibleHarms: undefined }));
           }}
           onBlur={() => validateOnBlur("possibleHarms")}
           placeholder="Descreva os possíveis danos (mínimo 3 caracteres)…"
           rows={2}
           aria-invalid={!!errors.possibleHarms}
-          aria-describedby={
-            errors.possibleHarms ? "manual-harms-err" : undefined
-          }
+          aria-describedby={errors.possibleHarms ? "manual-harms-err" : undefined}
           className={errors.possibleHarms ? FIELD_ERROR_CLASS : ""}
         />
         {errors.possibleHarms ? (
@@ -1023,9 +936,7 @@ function ManualRiskFormContents({
               className={`w-full ${errors.probability ? FIELD_ERROR_CLASS : ""}`}
               aria-label="Selecionar probabilidade"
               aria-invalid={!!errors.probability}
-              aria-describedby={
-                errors.probability ? "manual-prob-err" : undefined
-              }
+              aria-describedby={errors.probability ? "manual-prob-err" : undefined}
             >
               <SelectValue />
             </SelectTrigger>
@@ -1047,18 +958,14 @@ function ManualRiskFormContents({
           </Label>
           <Select
             value={severity}
-            onValueChange={(v) =>
-              setSeverity(maskNumber(v, { min: 1, max: 3 }))
-            }
+            onValueChange={(v) => setSeverity(maskNumber(v, { min: 1, max: 3 }))}
           >
             <SelectTrigger
               id="manual-sev"
               className={`w-full ${errors.severity ? FIELD_ERROR_CLASS : ""}`}
               aria-label="Selecionar severidade"
               aria-invalid={!!errors.severity}
-              aria-describedby={
-                errors.severity ? "manual-sev-err" : undefined
-              }
+              aria-describedby={errors.severity ? "manual-sev-err" : undefined}
             >
               <SelectValue />
             </SelectTrigger>
@@ -1070,9 +977,7 @@ function ManualRiskFormContents({
               ))}
             </SelectContent>
           </Select>
-          {errors.severity ? (
-            <FieldError id="manual-sev-err" message={errors.severity} />
-          ) : null}
+          {errors.severity ? <FieldError id="manual-sev-err" message={errors.severity} /> : null}
         </div>
       </div>
 
@@ -1105,20 +1010,11 @@ function ManualRiskFormContents({
       </div>
 
       <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={submitting}
-        >
+        <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           Cancelar
         </Button>
         <Button type="submit" disabled={submitting}>
-          {submitting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           Adicionar
         </Button>
       </DialogFooter>
@@ -1133,10 +1029,7 @@ function UncoveredFactorsSection({
 }: {
   onAddFactor: (mteFactorCode: string) => void;
 }) {
-  const uncovered = useMemo(
-    () => MTE_FACTORS.filter((f) => !f.coveredByCopsoq),
-    []
-  );
+  const uncovered = useMemo(() => MTE_FACTORS.filter((f) => !f.coveredByCopsoq), []);
 
   return (
     <Collapsible defaultOpen={false} asChild>
@@ -1157,9 +1050,8 @@ function UncoveredFactorsSection({
                   Fatores MTE não cobertos pelo COPSOQ II-BR
                 </h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  {uncovered.length} fator(es) FRPRT do MTE não são medidos
-                  pelo instrumento. Clique em &ldquo;Adicionar&rdquo; para
-                  incluí-los manualmente no inventário.
+                  {uncovered.length} fator(es) FRPRT do MTE não são medidos pelo instrumento. Clique
+                  em &ldquo;Adicionar&rdquo; para incluí-los manualmente no inventário.
                 </p>
               </div>
             </div>
@@ -1172,10 +1064,7 @@ function UncoveredFactorsSection({
         <CollapsibleContent>
           <ul className="border-t border-border divide-y divide-border">
             {uncovered.map((f) => (
-              <li
-                key={f.code}
-                className="py-3 flex items-start justify-between gap-3"
-              >
+              <li key={f.code} className="py-3 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge
@@ -1233,7 +1122,7 @@ function InventarioSkeleton() {
         <div className="flex items-center gap-2 border-b border-border bg-[var(--surface)] px-3 py-3">
           {Array.from({ length: 9 }).map((_, i) => (
             <Skeleton
-              key={i}
+              key={`skel-${i}`}
               className={`h-3 ${i === 0 ? "w-12" : i === 1 ? "w-20" : i === 2 ? "w-32" : i === 3 ? "w-28" : i === 4 ? "w-24" : i === 5 ? "w-20" : i === 6 ? "w-16" : i === 7 ? "w-20" : "w-24"}`}
             />
           ))}
@@ -1241,7 +1130,7 @@ function InventarioSkeleton() {
         {/* Body rows */}
         {Array.from({ length: 6 }).map((_, r) => (
           <div
-            key={r}
+            key={`skel-r-${r}`}
             className="flex items-center gap-2 border-b border-border last:border-b-0 px-3 py-3"
           >
             <Skeleton className="h-4 w-12" />
@@ -1291,12 +1180,10 @@ export function InventarioView() {
   const [manualFormPrefill, setManualFormPrefill] = useState<{
     mteFactorCode?: string;
   } | null>(() =>
-    inventoryPrefill?.mteFactorCode
-      ? { mteFactorCode: inventoryPrefill.mteFactorCode }
-      : null
+    inventoryPrefill?.mteFactorCode ? { mteFactorCode: inventoryPrefill.mteFactorCode } : null,
   );
   const [manualFormOpen, setManualFormOpen] = useState<boolean>(
-    () => !!inventoryPrefill?.mteFactorCode
+    () => !!inventoryPrefill?.mteFactorCode,
   );
 
   const [savingCell, setSavingCell] = useState<CellEdit | null>(null);
@@ -1321,10 +1208,7 @@ export function InventarioView() {
         setLoading(false);
       } catch (e) {
         if (cancelled) return;
-        const msg =
-          e instanceof ApiError
-            ? e.message
-            : "Erro inesperado ao carregar o inventário.";
+        const msg = e instanceof ApiError ? e.message : "Erro inesperado ao carregar o inventário.";
         setError(msg);
         setLoading(false);
       }
@@ -1333,7 +1217,7 @@ export function InventarioView() {
     return () => {
       cancelled = true;
     };
-  }, [assessmentId, refreshKey]);
+  }, [assessmentId]);
 
   // Consume the cross-module prefill: clear it once on mount so it doesn't
   // re-trigger after the user closes the auto-opened form. setInventoryPrefill
@@ -1345,45 +1229,36 @@ export function InventarioView() {
 
   const refresh = () => setRefreshKey((k) => k + 1);
 
-  const allItems = useMemo(
-    () => [...autoItems, ...manualItems],
-    [autoItems, manualItems]
-  );
+  const allItems = useMemo(() => [...autoItems, ...manualItems], [autoItems, manualItems]);
 
   const highRiskCount = useMemo(
     () =>
-      allItems.filter(
-        (i) => classifyInventoryRisk(i.probability, i.severity).level === "HIGH"
-      ).length,
-    [allItems]
+      allItems.filter((i) => classifyInventoryRisk(i.probability, i.severity).level === "HIGH")
+        .length,
+    [allItems],
   );
 
   const handlePatch = async (
     itemId: string,
     body: Record<string, unknown>,
-    field: EditableField
+    field: EditableField,
   ) => {
     setSavingCell({ itemId, field });
     setSavedCell(null);
     try {
       const updated = await api.inventory.update(itemId, body);
       setAutoItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
-      setManualItems((prev) =>
-        prev.map((i) => (i.id === itemId ? updated : i))
-      );
+      setManualItems((prev) => prev.map((i) => (i.id === itemId ? updated : i)));
       setSavingCell(null);
       setSavedCell({ itemId, field });
       window.setTimeout(() => {
-        setSavedCell((cur) =>
-          cur && cur.itemId === itemId && cur.field === field ? null : cur
-        );
+        setSavedCell((cur) => (cur && cur.itemId === itemId && cur.field === field ? null : cur));
       }, 1500);
       // No success toast — the inline savedCell indicator confirms the save.
       // Errors still surface via toast below.
     } catch (e) {
       setSavingCell(null);
-      const msg =
-        e instanceof ApiError ? e.message : "Erro ao salvar alteração.";
+      const msg = e instanceof ApiError ? e.message : "Erro ao salvar alteração.";
       toast.error(msg);
     }
   };
@@ -1398,8 +1273,7 @@ export function InventarioView() {
         toast.error("Itens automáticos não podem ser excluídos.");
         return;
       }
-      const msg =
-        e instanceof ApiError ? e.message : "Erro ao excluir item.";
+      const msg = e instanceof ApiError ? e.message : "Erro ao excluir item.";
       toast.error(msg);
     }
   };
@@ -1439,12 +1313,9 @@ export function InventarioView() {
             <ShieldAlert className="h-6 w-6 text-[var(--brand)]" />
           </div>
           <div className="space-y-1">
-            <h2 className="font-display text-lg tracking-tight">
-              Nenhuma avaliação selecionada
-            </h2>
+            <h2 className="font-display text-lg tracking-tight">Nenhuma avaliação selecionada</h2>
             <p className="text-sm text-muted-foreground max-w-md">
-              Acesse uma avaliação concluída para visualizar o inventário de
-              riscos psicossociais.
+              Acesse uma avaliação concluída para visualizar o inventário de riscos psicossociais.
             </p>
           </div>
           <Button onClick={() => go("painel")}>
@@ -1479,22 +1350,14 @@ export function InventarioView() {
                 Identificação de perigos e avaliação prioritária (NR-1)
               </p>
               {assessment ? (
-                <p
-                  className="text-xs text-muted-foreground mt-1 truncate"
-                  title={assessment.title}
-                >
+                <p className="text-xs text-muted-foreground mt-1 truncate" title={assessment.title}>
                   {assessment.title}
                 </p>
               ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refresh}
-              disabled={loading}
-            >
+            <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -1512,22 +1375,16 @@ export function InventarioView() {
         {/* Summary chips */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
           <Badge variant="outline" className="gap-1.5 bg-transparent">
-            <span className="font-mono-numeric font-semibold">
-              {autoItems.length}
-            </span>
+            <span className="font-mono-numeric font-semibold">{autoItems.length}</span>
             <span className="text-muted-foreground">automáticos</span>
           </Badge>
           <Badge variant="outline" className="gap-1.5 bg-transparent">
-            <span className="font-mono-numeric font-semibold">
-              {manualItems.length}
-            </span>
+            <span className="font-mono-numeric font-semibold">{manualItems.length}</span>
             <span className="text-muted-foreground">manuais</span>
           </Badge>
           <Badge className="risk-high-bg gap-1.5">
             <ShieldAlert className="h-3.5 w-3.5" />
-            <span className="font-mono-numeric font-semibold">
-              {highRiskCount}
-            </span>
+            <span className="font-mono-numeric font-semibold">{highRiskCount}</span>
             <span>alto risco</span>
           </Badge>
         </div>
@@ -1545,10 +1402,7 @@ export function InventarioView() {
               <p className="text-sm text-muted-foreground max-w-md">{error}</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
-              <Button
-                variant="outline"
-                onClick={() => go("avaliacao", { assessmentId })}
-              >
+              <Button variant="outline" onClick={() => go("avaliacao", { assessmentId })}>
                 <ChevronLeft className="h-4 w-4" />
                 Voltar à avaliação
               </Button>
@@ -1568,9 +1422,8 @@ export function InventarioView() {
             <div className="space-y-1">
               <h2 className="font-display text-lg tracking-tight">Inventário vazio</h2>
               <p className="text-sm text-muted-foreground max-w-md">
-                Nenhum item automático foi gerado (nenhum GHE elegível
-                apresentou dimensão com risco médio ou alto). Adicione riscos
-                manualmente ou verifique o resultado da avaliação.
+                Nenhum item automático foi gerado (nenhum GHE elegível apresentou dimensão com risco
+                médio ou alto). Adicione riscos manualmente ou verifique o resultado da avaliação.
               </p>
             </div>
             <Button onClick={() => openManualForm()}>

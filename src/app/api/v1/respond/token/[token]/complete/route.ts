@@ -24,11 +24,10 @@ export async function POST(_request: Request, { params }: RouteCtx) {
       where: { tokenId: rt.id },
     });
     if (answeredCount < 40) {
-      return workerErrorJson(
-        ERROR_CODES.VALIDATION_ERROR,
-        "INCOMPLETE_ANSWERS",
-        { answeredCount, totalItems: 40 }
-      );
+      return workerErrorJson(ERROR_CODES.VALIDATION_ERROR, "INCOMPLETE_ANSWERS", {
+        answeredCount,
+        totalItems: 40,
+      });
     }
 
     // Mark used
@@ -43,9 +42,7 @@ export async function POST(_request: Request, { params }: RouteCtx) {
       where: { id: rt.assessmentDepartment.id },
       data: {
         responseCount: { increment: 1 },
-        ...(newCount >= 5 && !rt.assessmentDepartment.isEligible
-          ? { isEligible: true }
-          : {}),
+        ...(newCount >= 5 && !rt.assessmentDepartment.isEligible ? { isEligible: true } : {}),
       },
     });
 

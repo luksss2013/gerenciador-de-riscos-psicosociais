@@ -7,9 +7,10 @@ import type {
   AuditLogEntry,
   CompanyBreakdown,
   CompanySummary,
+  CopsoqItemDTO,
+  CycleTrend,
   DashboardData,
   Department,
-  CycleTrend,
   Professional,
   ProfessionalDashboard,
   Report,
@@ -17,7 +18,6 @@ import type {
   RiskInventoryItem,
   SearchResults,
   WorkerTokenStatus,
-  CopsoqItemDTO,
 } from "./types";
 
 const BASE = "/api/v1";
@@ -34,10 +34,7 @@ export class ApiError extends Error {
   }
 }
 
-async function req<T>(
-  path: string,
-  init?: RequestInit & { json?: unknown }
-): Promise<T> {
+async function req<T>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   const { json, ...rest } = init ?? {};
   const headers: Record<string, string> = {
     ...(rest.headers as Record<string, string>),
@@ -54,10 +51,15 @@ async function req<T>(
   const text = await res.text();
   let data: unknown = null;
   if (text) {
-    try { data = JSON.parse(text); } catch { data = text; }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
   }
   if (!res.ok) {
-    const err = (data as { error?: { code: string; message: string; details?: unknown } } | null)?.error;
+    const err = (data as { error?: { code: string; message: string; details?: unknown } } | null)
+      ?.error;
     if (err) {
       throw new ApiError(err.code, err.message, res.status, err.details);
     }
@@ -71,12 +73,18 @@ async function req<T>(
 export const api = {
   auth: {
     register: (body: {
-      name: string; email: string; password: string;
-      professionType: string; credentialNumber?: string;
-      phone?: string; acceptedTerms: boolean;
-    }) => req<{ professional: Professional }>("/auth/register", {
-      method: "POST", json: body,
-    }),
+      name: string;
+      email: string;
+      password: string;
+      professionType: string;
+      credentialNumber?: string;
+      phone?: string;
+      acceptedTerms: boolean;
+    }) =>
+      req<{ professional: Professional }>("/auth/register", {
+        method: "POST",
+        json: body,
+      }),
     login: (body: { email: string; password: string }) =>
       req<{ professional: Professional }>("/auth/login", { method: "POST", json: body }),
     logout: () => req<{ ok: true }>("/auth/logout", { method: "POST" }),
@@ -89,7 +97,8 @@ export const api = {
     },
     update: async (body: Partial<Professional>): Promise<Professional> => {
       const res = await req<{ professional: Professional }>("/professionals/me", {
-        method: "PATCH", json: body,
+        method: "PATCH",
+        json: body,
       });
       return res.professional;
     },
@@ -99,16 +108,19 @@ export const api = {
   },
 
   auditLogs: {
-    list: (params: { page?: number; limit?: number; action?: string; resourceType?: string } = {}) => {
+    list: (
+      params: { page?: number; limit?: number; action?: string; resourceType?: string } = {},
+    ) => {
       const q = new URLSearchParams({
         page: String(params.page ?? 1),
         limit: String(params.limit ?? 50),
       });
       if (params.action) q.set("action", params.action);
       if (params.resourceType) q.set("resourceType", params.resourceType);
-      return req<{ data: AuditLogEntry[]; meta: { total: number; page: number; limit: number; pages: number } }>(
-        `/audit-logs?${q}`
-      );
+      return req<{
+        data: AuditLogEntry[];
+        meta: { total: number; page: number; limit: number; pages: number };
+      }>(`/audit-logs?${q}`);
     },
     exportCSV: (params: { action?: string; resourceType?: string } = {}): Promise<Response> => {
       const q = new URLSearchParams();
@@ -142,9 +154,10 @@ export const api = {
         limit: String(params.limit ?? 50),
         q: params.q ?? "",
       });
-      return req<{ data: CompanySummary[]; meta: { total: number; page: number; limit: number; pages: number } }>(
-        `/companies?${q}`
-      );
+      return req<{
+        data: CompanySummary[];
+        meta: { total: number; page: number; limit: number; pages: number };
+      }>(`/companies?${q}`);
     },
     get: (id: string) => req<CompanySummary>(`/companies/${id}`),
     create: (body: Record<string, unknown>) =>
@@ -155,12 +168,16 @@ export const api = {
   },
 
   departments: {
-    list: (companyId: string) =>
-      req<{ data: Department[] }>(`/companies/${companyId}/departments`),
-    create: (companyId: string, body: { name: string; description?: string; workerCount: number }) =>
-      req<Department>(`/companies/${companyId}/departments`, { method: "POST", json: body }),
+    list: (companyId: string) => req<{ data: Department[] }>(`/companies/${companyId}/departments`),
+    create: (
+      companyId: string,
+      body: { name: string; description?: string; workerCount: number },
+    ) => req<Department>(`/companies/${companyId}/departments`, { method: "POST", json: body }),
     update: (companyId: string, deptId: string, body: Partial<Department>) =>
-      req<Department>(`/companies/${companyId}/departments/${deptId}`, { method: "PATCH", json: body }),
+      req<Department>(`/companies/${companyId}/departments/${deptId}`, {
+        method: "PATCH",
+        json: body,
+      }),
     delete: (companyId: string, deptId: string) =>
       req<{ ok: true }>(`/companies/${companyId}/departments/${deptId}`, { method: "DELETE" }),
   },
@@ -169,10 +186,15 @@ export const api = {
     listByCompany: (companyId: string) =>
       req<{ data: Assessment[] }>(`/companies/${companyId}/assessments`),
     get: (id: string) => req<Assessment>(`/assessments/${id}`),
-    create: (companyId: string, body: {
-      title: string; startDate?: string; endDate: string;
-      departments: Array<{ departmentId: string; expectedResponses: number }>;
-    }) => req<Assessment>(`/companies/${companyId}/assessments`, { method: "POST", json: body }),
+    create: (
+      companyId: string,
+      body: {
+        title: string;
+        startDate?: string;
+        endDate: string;
+        departments: Array<{ departmentId: string; expectedResponses: number }>;
+      },
+    ) => req<Assessment>(`/companies/${companyId}/assessments`, { method: "POST", json: body }),
     update: (id: string, body: Partial<Assessment>) =>
       req<Assessment>(`/assessments/${id}`, { method: "PATCH", json: body }),
     duplicate: (id: string, body?: { title?: string }) =>
@@ -181,13 +203,17 @@ export const api = {
       req<{ status: string; totalTokens: number }>(`/assessments/${id}/launch`, { method: "POST" }),
     close: (id: string) =>
       req<{ status: string; eligibleDepts: number; totalDimensions: number }>(
-        `/assessments/${id}/close`, { method: "POST" }
+        `/assessments/${id}/close`,
+        { method: "POST" },
       ),
-    simulate: (id: string, body: {
-      count?: number;
-      assessmentDeptId?: string;
-      bias?: "low" | "medium" | "high";
-    }) =>
+    simulate: (
+      id: string,
+      body: {
+        count?: number;
+        assessmentDeptId?: string;
+        bias?: "low" | "medium" | "high";
+      },
+    ) =>
       req<{
         simulated: number;
         byDept: Array<{
@@ -199,7 +225,8 @@ export const api = {
       }>(`/assessments/${id}/simulate`, { method: "POST", json: body }),
     score: (id: string) =>
       req<{ status: string; eligibleDepts: number; totalDimensions: number }>(
-        `/assessments/${id}/score`, { method: "POST" }
+        `/assessments/${id}/score`,
+        { method: "POST" },
       ),
     progress: (id: string) => req<AssessmentProgress>(`/assessments/${id}/progress`),
     dashboard: (id: string) => req<DashboardData>(`/assessments/${id}/dashboard`),
@@ -211,7 +238,8 @@ export const api = {
       req<RiskInventoryGroup>(`/assessments/${assessmentId}/risk-inventory`),
     addManual: (assessmentId: string, body: Record<string, unknown>) =>
       req<RiskInventoryItem>(`/assessments/${assessmentId}/risk-inventory/manual`, {
-        method: "POST", json: body,
+        method: "POST",
+        json: body,
       }),
     update: (itemId: string, body: Record<string, unknown>) =>
       req<RiskInventoryItem>(`/risk-inventory-items/${itemId}`, { method: "PATCH", json: body }),
@@ -220,8 +248,7 @@ export const api = {
   },
 
   actionPlan: {
-    get: (assessmentId: string) =>
-      req<ActionPlan>(`/assessments/${assessmentId}/action-plan`),
+    get: (assessmentId: string) => req<ActionPlan>(`/assessments/${assessmentId}/action-plan`),
     addItem: (assessmentId: string, body: Record<string, unknown>) =>
       req<ActionItem>(`/assessments/${assessmentId}/action-items`, { method: "POST", json: body }),
     updateItem: (itemId: string, body: Record<string, unknown>) =>
@@ -231,14 +258,23 @@ export const api = {
   },
 
   reports: {
-    list: (assessmentId: string) =>
-      req<{ data: Report[] }>(`/assessments/${assessmentId}/reports`),
-    generate: (assessmentId: string, body: {
-      type: "pdf" | "docx" | "html";
-      metadata: { responsibleName: string; credentialNumber: string; reportDate: string; notes?: string };
-    }) => req<{ reportId: string; status: string }>(
-      `/assessments/${assessmentId}/reports/generate`, { method: "POST", json: body }
-    ),
+    list: (assessmentId: string) => req<{ data: Report[] }>(`/assessments/${assessmentId}/reports`),
+    generate: (
+      assessmentId: string,
+      body: {
+        type: "pdf" | "docx" | "html";
+        metadata: {
+          responsibleName: string;
+          credentialNumber: string;
+          reportDate: string;
+          notes?: string;
+        };
+      },
+    ) =>
+      req<{ reportId: string; status: string }>(`/assessments/${assessmentId}/reports/generate`, {
+        method: "POST",
+        json: body,
+      }),
     status: (reportId: string) =>
       req<{ status: string; downloadUrl?: string }>(`/reports/${reportId}/status`),
   },
@@ -246,15 +282,15 @@ export const api = {
   worker: {
     enterDept: (assessmentDeptId: string) =>
       req<{ token: string; redirectUrl: string }>(`/respond/dept/${assessmentDeptId}`),
-    tokenStatus: (token: string) =>
-      req<WorkerTokenStatus>(`/respond/token/${token}/status`),
+    tokenStatus: (token: string) => req<WorkerTokenStatus>(`/respond/token/${token}/status`),
     tokenItems: (token: string) =>
       req<{ items: CopsoqItemDTO[]; scale: Array<{ value: number; label: string }> }>(
-        `/respond/token/${token}/items`
+        `/respond/token/${token}/items`,
       ),
     answer: (token: string, body: { itemIndex: number; likertValue: number }) =>
       req<{ ok: true; answeredCount: number; totalItems: number }>(
-        `/respond/token/${token}/answer`, { method: "POST", json: body }
+        `/respond/token/${token}/answer`,
+        { method: "POST", json: body },
       ),
     complete: (token: string) =>
       req<{ message: string }>(`/respond/token/${token}/complete`, { method: "POST" }),
@@ -262,9 +298,10 @@ export const api = {
 
   system: {
     seedCopsoq: () =>
-      req<{ items: number; dimensions: number; seeded: boolean }>("/system/seed-copsoq", { method: "POST" }),
+      req<{ items: number; dimensions: number; seeded: boolean }>("/system/seed-copsoq", {
+        method: "POST",
+      }),
   },
 
-  search: (q: string) =>
-    req<SearchResults>(`/search?q=${encodeURIComponent(q)}`),
+  search: (q: string) => req<SearchResults>(`/search?q=${encodeURIComponent(q)}`),
 };

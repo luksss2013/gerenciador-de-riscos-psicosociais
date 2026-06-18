@@ -1,18 +1,25 @@
+import { COPSOQ_DIMENSIONS, type DimensionCode } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
+import { companyWeightedAverage, type DimensionScoreResult } from "@/lib/scoring";
 import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
-import {
-  companyWeightedAverage,
-  DimensionScoreResult,
-} from "@/lib/scoring";
-import { COPSOQ_DIMENSIONS, DimensionCode } from "@/lib/copsoq-data";
 
 // NR-1: psychosocial risk assessment cycle must be repeated at least every 2 years.
 const TWO_YEARS_MS = 1000 * 60 * 60 * 24 * 365 * 2;
 
 const PT_BR_MONTH_ABBR = [
-  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
 ];
 
 interface RecentAssessment {

@@ -13,7 +13,7 @@ interface RouteCtx {
 
 async function fetchCompanyOwned(id: string, professionalId: string) {
   const company = await db.company.findUnique({ where: { id } });
-  if (!company || !company.isActive) return null;
+  if (!company?.isActive) return null;
   await requireTenantOwnership(company.professionalId, professionalId);
   return company;
 }
@@ -104,7 +104,10 @@ export async function POST(request: Request, { params }: RouteCtx) {
       where: { companyId_name: { companyId: company.id, name } },
     });
     if (existing) {
-      return errorJson(ERROR_CODES.DEPARTMENT_NAME_DUPLICATE, "Department name already used in this company");
+      return errorJson(
+        ERROR_CODES.DEPARTMENT_NAME_DUPLICATE,
+        "Department name already used in this company",
+      );
     }
 
     const dept = await db.department.create({
@@ -115,15 +118,17 @@ export async function POST(request: Request, { params }: RouteCtx) {
         workerCount,
       },
     });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "department.create",
-        resourceType: "department",
-        resourceId: dept.id,
-        metadataJson: JSON.stringify({ name: dept.name, workerCount: dept.workerCount }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "department.create",
+          resourceType: "department",
+          resourceId: dept.id,
+          metadataJson: JSON.stringify({ name: dept.name, workerCount: dept.workerCount }),
+        },
+      })
+      .catch(() => {});
     return jsonResponse(serializeDept(dept), 201);
   } catch (e) {
     const code = (e as { code?: string })?.code;

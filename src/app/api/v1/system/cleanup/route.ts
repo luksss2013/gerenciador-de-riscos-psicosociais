@@ -1,10 +1,6 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import {
-  errorJson,
-  jsonResponse,
-  requireProfessional,
-} from "@/lib/session";
+import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 
 /**
  * POST /api/v1/system/cleanup
@@ -46,9 +42,7 @@ export async function POST() {
         departments: { select: { id: true } },
       },
     });
-    const oldDeptIds = oldCompletedAssessments.flatMap((a) =>
-      a.departments.map((d) => d.id),
-    );
+    const oldDeptIds = oldCompletedAssessments.flatMap((a) => a.departments.map((d) => d.id));
     const tokensDeleted =
       oldDeptIds.length > 0
         ? await db.responseToken.deleteMany({

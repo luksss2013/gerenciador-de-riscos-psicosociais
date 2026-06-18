@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { format, isBefore, isValid, parseISO, startOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,48 +18,10 @@ import {
   User,
   X,
 } from "lucide-react";
+import type * as React from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { format, parseISO, isBefore, startOfDay, isValid } from "date-fns";
-import { ptBR } from "date-fns/locale";
-
-import { api, ApiError } from "@/lib/api";
-import { useView } from "@/lib/store";
-import type {
-  ActionItem,
-  ActionStatus,
-  Assessment,
-  AssessmentDepartment,
-  DimensionCode,
-} from "@/lib/types";
-import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
-import { ACTION_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
-import {
-  FIELD_ERROR_CLASS,
-  FieldError,
-  maskCurrency,
-  parseCurrencyBRL,
-  validateRequired,
-} from "@/lib/form-utils";
-
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +33,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -78,16 +52,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ApiError, api } from "@/lib/api";
+import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
+import { ACTION_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
+import {
+  FIELD_ERROR_CLASS,
+  FieldError,
+  maskCurrency,
+  parseCurrencyBRL,
+  validateRequired,
+} from "@/lib/form-utils";
+import { useView } from "@/lib/store";
+import type {
+  ActionItem,
+  ActionStatus,
+  Assessment,
+  AssessmentDepartment,
+  DimensionCode,
+} from "@/lib/types";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -105,12 +98,7 @@ const STATUS_ORDER: Record<ActionStatus, number> = {
   cancelled: 3,
 };
 
-const STATUS_OPTIONS: ActionStatus[] = [
-  "pending",
-  "in_progress",
-  "completed",
-  "cancelled",
-];
+const STATUS_OPTIONS: ActionStatus[] = ["pending", "in_progress", "completed", "cancelled"];
 
 const FILTER_ALL = "__all__";
 const DEPT_COMPANY = "__company__"; // represents "Toda a empresa" (null departmentId)
@@ -190,12 +178,12 @@ function PlanHeaderKpis({ items }: PlanHeaderKpisProps) {
   const highDimCodes = new Set(
     items
       .filter((i) => i.riskLevelTrigger === "HIGH" && i.dimensionCode)
-      .map((i) => i.dimensionCode as string)
+      .map((i) => i.dimensionCode as string),
   );
   const completedDimCodes = new Set(
     items
       .filter((i) => i.status === "completed" && i.dimensionCode)
-      .map((i) => i.dimensionCode as string)
+      .map((i) => i.dimensionCode as string),
   );
   let highCompletedPct = 0;
   if (highDimCodes.size > 0) {
@@ -241,12 +229,7 @@ function PlanHeaderKpis({ items }: PlanHeaderKpisProps) {
     >
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
         {kpis.map((k) => (
-          <div
-            key={k.label}
-            className="px-3 first:pl-0 last:pr-0"
-            role="group"
-            aria-label={`${k.label}: ${k.value}${k.hint ? `. ${k.hint}` : ""}`}
-          >
+          <div key={k.label} className="px-3 first:pl-0 last:pr-0">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">
               {k.label}
             </div>
@@ -254,9 +237,7 @@ function PlanHeaderKpis({ items }: PlanHeaderKpisProps) {
               {k.value}
             </div>
             {k.hint ? (
-              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
-                {k.hint}
-              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{k.hint}</div>
             ) : null}
           </div>
         ))}
@@ -299,16 +280,11 @@ function PlanFilters({
     responsibleFilter.trim() !== "";
 
   return (
-    <section
-      aria-label="Filtros do plano de ação"
-      className="border-t border-border pt-5 pb-5"
-    >
+    <section aria-label="Filtros do plano de ação" className="border-t border-border pt-5 pb-5">
       <div className="flex items-start gap-2 mb-4">
         <Filter className="h-4 w-4 text-[var(--brand)] mt-1 shrink-0" aria-hidden="true" />
         <div className="min-w-0">
-          <h2 className="font-display text-base tracking-tight text-foreground">
-            Filtros
-          </h2>
+          <h2 className="font-display text-base tracking-tight text-foreground">Filtros</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
             Combine status, GHE, dimensão e responsável para localizar ações.
           </p>
@@ -320,11 +296,7 @@ function PlanFilters({
             Status
           </Label>
           <Select value={statusFilter} onValueChange={onStatusChange}>
-            <SelectTrigger
-              id="filter-status"
-              className="w-full"
-              aria-label="Filtrar por status"
-            >
+            <SelectTrigger id="filter-status" className="w-full" aria-label="Filtrar por status">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -343,11 +315,7 @@ function PlanFilters({
             GHE
           </Label>
           <Select value={deptFilter} onValueChange={onDeptChange}>
-            <SelectTrigger
-              id="filter-dept"
-              className="w-full"
-              aria-label="Filtrar por GHE"
-            >
+            <SelectTrigger id="filter-dept" className="w-full" aria-label="Filtrar por GHE">
               <SelectValue placeholder="GHE" />
             </SelectTrigger>
             <SelectContent>
@@ -367,11 +335,7 @@ function PlanFilters({
             Dimensão
           </Label>
           <Select value={dimFilter} onValueChange={onDimChange}>
-            <SelectTrigger
-              id="filter-dim"
-              className="w-full"
-              aria-label="Filtrar por dimensão"
-            >
+            <SelectTrigger id="filter-dim" className="w-full" aria-label="Filtrar por dimensão">
               <SelectValue placeholder="Dimensão" />
             </SelectTrigger>
             <SelectContent>
@@ -425,11 +389,7 @@ interface InlineStatusSelectProps {
   pendingItemId: string | null;
 }
 
-function InlineStatusSelect({
-  item,
-  onStatusChange,
-  pendingItemId,
-}: InlineStatusSelectProps) {
+function InlineStatusSelect({ item, onStatusChange, pendingItemId }: InlineStatusSelectProps) {
   const isUpdating = pendingItemId === item.id;
   return (
     <div className="flex items-center gap-1.5">
@@ -440,11 +400,7 @@ function InlineStatusSelect({
         }}
         disabled={isUpdating}
       >
-        <SelectTrigger
-          size="sm"
-          className="w-[160px] h-8"
-          aria-label="Alterar status da ação"
-        >
+        <SelectTrigger size="sm" className="w-[160px] h-8" aria-label="Alterar status da ação">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -456,10 +412,7 @@ function InlineStatusSelect({
         </SelectContent>
       </Select>
       {isUpdating ? (
-        <Loader2
-          className="h-3 w-3 animate-spin text-muted-foreground"
-          aria-label="Salvando"
-        />
+        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-label="Salvando" />
       ) : null}
     </div>
   );
@@ -506,26 +459,23 @@ function ActionItemsTable({
   }, [items]);
 
   return (
-    <section
-      aria-label="Ações 5W2H"
-      className="border-t border-border"
-    >
+    <section aria-label="Ações 5W2H" className="border-t border-border">
       <div className="pt-5 pb-4">
         <h2 className="font-display text-xl tracking-tight text-foreground flex items-center gap-2">
           <ListChecks className="h-4 w-4 text-[var(--brand)]" aria-hidden="true" />
           Ações 5W2H
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          {sorted.length} ação(ões) listada(s). Altere o status diretamente na
-          linha ou clique em editar para ajustar os campos 5W2H.
+          {sorted.length} ação(ões) listada(s). Altere o status diretamente na linha ou clique em
+          editar para ajustar os campos 5W2H.
         </p>
       </div>
       <div className="overflow-x-auto scroll-area border-t border-border">
         <Table className="min-w-[1120px]">
           <caption className="sr-only">
-            Lista de ações 5W2H do plano de ação. Colunas: GHE, dimensão, o
-            quê, responsável, prazo (com indicação de vencido quando
-            aplicável), status (seleção inline) e ações de editar e excluir.
+            Lista de ações 5W2H do plano de ação. Colunas: GHE, dimensão, o quê, responsável, prazo
+            (com indicação de vencido quando aplicável), status (seleção inline) e ações de editar e
+            excluir.
           </caption>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border">
@@ -555,10 +505,7 @@ function ActionItemsTable({
           <TableBody>
             {sorted.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="text-center text-muted-foreground py-8 text-sm"
-                >
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8 text-sm">
                   Nenhuma ação encontrada com os filtros atuais.
                 </TableCell>
               </TableRow>
@@ -573,10 +520,7 @@ function ActionItemsTable({
                     className="border-b border-border hover:bg-[var(--surface)] transition-colors align-top"
                   >
                     <TableCell className="py-3 align-top">
-                      <div
-                        className="truncate max-w-[150px] text-sm"
-                        title={deptDisplayName(item)}
-                      >
+                      <div className="truncate max-w-[150px] text-sm" title={deptDisplayName(item)}>
                         {deptDisplayName(item)}
                       </div>
                     </TableCell>
@@ -585,8 +529,8 @@ function ActionItemsTable({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span
-                              tabIndex={0}
                               className="inline-flex"
+                              role="img"
                               aria-label={`${dim.code} · ${dim.namePtBr}`}
                             >
                               <Badge
@@ -608,11 +552,7 @@ function ActionItemsTable({
                     <TableCell className="py-3 align-top">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span
-                            tabIndex={0}
-                            className="block max-w-[280px] truncate text-sm"
-                            title={item.what}
-                          >
+                          <span className="block max-w-[280px] truncate text-sm" title={item.what}>
                             {item.what}
                           </span>
                         </TooltipTrigger>
@@ -627,10 +567,7 @@ function ActionItemsTable({
                           className="h-3.5 w-3.5 text-muted-foreground shrink-0"
                           aria-hidden="true"
                         />
-                        <span
-                          className="truncate max-w-[140px]"
-                          title={item.who}
-                        >
+                        <span className="truncate max-w-[140px]" title={item.who}>
                           {item.who}
                         </span>
                       </div>
@@ -685,8 +622,7 @@ function ActionItemsTable({
                                 Excluir ação do plano?
                               </AlertDialogTitle>
                               <AlertDialogDescription>
-                                Esta ação remove o item 5W2H e não pode ser
-                                desfeita.
+                                Esta ação remove o item 5W2H e não pode ser desfeita.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -772,8 +708,8 @@ function ActionItemForm({
             {mode === "edit" ? "Editar Ação 5W2H" : "Nova Ação 5W2H"}
           </DialogTitle>
           <DialogDescription>
-            Descreva a medida de intervenção conforme a metodologia 5W2H
-            (O quê, Por quê, Quem, Onde, Quando, Como e Quanto custa).
+            Descreva a medida de intervenção conforme a metodologia 5W2H (O quê, Por quê, Quem,
+            Onde, Quando, Como e Quanto custa).
           </DialogDescription>
         </DialogHeader>
         {open ? (
@@ -813,14 +749,12 @@ function ActionItemFormContents({
 
   // Lazy useState initializers — read initialItem (edit) or prefill (create)
   // at mount time only. Evaluated once when this contents component mounts.
-  const [what, setWhat] = useState<string>(
-    initialItem?.what ?? prefill?.what ?? ""
-  );
+  const [what, setWhat] = useState<string>(initialItem?.what ?? prefill?.what ?? "");
   const [why, setWhy] = useState<string>(initialItem?.why ?? "");
   const [who, setWho] = useState<string>(initialItem?.who ?? "");
   const [whereVal, setWhereVal] = useState<string>(initialItem?.where ?? "");
   const [whenDate, setWhenDate] = useState<string>(
-    initialItem?.whenDate ? initialItem.whenDate.slice(0, 10) : ""
+    initialItem?.whenDate ? initialItem.whenDate.slice(0, 10) : "",
   );
   const [how, setHow] = useState<string>(initialItem?.how ?? "");
   const [estimatedCost, setEstimatedCost] = useState<string>(
@@ -828,18 +762,18 @@ function ActionItemFormContents({
       ? maskCurrency(
           // Re-render the stored number as a BRL-formatted string. Multiply
           // by 100 because maskCurrency expects cents-as-digits.
-          String(Math.round(initialItem.estimatedCost * 100))
+          String(Math.round(initialItem.estimatedCost * 100)),
         )
-      : ""
+      : "",
   );
   const [departmentId, setDepartmentId] = useState<string>(
-    initialItem?.departmentId ?? prefill?.departmentId ?? ""
+    initialItem?.departmentId ?? prefill?.departmentId ?? "",
   );
   const [dimensionCode, setDimensionCode] = useState<string>(
-    initialItem?.dimensionCode ?? prefill?.dimensionCode ?? ""
+    initialItem?.dimensionCode ?? prefill?.dimensionCode ?? "",
   );
   const [riskLevelTrigger, setRiskLevelTrigger] = useState<string>(
-    initialItem?.riskLevelTrigger ?? prefill?.riskLevelTrigger ?? ""
+    initialItem?.riskLevelTrigger ?? prefill?.riskLevelTrigger ?? "",
   );
 
   const [submitting, setSubmitting] = useState(false);
@@ -856,7 +790,7 @@ function ActionItemFormContents({
     if (!whenDate) {
       errs.whenDate = "Informe a data prevista.";
     } else {
-      const d = new Date(whenDate + "T00:00:00");
+      const d = new Date(`${whenDate}T00:00:00`);
       if (Number.isNaN(d.getTime())) {
         errs.whenDate = "Data inválida (use AAAA-MM-DD).";
       } else {
@@ -907,9 +841,7 @@ function ActionItemFormContents({
           setErrors({ form: msg });
           toast.error(msg);
         } else if (e.code === "ASSESSMENT_NOT_COMPLETED") {
-          toast.error(
-            "A avaliação precisa estar concluída para cadastrar ações."
-          );
+          toast.error("A avaliação precisa estar concluída para cadastrar ações.");
         } else {
           toast.error(e.message);
         }
@@ -938,7 +870,7 @@ function ActionItemFormContents({
       } else if (field === "whenDate") {
         if (!whenDate) next.whenDate = "Informe a data prevista.";
         else {
-          const d = new Date(whenDate + "T00:00:00");
+          const d = new Date(`${whenDate}T00:00:00`);
           if (Number.isNaN(d.getTime())) {
             next.whenDate = "Data inválida (use AAAA-MM-DD).";
           } else {
@@ -952,8 +884,7 @@ function ActionItemFormContents({
       } else if (field === "estimatedCost") {
         if (estimatedCost.trim() !== "") {
           const n = parseCurrencyBRL(estimatedCost);
-          next.estimatedCost =
-            !Number.isFinite(n) || n < 0 ? "Valor inválido." : undefined;
+          next.estimatedCost = !Number.isFinite(n) || n < 0 ? "Valor inválido." : undefined;
         } else {
           next.estimatedCost = undefined;
         }
@@ -969,8 +900,7 @@ function ActionItemFormContents({
         <Info className="h-4 w-4 text-[var(--brand)]" />
         <AlertTitle className="text-[var(--brand)]">Orientação NR-1</AlertTitle>
         <AlertDescription>
-          NR-1 orienta priorizar medidas na organização do trabalho antes de
-          ações individuais.
+          NR-1 orienta priorizar medidas na organização do trabalho antes de ações individuais.
         </AlertDescription>
       </Alert>
 
@@ -997,8 +927,7 @@ function ActionItemFormContents({
           value={what}
           onChange={(e) => {
             setWhat(e.target.value);
-            if (errors.what)
-              setErrors((p) => ({ ...p, what: undefined }));
+            if (errors.what) setErrors((p) => ({ ...p, what: undefined }));
           }}
           onBlur={() => validateOnBlur("what")}
           placeholder="Descreva a ação a ser executada…"
@@ -1007,9 +936,7 @@ function ActionItemFormContents({
           aria-describedby={errors.what ? "ai-what-err" : undefined}
           className={errors.what ? FIELD_ERROR_CLASS : ""}
         />
-        {errors.what ? (
-          <FieldError id="ai-what-err" message={errors.what} />
-        ) : null}
+        {errors.what ? <FieldError id="ai-what-err" message={errors.what} /> : null}
       </div>
 
       {/* Por Quê */}
@@ -1022,8 +949,7 @@ function ActionItemFormContents({
           value={why}
           onChange={(e) => {
             setWhy(e.target.value);
-            if (errors.why)
-              setErrors((p) => ({ ...p, why: undefined }));
+            if (errors.why) setErrors((p) => ({ ...p, why: undefined }));
           }}
           onBlur={() => validateOnBlur("why")}
           placeholder="Justifique o motivo da ação…"
@@ -1032,9 +958,7 @@ function ActionItemFormContents({
           aria-describedby={errors.why ? "ai-why-err" : undefined}
           className={errors.why ? FIELD_ERROR_CLASS : ""}
         />
-        {errors.why ? (
-          <FieldError id="ai-why-err" message={errors.why} />
-        ) : null}
+        {errors.why ? <FieldError id="ai-why-err" message={errors.why} /> : null}
       </div>
 
       {/* Quem + Onde */}
@@ -1046,11 +970,11 @@ function ActionItemFormContents({
           <Input
             id="ai-who"
             type="text"
+            autoComplete="name"
             value={who}
             onChange={(e) => {
               setWho(e.target.value);
-              if (errors.who)
-                setErrors((p) => ({ ...p, who: undefined }));
+              if (errors.who) setErrors((p) => ({ ...p, who: undefined }));
             }}
             onBlur={() => validateOnBlur("who")}
             placeholder="Responsável pela ação"
@@ -1058,9 +982,7 @@ function ActionItemFormContents({
             aria-describedby={errors.who ? "ai-who-err" : undefined}
             className={errors.who ? FIELD_ERROR_CLASS : ""}
           />
-          {errors.who ? (
-            <FieldError id="ai-who-err" message={errors.who} />
-          ) : null}
+          {errors.who ? <FieldError id="ai-who-err" message={errors.who} /> : null}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ai-where">
@@ -1072,8 +994,7 @@ function ActionItemFormContents({
             value={whereVal}
             onChange={(e) => {
               setWhereVal(e.target.value);
-              if (errors.where)
-                setErrors((p) => ({ ...p, where: undefined }));
+              if (errors.where) setErrors((p) => ({ ...p, where: undefined }));
             }}
             onBlur={() => validateOnBlur("where")}
             placeholder="Local de execução"
@@ -1081,9 +1002,7 @@ function ActionItemFormContents({
             aria-describedby={errors.where ? "ai-where-err" : undefined}
             className={errors.where ? FIELD_ERROR_CLASS : ""}
           />
-          {errors.where ? (
-            <FieldError id="ai-where-err" message={errors.where} />
-          ) : null}
+          {errors.where ? <FieldError id="ai-where-err" message={errors.where} /> : null}
         </div>
       </div>
 
@@ -1099,17 +1018,14 @@ function ActionItemFormContents({
             value={whenDate}
             onChange={(e) => {
               setWhenDate(e.target.value);
-              if (errors.whenDate)
-                setErrors((p) => ({ ...p, whenDate: undefined }));
+              if (errors.whenDate) setErrors((p) => ({ ...p, whenDate: undefined }));
             }}
             onBlur={() => validateOnBlur("whenDate")}
             aria-invalid={!!errors.whenDate}
             aria-describedby={errors.whenDate ? "ai-when-err" : undefined}
             className={`font-mono-numeric ${errors.whenDate ? FIELD_ERROR_CLASS : ""}`}
           />
-          {errors.whenDate ? (
-            <FieldError id="ai-when-err" message={errors.whenDate} />
-          ) : null}
+          {errors.whenDate ? <FieldError id="ai-when-err" message={errors.whenDate} /> : null}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="ai-cost">Quanto custa (opcional)</Label>
@@ -1120,18 +1036,13 @@ function ActionItemFormContents({
             value={estimatedCost}
             onChange={(e) => {
               setEstimatedCost(maskCurrency(e.target.value));
-              if (errors.estimatedCost)
-                setErrors((p) => ({ ...p, estimatedCost: undefined }));
+              if (errors.estimatedCost) setErrors((p) => ({ ...p, estimatedCost: undefined }));
             }}
             onBlur={() => validateOnBlur("estimatedCost")}
             placeholder="0,00"
             aria-invalid={!!errors.estimatedCost}
-            aria-describedby={
-              errors.estimatedCost ? "ai-cost-err" : undefined
-            }
-            className={`font-mono-numeric ${
-              errors.estimatedCost ? FIELD_ERROR_CLASS : ""
-            }`}
+            aria-describedby={errors.estimatedCost ? "ai-cost-err" : undefined}
+            className={`font-mono-numeric ${errors.estimatedCost ? FIELD_ERROR_CLASS : ""}`}
           />
           {errors.estimatedCost ? (
             <FieldError id="ai-cost-err" message={errors.estimatedCost} />
@@ -1158,9 +1069,7 @@ function ActionItemFormContents({
           aria-describedby={errors.how ? "ai-how-err" : undefined}
           className={errors.how ? FIELD_ERROR_CLASS : ""}
         />
-        {errors.how ? (
-          <FieldError id="ai-how-err" message={errors.how} />
-        ) : null}
+        {errors.how ? <FieldError id="ai-how-err" message={errors.how} /> : null}
       </div>
 
       {/* GHE afetado + Dimensão + Nível de risco que originou */}
@@ -1168,11 +1077,7 @@ function ActionItemFormContents({
         <div className="space-y-1.5">
           <Label htmlFor="ai-dept">GHE afetado (opcional)</Label>
           <Select value={departmentId} onValueChange={setDepartmentId}>
-            <SelectTrigger
-              id="ai-dept"
-              className="w-full"
-              aria-label="Selecionar GHE afetado"
-            >
+            <SelectTrigger id="ai-dept" className="w-full" aria-label="Selecionar GHE afetado">
               <SelectValue placeholder="Toda a empresa" />
             </SelectTrigger>
             <SelectContent>
@@ -1188,11 +1093,7 @@ function ActionItemFormContents({
         <div className="space-y-1.5">
           <Label htmlFor="ai-dim">Dimensão (opcional)</Label>
           <Select value={dimensionCode} onValueChange={setDimensionCode}>
-            <SelectTrigger
-              id="ai-dim"
-              className="w-full"
-              aria-label="Selecionar dimensão COPSOQ"
-            >
+            <SelectTrigger id="ai-dim" className="w-full" aria-label="Selecionar dimensão COPSOQ">
               <SelectValue placeholder="—" />
             </SelectTrigger>
             <SelectContent>
@@ -1205,13 +1106,8 @@ function ActionItemFormContents({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ai-risk">
-            Nível de risco que originou (opcional)
-          </Label>
-          <Select
-            value={riskLevelTrigger}
-            onValueChange={setRiskLevelTrigger}
-          >
+          <Label htmlFor="ai-risk">Nível de risco que originou (opcional)</Label>
+          <Select value={riskLevelTrigger} onValueChange={setRiskLevelTrigger}>
             <SelectTrigger
               id="ai-risk"
               className="w-full"
@@ -1229,12 +1125,7 @@ function ActionItemFormContents({
       </div>
 
       <DialogFooter>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={submitting}
-        >
+        <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           Cancelar
         </Button>
         <Button type="submit" disabled={submitting}>
@@ -1261,7 +1152,7 @@ function PlanoSkeleton() {
       <div className="bg-[var(--surface)] rounded-lg p-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-3 first:pl-0 last:pr-0">
+            <div key={`skel-${i}`} className="px-3 first:pl-0 last:pr-0">
               <Skeleton className="h-2.5 w-20" />
               <Skeleton className="h-7 w-10 mt-2" />
               <Skeleton className="h-2.5 w-24 mt-1.5" />
@@ -1300,7 +1191,7 @@ function PlanoSkeleton() {
           {/* Body rows */}
           {Array.from({ length: 6 }).map((_, r) => (
             <div
-              key={r}
+              key={`skel-r-${r}`}
               className="flex items-center gap-3 border-b border-border last:border-b-0 px-4 py-3"
             >
               <Skeleton className="h-4 w-12" />
@@ -1346,13 +1237,9 @@ export function PlanoView() {
   // cross-module shortcut (resultados critical-dimension or inventário
   // "Criar Ação"), the form opens pre-filled without any setState-in-effect.
   const [formOpen, setFormOpen] = useState<boolean>(() => !!actionItemPrefill);
-  const [formPrefill, setFormPrefill] =
-    useState<ActionItemFormPrefill | null>(
-      () =>
-        actionItemPrefill
-          ? { ...actionItemPrefill }
-          : null
-    );
+  const [formPrefill, setFormPrefill] = useState<ActionItemFormPrefill | null>(() =>
+    actionItemPrefill ? { ...actionItemPrefill } : null,
+  );
   const [editingItem, setEditingItem] = useState<ActionItem | null>(null);
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
 
@@ -1375,9 +1262,7 @@ export function PlanoView() {
       } catch (e) {
         if (cancelled) return;
         const msg =
-          e instanceof ApiError
-            ? e.message
-            : "Erro inesperado ao carregar o plano de ação.";
+          e instanceof ApiError ? e.message : "Erro inesperado ao carregar o plano de ação.";
         setError(msg);
         setLoading(false);
       }
@@ -1386,7 +1271,7 @@ export function PlanoView() {
     return () => {
       cancelled = true;
     };
-  }, [assessmentId, refreshKey]);
+  }, [assessmentId]);
 
   // Consume the cross-module prefill: clear it once on mount so it doesn't
   // re-trigger after the user closes the auto-opened form.
@@ -1409,8 +1294,7 @@ export function PlanoView() {
           return false;
         }
       }
-      if (dimFilter !== FILTER_ALL && i.dimensionCode !== dimFilter)
-        return false;
+      if (dimFilter !== FILTER_ALL && i.dimensionCode !== dimFilter) return false;
       if (responsibleFilter.trim() !== "") {
         const q = responsibleFilter.trim().toLowerCase();
         if (!i.who.toLowerCase().includes(q)) return false;
@@ -1431,9 +1315,7 @@ export function PlanoView() {
   const handleStatusChange = async (itemId: string, status: ActionStatus) => {
     const prev = items;
     // Optimistic update
-    setItems((cur) =>
-      cur.map((i) => (i.id === itemId ? { ...i, status } : i))
-    );
+    setItems((cur) => cur.map((i) => (i.id === itemId ? { ...i, status } : i)));
     setPendingItemId(itemId);
     try {
       const updated = await api.actionPlan.updateItem(itemId, { status });
@@ -1442,8 +1324,7 @@ export function PlanoView() {
     } catch (e) {
       // Revert on error
       setItems(prev);
-      const msg =
-        e instanceof ApiError ? e.message : "Erro ao alterar status.";
+      const msg = e instanceof ApiError ? e.message : "Erro ao alterar status.";
       toast.error(msg);
     } finally {
       setPendingItemId(null);
@@ -1456,8 +1337,7 @@ export function PlanoView() {
       setItems((cur) => cur.filter((i) => i.id !== itemId));
       toast.success("Ação excluída do plano.");
     } catch (e) {
-      const msg =
-        e instanceof ApiError ? e.message : "Erro ao excluir ação.";
+      const msg = e instanceof ApiError ? e.message : "Erro ao excluir ação.";
       toast.error(msg);
     }
   };
@@ -1465,9 +1345,7 @@ export function PlanoView() {
   const handleSubmit = async (body: Record<string, unknown>) => {
     if (editingItem) {
       const updated = await api.actionPlan.updateItem(editingItem.id, body);
-      setItems((cur) =>
-        cur.map((i) => (i.id === editingItem.id ? updated : i))
-      );
+      setItems((cur) => cur.map((i) => (i.id === editingItem.id ? updated : i)));
       toast.success("Ação atualizada.");
       setFormOpen(false);
       setEditingItem(null);
@@ -1506,12 +1384,9 @@ export function PlanoView() {
             <ListChecks className="h-6 w-6 text-[var(--brand)]" />
           </div>
           <div className="space-y-1">
-            <h2 className="font-display text-lg tracking-tight">
-              Nenhuma avaliação selecionada
-            </h2>
+            <h2 className="font-display text-lg tracking-tight">Nenhuma avaliação selecionada</h2>
             <p className="text-sm text-muted-foreground max-w-md">
-              Acesse uma avaliação concluída para visualizar e gerenciar o
-              plano de ação 5W2H.
+              Acesse uma avaliação concluída para visualizar e gerenciar o plano de ação 5W2H.
             </p>
           </div>
           <Button onClick={() => go("painel")}>
@@ -1548,22 +1423,14 @@ export function PlanoView() {
                 Priorização de medidas de intervenção (NR-1)
               </p>
               {assessment ? (
-                <p
-                  className="text-xs text-muted-foreground mt-1 truncate"
-                  title={assessment.title}
-                >
+                <p className="text-xs text-muted-foreground mt-1 truncate" title={assessment.title}>
                   {assessment.title}
                 </p>
               ) : null}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refresh}
-              disabled={loading}
-            >
+            <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -1588,15 +1455,10 @@ export function PlanoView() {
               <h2 className="font-display text-lg tracking-tight">
                 Não foi possível carregar o plano de ação
               </h2>
-              <p className="text-sm text-muted-foreground max-w-md">
-                {error}
-              </p>
+              <p className="text-sm text-muted-foreground max-w-md">{error}</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
-              <Button
-                variant="outline"
-                onClick={() => go("avaliacao", { assessmentId })}
-              >
+              <Button variant="outline" onClick={() => go("avaliacao", { assessmentId })}>
                 <ChevronLeft className="h-4 w-4" />
                 Voltar à avaliação
               </Button>
@@ -1618,12 +1480,9 @@ export function PlanoView() {
                   <ListChecks className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div className="space-y-1">
-                  <h2 className="font-display text-lg tracking-tight">
-                    Plano de ação vazio
-                  </h2>
+                  <h2 className="font-display text-lg tracking-tight">Plano de ação vazio</h2>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Nenhuma ação cadastrada. Crie a primeira ação 5W2H para
-                    esta avaliação.
+                    Nenhuma ação cadastrada. Crie a primeira ação 5W2H para esta avaliação.
                   </p>
                 </div>
                 <Button onClick={openCreate}>

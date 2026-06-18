@@ -1,30 +1,13 @@
 "use client";
 
-import * as React from "react";
+import { Brain, ClipboardCheck, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import type * as React from "react";
 import { useState } from "react";
-import {
-  Brain,
-  ClipboardCheck,
-  Eye,
-  EyeOff,
-  Loader2,
-  ShieldCheck,
-} from "lucide-react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useAuth } from "@/lib/store";
-import {
-  PROFESSION_TYPES,
-  PROFESSION_TYPE_LABELS,
-} from "@/lib/errors";
-import type { ProfessionType } from "@/lib/types";
-
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -32,7 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ApiError, api } from "@/lib/api";
+import { PROFESSION_TYPE_LABELS, PROFESSION_TYPES } from "@/lib/errors";
+import { useAuth } from "@/lib/store";
+import type { ProfessionType } from "@/lib/types";
 
 interface LoginFields {
   email: string;
@@ -59,20 +47,17 @@ const MARKETING_BULLETS: Array<{
   {
     icon: ClipboardCheck,
     title: "40 itens canônicos",
-    description:
-      "Instrumento COPSOQ II-BR completo, com 40 itens em 11 dimensões psicossociais.",
+    description: "Instrumento COPSOQ II-BR completo, com 40 itens em 11 dimensões psicossociais.",
   },
   {
     icon: Brain,
     title: "11 dimensões psicossociais",
-    description:
-      "Exigências cognitivas, emocionais, dupla presença, reconhecimento e mais.",
+    description: "Exigências cognitivas, emocionais, dupla presença, reconhecimento e mais.",
   },
   {
     icon: ShieldCheck,
     title: "Conformidade NR-1 / FRPRT",
-    description:
-      "Atende à Portaria MTE 1.419/2024 e ao FRPRT para o PGR do empregador.",
+    description: "Atende à Portaria MTE 1.419/2024 e ao FRPRT para o PGR do empregador.",
   },
   {
     icon: Eye,
@@ -95,13 +80,8 @@ export function AuthScreen() {
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3">
-              <ShieldCheck
-                className="h-6 w-6 text-[var(--accent)]"
-                aria-hidden
-              />
-              <div className="font-display text-xl tracking-tight">
-                NR-1 Copsoq
-              </div>
+              <ShieldCheck className="h-6 w-6 text-[var(--accent)]" aria-hidden />
+              <div className="font-display text-xl tracking-tight">NR-1 Copsoq</div>
             </div>
 
             <h1 className="font-display mt-12 text-3xl xl:text-4xl leading-tight tracking-tight">
@@ -110,9 +90,8 @@ export function AuthScreen() {
               Psicossociais conforme NR-1
             </h1>
             <p className="mt-4 max-w-md leading-relaxed text-white/80">
-              Plataforma SaaS multi-tenant para o profissional de SST gerir
-              ciclos de avaliação, inventário de riscos e plano de ação —
-              usando o instrumento COPSOQ II-BR.
+              Plataforma SaaS multi-tenant para o profissional de SST gerir ciclos de avaliação,
+              inventário de riscos e plano de ação — usando o instrumento COPSOQ II-BR.
             </p>
 
             <ul className="mt-10 space-y-6 max-w-md">
@@ -120,10 +99,7 @@ export function AuthScreen() {
                 const Icon = b.icon;
                 return (
                   <li key={b.title} className="flex gap-3">
-                    <Icon
-                      className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]"
-                      aria-hidden
-                    />
+                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent)]" aria-hidden />
                     <div>
                       <div className="font-medium leading-snug">{b.title}</div>
                       <div className="text-sm text-white/70 leading-snug mt-0.5">
@@ -137,9 +113,8 @@ export function AuthScreen() {
           </div>
 
           <div className="relative z-10 mt-12 text-xs text-white/55 leading-relaxed">
-            Plataforma SaaS para gestão de Riscos Psicossociais conforme NR-1
-            (Portaria MTE 1.419/2024) usando instrumento COPSOQ II-BR
-            (Gonçalves et al. 2021).
+            Plataforma SaaS para gestão de Riscos Psicossociais conforme NR-1 (Portaria MTE
+            1.419/2024) usando instrumento COPSOQ II-BR (Gonçalves et al. 2021).
             <br />
             LGPD: dados do trabalhador anonimizados por design.
           </div>
@@ -152,9 +127,7 @@ export function AuthScreen() {
               <div className="h-9 w-9 rounded-md bg-[var(--brand)] flex items-center justify-center">
                 <ShieldCheck className="h-5 w-5 text-[var(--accent-foreground)]" />
               </div>
-              <span className="font-display text-lg tracking-tight">
-                NR-1 Copsoq
-              </span>
+              <span className="font-display text-lg tracking-tight">NR-1 Copsoq</span>
             </div>
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as "login" | "register")}>
@@ -228,6 +201,7 @@ function LoginForm() {
             id="login-email"
             type="email"
             autoComplete="email"
+            spellCheck={false}
             placeholder="voce@exemplo.com"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -242,6 +216,7 @@ function LoginForm() {
               id="login-password"
               type={showPw ? "text" : "password"}
               autoComplete="current-password"
+              spellCheck={false}
               placeholder="••••••••"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -390,6 +365,7 @@ function RegisterForm() {
             id="reg-email"
             type="email"
             autoComplete="email"
+            spellCheck={false}
             placeholder="voce@exemplo.com"
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
@@ -404,6 +380,7 @@ function RegisterForm() {
               id="reg-password"
               type={showPw ? "text" : "password"}
               autoComplete="new-password"
+              spellCheck={false}
               placeholder="Mínimo 8 caracteres"
               value={form.password}
               onChange={(e) => update("password", e.target.value)}
@@ -484,12 +461,9 @@ function RegisterForm() {
             className="mt-0.5"
           />
           <Label htmlFor="reg-terms" className="text-xs leading-relaxed font-normal">
-            Li e aceito os{" "}
-            <span className="text-primary font-medium">Termos de Uso</span> e a{" "}
-            <span className="text-primary font-medium">
-              Política de Privacidade (LGPD)
-            </span>
-            , incluindo o anonimato do trabalhador por design.
+            Li e aceito os <span className="text-primary font-medium">Termos de Uso</span> e a{" "}
+            <span className="text-primary font-medium">Política de Privacidade (LGPD)</span>,
+            incluindo o anonimato do trabalhador por design.
           </Label>
         </div>
 

@@ -14,12 +14,18 @@ export async function GET(_request: Request, { params }: RouteCtx) {
       include: { assessment: true },
     });
     if (!ad) {
-      return workerErrorJson(ERROR_CODES.ASSESSMENT_DEPT_NOT_FOUND, "Assessment department not found");
+      return workerErrorJson(
+        ERROR_CODES.ASSESSMENT_DEPT_NOT_FOUND,
+        "Assessment department not found",
+      );
     }
 
     // Validate assessment.status = 'collecting' AND endDate >= today
     if (ad.assessment.status !== "collecting") {
-      return workerErrorJson(ERROR_CODES.ASSESSMENT_NOT_COLLECTING, "Assessment is not collecting responses");
+      return workerErrorJson(
+        ERROR_CODES.ASSESSMENT_NOT_COLLECTING,
+        "Assessment is not collecting responses",
+      );
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);

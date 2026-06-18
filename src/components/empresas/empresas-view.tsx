@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -17,18 +15,17 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useView } from "@/lib/store";
-import type { CompanySummary } from "@/lib/types";
-import { formatCnpj, sanitizeCnpj } from "@/lib/cnpj";
 import { CompanyFormDialog } from "@/components/empresas/company-form-dialog";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ApiError, api } from "@/lib/api";
+import { formatCnpj, sanitizeCnpj } from "@/lib/cnpj";
+import { useView } from "@/lib/store";
+import type { CompanySummary } from "@/lib/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -144,11 +141,7 @@ export function EmpresasView() {
       const name = c.name.toLowerCase();
       const cnpj = sanitizeCnpj(c.cnpj);
       const formatted = formatCnpj(c.cnpj).toLowerCase();
-      return (
-        name.includes(q) ||
-        cnpj.includes(q) ||
-        formatted.includes(q)
-      );
+      return name.includes(q) || cnpj.includes(q) || formatted.includes(q);
     });
   }, [companies, searchTerm]);
 
@@ -175,7 +168,7 @@ export function EmpresasView() {
     toast.success(`Empresa "${c.name}" cadastrada.`);
     void load();
   };
-  const onUpdated = (c: CompanySummary) => {
+  const onUpdated = (_c: CompanySummary) => {
     setFormOpen(false);
     toast.success("Empresa atualizada.");
     void load();
@@ -186,9 +179,7 @@ export function EmpresasView() {
       {/* Page header */}
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-border pb-6 mb-6">
         <div>
-          <h1 className="font-display text-2xl sm:text-3xl tracking-tight">
-            Empresas
-          </h1>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight">Empresas</h1>
           <p className="text-sm text-muted-foreground mt-1.5">
             Gerencie seus clientes e seus ciclos de avaliação.
           </p>
@@ -266,17 +257,13 @@ export function EmpresasView() {
       {/* Loaded */}
       {!loading && !error && companies && (
         <div className="animate-in fade-in duration-300">
-        <>
           {companies.length === 0 ? (
             <EmptyState onAdd={openCreate} />
           ) : filtered.length === 0 ? (
             <NoResults onClear={() => setSearchInput("")} />
           ) : (
             <>
-              <section
-                aria-label="Lista de empresas"
-                className="border-t border-border"
-              >
+              <section aria-label="Lista de empresas" className="border-t border-border">
                 {pageItems.map((c) => (
                   <CompanyRow
                     key={c.id}
@@ -329,7 +316,6 @@ export function EmpresasView() {
               )}
             </>
           )}
-        </>
         </div>
       )}
 
@@ -371,8 +357,9 @@ function CompanyRow({
         <div className="min-w-0 flex-1 flex items-start gap-3">
           <span
             className={`mt-1.5 h-2.5 w-2.5 rounded-full shrink-0 ${STATUS_DOT_CLASS[status]}`}
-            aria-label={`Status: ${STATUS_LABEL[status]}`}
             title={STATUS_LABEL[status]}
+            role="img"
+            aria-label={`Status: ${STATUS_LABEL[status]}`}
           />
           <div className="min-w-0">
             <div className="flex items-baseline gap-2 flex-wrap">
@@ -398,9 +385,7 @@ function CompanyRow({
               {company.cnaePrimary && (
                 <span className="inline-flex items-center gap-1.5 min-w-0">
                   <ClipboardList className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate font-mono-numeric">
-                    CNAE {company.cnaePrimary}
-                  </span>
+                  <span className="truncate font-mono-numeric">CNAE {company.cnaePrimary}</span>
                 </span>
               )}
             </div>
@@ -431,7 +416,12 @@ function CompanyRow({
           >
             Editar
           </Button>
-          <Button size="sm" variant="ghost" onClick={onOpen} className="text-[var(--brand)] hover:text-[var(--brand-light)]">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onOpen}
+            className="text-[var(--brand)] hover:text-[var(--brand-light)]"
+          >
             Acessar
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
@@ -451,9 +441,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <div className="max-w-md">
         <h2 className="font-display text-xl">Nenhuma empresa cadastrada</h2>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Adicione a primeira para começar.
-        </p>
+        <p className="text-sm text-muted-foreground mt-1.5">Adicione a primeira para começar.</p>
       </div>
       <Button onClick={onAdd}>
         <Plus className="h-4 w-4" />

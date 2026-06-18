@@ -1,6 +1,6 @@
-import { db } from "@/lib/db";
-import { ERROR_CODES, BRAZILIAN_UFS } from "@/lib/errors";
 import { formatCnpj } from "@/lib/cnpj";
+import { db } from "@/lib/db";
+import { BRAZILIAN_UFS, ERROR_CODES } from "@/lib/errors";
 import {
   errorJson,
   jsonResponse,
@@ -58,7 +58,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     const professional = await requireProfessional();
     const { id } = await params;
     const company = await fetchCompany(id);
-    if (!company || !company.isActive) {
+    if (!company?.isActive) {
       return errorJson(ERROR_CODES.COMPANY_NOT_FOUND, "Company not found");
     }
     await requireTenantOwnership(company.professionalId, professional.id);
@@ -114,7 +114,7 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     const professional = await requireProfessional();
     const { id } = await params;
     const company = await fetchCompany(id);
-    if (!company || !company.isActive) {
+    if (!company?.isActive) {
       return errorJson(ERROR_CODES.COMPANY_NOT_FOUND, "Company not found");
     }
     await requireTenantOwnership(company.professionalId, professional.id);
@@ -153,8 +153,7 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
           : null;
     }
     if (body.city !== undefined) {
-      data.city =
-        typeof body.city === "string" && body.city.trim() ? body.city.trim() : null;
+      data.city = typeof body.city === "string" && body.city.trim() ? body.city.trim() : null;
     }
     if (body.state !== undefined) {
       data.state =
@@ -182,21 +181,21 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     }
     if (body.dpoPoc !== undefined) {
       data.dpoPoc =
-        typeof body.dpoPoc === "string" && body.dpoPoc.trim()
-          ? body.dpoPoc.trim()
-          : null;
+        typeof body.dpoPoc === "string" && body.dpoPoc.trim() ? body.dpoPoc.trim() : null;
     }
 
     const updated = await db.company.update({ where: { id: company.id }, data });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "company.update",
-        resourceType: "company",
-        resourceId: updated.id,
-        metadataJson: JSON.stringify({ id: updated.id, fields: Object.keys(body) }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "company.update",
+          resourceType: "company",
+          resourceId: updated.id,
+          metadataJson: JSON.stringify({ id: updated.id, fields: Object.keys(body) }),
+        },
+      })
+      .catch(() => {});
     return jsonResponse(serializeCompany(updated));
   } catch (e) {
     const code = (e as { code?: string })?.code;
@@ -232,20 +231,22 @@ export async function DELETE(_request: Request, { params }: RouteCtx) {
     if (activeAssessment) {
       return errorJson(
         ERROR_CODES.DEPARTMENT_HAS_ACTIVE_ASSESSMENT,
-        "Company has active assessment; close or wait before deletion"
+        "Company has active assessment; close or wait before deletion",
       );
     }
 
     await db.company.update({ where: { id: company.id }, data: { isActive: false } });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "company.delete",
-        resourceType: "company",
-        resourceId: company.id,
-        metadataJson: JSON.stringify({ id: company.id, name: company.name }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "company.delete",
+          resourceType: "company",
+          resourceId: company.id,
+          metadataJson: JSON.stringify({ id: company.id, name: company.name }),
+        },
+      })
+      .catch(() => {});
     return jsonResponse({ ok: true });
   } catch (e) {
     const code = (e as { code?: string })?.code;

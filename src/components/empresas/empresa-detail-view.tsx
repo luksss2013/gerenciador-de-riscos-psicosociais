@@ -1,8 +1,6 @@
 "use client";
 
-import * as React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { format, parseISO, isValid as isValidDate } from "date-fns";
+import { format, isValid as isValidDate, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   AlertCircle,
@@ -25,49 +23,11 @@ import {
   User,
   Users,
 } from "lucide-react";
+import type * as React from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-
-import { api, ApiError } from "@/lib/api";
-import { useView } from "@/lib/store";
-import type {
-  Assessment,
-  CompanySummary,
-  Department,
-} from "@/lib/types";
-import { formatCnpj } from "@/lib/cnpj";
-import {
-  ASSESSMENT_STATUS_LABELS,
-} from "@/lib/errors";
-import {
-  FIELD_ERROR_CLASS,
-  FieldError,
-  DateRangeField,
-  maskNumber,
-  validateRequired,
-} from "@/lib/form-utils";
-import { NrStatusBadge, type NrStatus } from "@/components/shell/nr-status-badge";
 import { CompanyFormDialog } from "@/components/empresas/company-form-dialog";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { type NrStatus, NrStatusBadge } from "@/components/shell/nr-status-badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,6 +38,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -86,7 +60,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { ApiError, api } from "@/lib/api";
+import { formatCnpj } from "@/lib/cnpj";
+import { ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
+import {
+  DateRangeField,
+  FIELD_ERROR_CLASS,
+  FieldError,
+  maskNumber,
+  validateRequired,
+} from "@/lib/form-utils";
+import { useView } from "@/lib/store";
+import type { Assessment, CompanySummary, Department } from "@/lib/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -161,7 +148,7 @@ export function EmpresaDetailView() {
 
   useEffect(() => {
     void load();
-  }, [load, refreshKey]);
+  }, [load]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -178,13 +165,10 @@ export function EmpresaDetailView() {
           <div>
             <p className="font-display text-lg">Nenhuma empresa selecionada</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Volte para a lista de empresas e escolha um cliente para
-              visualizar seus detalhes.
+              Volte para a lista de empresas e escolha um cliente para visualizar seus detalhes.
             </p>
           </div>
-          <Button onClick={() => go("empresas")}>
-            Ver empresas
-          </Button>
+          <Button onClick={() => go("empresas")}>Ver empresas</Button>
         </section>
       </div>
     );
@@ -203,9 +187,7 @@ export function EmpresaDetailView() {
           </div>
           <div>
             <p className="font-display text-lg">Falha ao carregar a empresa</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {error ?? "Tente novamente."}
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">{error ?? "Tente novamente."}</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => go("painel")}>
@@ -231,16 +213,12 @@ export function EmpresaDetailView() {
           onClick={() => go("painel")}
           className="-ml-2 text-muted-foreground hover:text-foreground"
         >
-          <ArrowRight className="h-4 w-4 rotate-180" />
+          <ArrowRight className="h-4 w-4 rotate-180" aria-hidden="true" />
           Voltar ao painel
         </Button>
       </nav>
 
-      <CompanyDetailHeader
-        company={company}
-        onEdit={() => setEditOpen(true)}
-        onRefresh={refresh}
-      />
+      <CompanyDetailHeader company={company} onEdit={() => setEditOpen(true)} onRefresh={refresh} />
 
       <div className="mt-8">
         <CompanyTabs
@@ -346,10 +324,7 @@ function CompanyDetailHeader({
           )}
           {company.contactEmail && (
             <DetailItem icon={Mail} label="E-mail">
-              <a
-                href={`mailto:${company.contactEmail}`}
-                className="hover:underline"
-              >
+              <a href={`mailto:${company.contactEmail}`} className="hover:underline">
                 {company.contactEmail}
               </a>
             </DetailItem>
@@ -378,9 +353,7 @@ function DetailItem({
     <div className="flex items-start gap-2.5 min-w-0">
       <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-          {label}
-        </dt>
+        <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
         <dd className="text-sm font-medium truncate">{children}</dd>
       </div>
     </div>
@@ -437,7 +410,7 @@ function OverviewTab({
   const [createOpen, setCreateOpen] = useState(false);
   const summary = company.summary;
   const lastStatus = summary.lastAssessmentStatus
-    ? ASSESSMENT_STATUS_LABELS[summary.lastAssessmentStatus] ?? summary.lastAssessmentStatus
+    ? (ASSESSMENT_STATUS_LABELS[summary.lastAssessmentStatus] ?? summary.lastAssessmentStatus)
     : null;
   const lastDate = fmtDate(summary.lastAssessmentCompletedAt);
 
@@ -450,31 +423,19 @@ function OverviewTab({
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
               Departamentos
             </div>
-            <div className="font-mono-numeric text-2xl mt-1">
-              {summary.departmentsCount}
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              GHEs cadastrados
-            </div>
+            <div className="font-mono-numeric text-2xl mt-1">{summary.departmentsCount}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">GHEs cadastrados</div>
           </div>
           <div className="sm:px-5 py-3 sm:py-0">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">
-              Avaliações
-            </div>
-            <div className="font-mono-numeric text-2xl mt-1">
-              {summary.assessmentsCount}
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              Ciclos registrados
-            </div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Avaliações</div>
+            <div className="font-mono-numeric text-2xl mt-1">{summary.assessmentsCount}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Ciclos registrados</div>
           </div>
           <div className="sm:pl-5 py-3 sm:py-0">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">
               Última avaliação
             </div>
-            <div className="font-mono-numeric text-2xl mt-1">
-              {lastStatus ?? "—"}
-            </div>
+            <div className="font-mono-numeric text-2xl mt-1">{lastStatus ?? "—"}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
               {lastDate !== "—" ? `Concluída em ${lastDate}` : "Sem conclusões"}
             </div>
@@ -497,7 +458,10 @@ function OverviewTab({
           </Button>
         </div>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-          <Meta label="CNPJ" value={<span className="font-mono-numeric">{formatCnpj(company.cnpj)}</span>} />
+          <Meta
+            label="CNPJ"
+            value={<span className="font-mono-numeric">{formatCnpj(company.cnpj)}</span>}
+          />
           <Meta label="CNAE principal" value={company.cnaePrimary ?? "—"} />
           <Meta
             label="Localização"
@@ -510,9 +474,13 @@ function OverviewTab({
           <Meta
             label="Nº de empregados"
             value={
-              company.employeeCount != null
-                ? <span className="font-mono-numeric">{company.employeeCount.toLocaleString("pt-BR")}</span>
-                : "—"
+              company.employeeCount != null ? (
+                <span className="font-mono-numeric">
+                  {company.employeeCount.toLocaleString("pt-BR")}
+                </span>
+              ) : (
+                "—"
+              )
             }
           />
           <Meta label="Responsável" value={company.contactName ?? "—"} />
@@ -536,9 +504,7 @@ function OverviewTab({
 function Meta({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-        {label}
-      </dt>
+      <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="text-sm font-medium mt-0.5 truncate">{value}</dd>
     </div>
   );
@@ -610,9 +576,7 @@ function DepartmentsTab({
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.code === "DEPARTMENT_HAS_ACTIVE_ASSESSMENT") {
-          toast.error(
-            "Este departamento possui uma avaliação ativa e não pode ser desativado."
-          );
+          toast.error("Este departamento possui uma avaliação ativa e não pode ser desativado.");
         } else {
           toast.error(e.message);
         }
@@ -630,8 +594,7 @@ function DepartmentsTab({
         <div>
           <h2 className="font-display text-xl">Departamentos (GHEs)</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Grupos Homogêneos de Exposição nos quais a coleta de dados é
-            estratificada.
+            Grupos Homogêneos de Exposição nos quais a coleta de dados é estratificada.
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -679,10 +642,18 @@ function DepartmentsTab({
             </caption>
             <TableHeader>
               <TableRow className="border-b border-border hover:bg-transparent">
-                <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Nome</TableHead>
-                <TableHead className="w-32 text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Trabalhadores</TableHead>
-                <TableHead className="w-28 text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Status</TableHead>
-                <TableHead className="w-32 text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">Ações</TableHead>
+                <TableHead className="text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Nome
+                </TableHead>
+                <TableHead className="w-32 text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Trabalhadores
+                </TableHead>
+                <TableHead className="w-28 text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Status
+                </TableHead>
+                <TableHead className="w-32 text-right text-muted-foreground font-medium uppercase tracking-wider text-xs py-3">
+                  Ações
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -748,20 +719,15 @@ function DepartmentsTab({
       />
 
       {/* Delete confirm */}
-      <AlertDialog
-        open={!!confirmDelete}
-        onOpenChange={(v) => !v && setConfirmDelete(null)}
-      >
+      <AlertDialog open={!!confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="font-display">Desativar departamento</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja desativar{" "}
-              <span className="font-medium text-foreground">
-                {confirmDelete?.name}
-              </span>
-              ? Esta ação é reversível apenas recriando o departamento.
-              Departamentos com avaliação ativa não podem ser desativados.
+              <span className="font-medium text-foreground">{confirmDelete?.name}</span>? Esta ação
+              é reversível apenas recriando o departamento. Departamentos com avaliação ativa não
+              podem ser desativados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -919,9 +885,7 @@ function DepartmentFormDialog({
                 }}
                 onBlur={() => {
                   if (!validateRequired(form.name, 2)) {
-                    setNameError(
-                      "Informe o nome do departamento (mínimo 2 caracteres)."
-                    );
+                    setNameError("Informe o nome do departamento (mínimo 2 caracteres).");
                   }
                 }}
                 autoFocus
@@ -929,9 +893,7 @@ function DepartmentFormDialog({
                 aria-describedby={nameError ? "dept-name-err" : undefined}
                 className={nameError ? FIELD_ERROR_CLASS : ""}
               />
-              {nameError && (
-                <FieldError id="dept-name-err" message={nameError} />
-              )}
+              {nameError && <FieldError id="dept-name-err" message={nameError} />}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="dept-desc">Descrição</Label>
@@ -939,9 +901,7 @@ function DepartmentFormDialog({
                 id="dept-desc"
                 rows={3}
                 value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Setor, turno, características do grupo…"
               />
             </div>
@@ -1080,8 +1040,7 @@ function AssessmentsTab({
           <div>
             <p className="font-display text-lg">Nenhuma avaliação cadastrada</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Inicie o primeiro ciclo de avaliação COPSOQ II-BR para esta
-              empresa.
+              Inicie o primeiro ciclo de avaliação COPSOQ II-BR para esta empresa.
             </p>
           </div>
           <Button onClick={() => setCreateOpen(true)}>
@@ -1123,13 +1082,7 @@ function AssessmentsTab({
   );
 }
 
-function AssessmentRow({
-  assessment,
-  onOpen,
-}: {
-  assessment: Assessment;
-  onOpen: () => void;
-}) {
+function AssessmentRow({ assessment, onOpen }: { assessment: Assessment; onOpen: () => void }) {
   const status = assessment.status;
   const label = ASSESSMENT_STATUS_LABELS[status] ?? status;
   const isCollecting = status === "collecting";
@@ -1162,7 +1115,6 @@ function AssessmentRow({
         return "risk-low-bg border-transparent";
       case "archived":
         return "bg-muted text-muted-foreground border-transparent";
-      case "draft":
       default:
         return "bg-muted text-muted-foreground border-transparent";
     }
@@ -1186,7 +1138,9 @@ function AssessmentRow({
           <div className="text-xs text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              <span className="font-mono-numeric">{fmtPeriod(assessment.startDate, assessment.endDate)}</span>
+              <span className="font-mono-numeric">
+                {fmtPeriod(assessment.startDate, assessment.endDate)}
+              </span>
             </span>
             {isCollecting && adesao != null && (
               <span className="inline-flex items-center gap-1">
@@ -1237,9 +1191,7 @@ function CreateAssessmentDialog({
   const [deptsError, setDeptsError] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
-  const [startDate, setStartDate] = useState(
-    format(new Date(), "yyyy-MM-dd")
-  );
+  const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [endDate, setEndDate] = useState("");
   const [selected, setSelected] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -1302,8 +1254,7 @@ function CreateAssessmentDialog({
   };
 
   const selectedCount = Object.keys(selected).length;
-  const dateValid =
-    startDate && endDate && new Date(endDate) > new Date(startDate);
+  const dateValid = startDate && endDate && new Date(endDate) > new Date(startDate);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1358,9 +1309,8 @@ function CreateAssessmentDialog({
         <DialogHeader>
           <DialogTitle className="font-display text-xl">Nova avaliação</DialogTitle>
           <DialogDescription>
-            Configure o ciclo COPSOQ II-BR e os departamentos participantes.
-            O instrumento, datas e adesão por GHE poderão ser ajustados na
-            próxima etapa.
+            Configure o ciclo COPSOQ II-BR e os departamentos participantes. O instrumento, datas e
+            adesão por GHE poderão ser ajustados na próxima etapa.
           </DialogDescription>
         </DialogHeader>
 
@@ -1398,8 +1348,8 @@ function CreateAssessmentDialog({
               <div className="flex items-center justify-between gap-2">
                 <Label>Departamentos participantes</Label>
                 <span className="text-xs text-muted-foreground">
-                  <span className="font-mono-numeric">{selectedCount}</span>{" "}
-                  selecionado{selectedCount !== 1 ? "s" : ""}
+                  <span className="font-mono-numeric">{selectedCount}</span> selecionado
+                  {selectedCount !== 1 ? "s" : ""}
                 </span>
               </div>
               {loadingDepts ? (
@@ -1411,8 +1361,8 @@ function CreateAssessmentDialog({
                 <p className="text-sm text-[var(--risk-high)] py-2">{deptsError}</p>
               ) : departments.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground text-center">
-                  Nenhum departamento ativo. Cadastre GHEs na aba
-                  &ldquo;Departamentos&rdquo; antes de iniciar uma avaliação.
+                  Nenhum departamento ativo. Cadastre GHEs na aba &ldquo;Departamentos&rdquo; antes
+                  de iniciar uma avaliação.
                 </div>
               ) : (
                 <div className="rounded-md border border-border divide-y divide-border max-h-72 overflow-y-auto scroll-area">
@@ -1427,14 +1377,10 @@ function CreateAssessmentDialog({
                         <Checkbox
                           id={`asmt-dept-${d.id}`}
                           checked={checked}
-                          onCheckedChange={() =>
-                            toggleDept(d.id, d.workerCount)
-                          }
+                          onCheckedChange={() => toggleDept(d.id, d.workerCount)}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">
-                            {d.name}
-                          </div>
+                          <div className="text-sm font-medium truncate">{d.name}</div>
                           <div className="text-xs text-muted-foreground">
                             <span className="font-mono-numeric">
                               {d.workerCount.toLocaleString("pt-BR")}
@@ -1444,12 +1390,11 @@ function CreateAssessmentDialog({
                         </div>
                         <div
                           className="flex items-center gap-1.5"
-                          onClick={(e) => e.preventDefault()}
+                          role="none"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
                         >
-                          <Label
-                            htmlFor={`asmt-exp-${d.id}`}
-                            className="sr-only"
-                          >
+                          <Label htmlFor={`asmt-exp-${d.id}`} className="sr-only">
                             Respostas esperadas para {d.name}
                           </Label>
                           <Input
@@ -1470,8 +1415,8 @@ function CreateAssessmentDialog({
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                O número de respostas esperadas define a meta de adesão por GHE
-                (mínimo 5 para elegibilidade).
+                O número de respostas esperadas define a meta de adesão por GHE (mínimo 5 para
+                elegibilidade).
               </p>
             </div>
           </fieldset>
@@ -1488,18 +1433,12 @@ function CreateAssessmentDialog({
                 Pendências para criar a avaliação:
               </p>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-5 list-disc">
-                {!title.trim() && (
-                  <li>Informe o título da avaliação</li>
-                )}
-                {!endDate && (
-                  <li>Selecione a data final da coleta</li>
-                )}
+                {!title.trim() && <li>Informe o título da avaliação</li>}
+                {!endDate && <li>Selecione a data final da coleta</li>}
                 {endDate && startDate && new Date(endDate) <= new Date(startDate) && (
                   <li>A data final deve ser posterior à data de início</li>
                 )}
-                {selectedCount === 0 && (
-                  <li>Selecione ao menos um departamento participante</li>
-                )}
+                {selectedCount === 0 && <li>Selecione ao menos um departamento participante</li>}
               </ul>
             </div>
           )}
@@ -1516,11 +1455,7 @@ function CreateAssessmentDialog({
             <Button
               type="submit"
               disabled={
-                submitting ||
-                loadingDepts ||
-                !!deptsError ||
-                !dateValid ||
-                selectedCount === 0
+                submitting || loadingDepts || !!deptsError || !dateValid || selectedCount === 0
               }
             >
               {submitting ? (

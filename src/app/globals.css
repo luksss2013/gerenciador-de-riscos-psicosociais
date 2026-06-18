@@ -62,58 +62,58 @@
 
   /* ─── NR-1 Copsoq — Clinical-institutional, warm-editorial identity ─── */
   /* Primary: deep pine (institutional calm + health/well-being) */
-  --brand: #2F4A43;
-  --brand-light: #3F6A5E;
+  --brand: #2f4a43;
+  --brand-light: #3f6a5e;
   /* Accent: restrained terracotta (human warmth, used sparingly) */
-  --accent: #B8623E;
-  --accent-foreground: #FAF8F4;
+  --accent: #b8623e;
+  --accent-foreground: #faf8f4;
 
   /* Risk — muted but semantically clear */
-  --risk-high: #C25647;
-  --risk-medium: #C9952F;
-  --risk-low: #5B8A6A;
+  --risk-high: #c25647;
+  --risk-medium: #c9952f;
+  --risk-low: #5b8a6a;
 
   /* Warm stone surfaces */
-  --surface: #F4F0E9;
-  --surface-card: #FFFFFF;
-  --border: #E4DDD2;
-  --text-primary: #2A2620;
-  --text-muted: #6B6358;
-  --success: #5B8A6A;
-  --warning: #C9952F;
+  --surface: #f4f0e9;
+  --surface-card: #ffffff;
+  --border: #e4ddd2;
+  --text-primary: #2a2620;
+  --text-muted: #6b6358;
+  --success: #5b8a6a;
+  --warning: #c9952f;
 
   /* Core shadcn tokens */
-  --background: #FAF8F4;
-  --foreground: #2A2620;
-  --card: #FFFFFF;
-  --card-foreground: #2A2620;
-  --popover: #FFFFFF;
-  --popover-foreground: #2A2620;
-  --primary: #2F4A43;
-  --primary-foreground: #FAF8F4;
-  --secondary: #EDE7DC;
-  --secondary-foreground: #2A2620;
-  --muted: #F4F0E9;
-  --muted-foreground: #6B6358;
-  --destructive: #C25647;
-  --input: #E4DDD2;
-  --ring: #3F6A5E;
+  --background: #faf8f4;
+  --foreground: #2a2620;
+  --card: #ffffff;
+  --card-foreground: #2a2620;
+  --popover: #ffffff;
+  --popover-foreground: #2a2620;
+  --primary: #2f4a43;
+  --primary-foreground: #faf8f4;
+  --secondary: #ede7dc;
+  --secondary-foreground: #2a2620;
+  --muted: #f4f0e9;
+  --muted-foreground: #6b6358;
+  --destructive: #c25647;
+  --input: #e4ddd2;
+  --ring: #3f6a5e;
 
-  --chart-1: #2F4A43;
-  --chart-2: #5B8A6A;
-  --chart-3: #B8623E;
-  --chart-4: #C9952F;
-  --chart-5: #C25647;
+  --chart-1: #2f4a43;
+  --chart-2: #5b8a6a;
+  --chart-3: #b8623e;
+  --chart-4: #c9952f;
+  --chart-5: #c25647;
 
   /* Sidebar — warm, tone-separated from content */
-  --sidebar: #F4F0E9;
-  --sidebar-foreground: #2A2620;
-  --sidebar-primary: #2F4A43;
-  --sidebar-primary-foreground: #FAF8F4;
-  --sidebar-accent: #EAF0EC;
-  --sidebar-accent-foreground: #2F4A43;
-  --sidebar-border: #E4DDD2;
-  --sidebar-ring: #3F6A5E;
+  --sidebar: #f4f0e9;
+  --sidebar-foreground: #2a2620;
+  --sidebar-primary: #2f4a43;
+  --sidebar-primary-foreground: #faf8f4;
+  --sidebar-accent: #eaf0ec;
+  --sidebar-accent-foreground: #2f4a43;
+  --sidebar-border: #e4ddd2;
+  --sidebar-ring: #3f6a5e;
 }
 
 @layer base {
@@ -124,7 +124,8 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
-  html, body {
+  html,
+  body {
     @apply min-h-screen;
   }
 }
@@ -164,14 +165,25 @@
 }
 
 /* Risk level helpers — muted tokens */
-.risk-low-bg { background-color: var(--risk-low); color: #FAF8F4; }
-.risk-medium-bg { background-color: var(--risk-medium); color: #2A2620; }
-.risk-high-bg { background-color: var(--risk-high); color: #FAF8F4; }
+.risk-low-bg {
+  background-color: var(--risk-low);
+  color: #faf8f4;
+}
+.risk-medium-bg {
+  background-color: var(--risk-medium);
+  color: #2a2620;
+}
+.risk-high-bg {
+  background-color: var(--risk-high);
+  color: #faf8f4;
+}
 
 /* Subtle surface hover — replaces the old card-hover lift.
    Border-color + bg shift only, no transform/shadow. */
 .surface-hover {
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 .surface-hover:hover {
   background-color: var(--surface);
@@ -181,13 +193,19 @@
 /* Kept for backward-compat with existing component references —
    now a no-op alias so old markup doesn't break. */
 .card-hover {
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 /* Animated ring for adesão */
 @keyframes ring-fill {
-  from { stroke-dashoffset: var(--ring-circumference); }
-  to { stroke-dashoffset: var(--ring-offset); }
+  from {
+    stroke-dashoffset: var(--ring-circumference);
+  }
+  to {
+    stroke-dashoffset: var(--ring-offset);
+  }
 }
 .ring-progress {
   animation: ring-fill 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
@@ -195,8 +213,12 @@
 
 /* Skeleton shimmer — warm-stone gradient sweep, no flat gray */
 @keyframes skeleton-shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 .skeleton-shimmer {
   background: linear-gradient(
@@ -220,18 +242,23 @@
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
   }
   .ring-progress {
-    animation: none !important;
+    animation: none;
   }
 }
 
 /* Print-friendly report preview */
 @media print {
-  .no-print { display: none !important; }
-  .print-area { box-shadow: none !important; border: none !important; }
+  .no-print {
+    display: none;
+  }
+  .print-area {
+    box-shadow: none;
+    border: none;
+  }
 }

@@ -1,11 +1,7 @@
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import {
-  errorJson,
-  jsonResponse,
-  requireProfessional,
-} from "@/lib/session";
+import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 
 const SESSION_COOKIE = "nr1_session";
 

@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -20,26 +18,9 @@ import {
   ShieldCheck,
   TrendingUp,
 } from "lucide-react";
-
-import { api, ApiError } from "@/lib/api";
-import { useView } from "@/lib/store";
-import type {
-  Assessment,
-  CycleTrend,
-  DashboardData,
-  DimensionCode,
-  DimensionResultDTO,
-  RiskLevel,
-} from "@/lib/types";
-import {
-  COPSOQ_DIMENSIONS,
-  INVENTORY_TEMPLATES,
-  getDimension,
-} from "@/lib/copsoq-data";
-import { RISK_LEVEL_LABELS } from "@/lib/errors";
-
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -49,21 +30,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ApiError, api } from "@/lib/api";
+import { COPSOQ_DIMENSIONS, getDimension, INVENTORY_TEMPLATES } from "@/lib/copsoq-data";
+import { RISK_LEVEL_LABELS } from "@/lib/errors";
+import { useView } from "@/lib/store";
+import type {
+  Assessment,
+  CycleTrend,
+  DashboardData,
+  DimensionCode,
+  DimensionResultDTO,
+  RiskLevel,
+} from "@/lib/types";
 
 // ─── Color helpers ──────────────────────────────────────────────────────────
 
 function riskScoreBg(score: number): string {
   // Muted sage → ochre → clay ramp (HSL 120°→45°→10° at ~45% saturation).
-  const h =
-    score <= 50
-      ? 120 - (score / 50) * (120 - 45)
-      : 45 - ((score - 50) / 50) * (45 - 10);
+  const h = score <= 50 ? 120 - (score / 50) * (120 - 45) : 45 - ((score - 50) / 50) * (45 - 10);
   return `hsl(${h}, 45%, 48%)`;
 }
 
@@ -140,16 +125,13 @@ function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
     },
   ];
   return (
-    <section
-      aria-label="Indicadores-chave"
-      className="bg-[var(--surface)] rounded-lg p-5"
-    >
+    <section aria-label="Indicadores-chave" className="bg-[var(--surface)] rounded-lg p-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
         {stats.map((s) => (
           <div
             key={s.label}
+            role="img"
             className="px-3 first:pl-0 last:pr-0"
-            role="group"
             aria-label={`${s.label}: ${s.value}${s.hint ? `. ${s.hint}` : ""}`}
           >
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">
@@ -159,9 +141,7 @@ function DashboardKpis({ kpis }: { kpis: DashboardData["kpis"] }) {
               {s.value}
             </div>
             {s.hint ? (
-              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">
-                {s.hint}
-              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{s.hint}</div>
             ) : null}
           </div>
         ))}
@@ -197,18 +177,12 @@ function ScoreCell({
           <div
             tabIndex={0}
             role="gridcell"
-            aria-label={ariaLabel}
             className="flex items-center justify-center gap-1 px-2 py-2.5 min-w-[3rem] min-h-[2.5rem] cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           >
-            <span
-              className="font-mono-numeric text-sm font-semibold"
-              aria-hidden="true"
-            >
+            <span className="font-mono-numeric text-sm font-semibold" aria-hidden="true">
               {dr.riskScore.toFixed(0)}
             </span>
-            {lowAlpha ? (
-              <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
-            ) : null}
+            {lowAlpha ? <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" /> : null}
           </div>
         </TooltipTrigger>
         <TooltipContent>{tooltipText}</TooltipContent>
@@ -217,11 +191,7 @@ function ScoreCell({
   );
 }
 
-function HeatRow({
-  row,
-}: {
-  row: DashboardData["heatmap"][number];
-}) {
+function HeatRow({ row }: { row: DashboardData["heatmap"][number] }) {
   if (!row.isEligible || !row.dimensions) {
     return (
       <tr className="bg-muted/40 text-muted-foreground hover:bg-[var(--surface)] transition-colors">
@@ -229,9 +199,7 @@ function HeatRow({
           <div className="truncate max-w-[10rem]" title={row.deptName}>
             {row.deptName}
           </div>
-          <div className="text-xs font-normal opacity-80 font-mono-numeric">
-            N={row.nResponses}
-          </div>
+          <div className="text-xs font-normal opacity-80 font-mono-numeric">N={row.nResponses}</div>
         </td>
         <td
           colSpan={COPSOQ_DIMENSIONS.length}
@@ -269,14 +237,7 @@ function HeatRow({
             </td>
           );
         }
-        return (
-          <ScoreCell
-            key={d.code}
-            dimName={d.namePtBr}
-            gheName={row.deptName}
-            dr={dr}
-          />
-        );
+        return <ScoreCell key={d.code} dimName={d.namePtBr} gheName={row.deptName} dr={dr} />;
       })}
     </tr>
   );
@@ -291,18 +252,17 @@ function HeatMap({ heatmap }: { heatmap: DashboardData["heatmap"] }) {
           Mapa de calor — GHE × Dimensão
         </h2>
         <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-          Cores verde → amarelo → vermelho indicam risco crescente (0 a 100).
-          GHEs com menos de 5 respostas são exibidas como inelegíveis (RB-03).
-          Ícone <AlertTriangle className="inline h-3 w-3" aria-hidden="true" />{" "}
-          indica baixa confiabilidade (α &lt; 0,5).
+          Cores verde → amarelo → vermelho indicam risco crescente (0 a 100). GHEs com menos de 5
+          respostas são exibidas como inelegíveis (RB-03). Ícone{" "}
+          <AlertTriangle className="inline h-3 w-3" aria-hidden="true" /> indica baixa
+          confiabilidade (α &lt; 0,5).
         </p>
       </div>
       <div className="max-h-[28rem] overflow-auto scroll-area rounded-md border border-border">
-        <table className="w-full text-sm border-collapse" role="grid">
+        <table className="w-full text-sm border-collapse">
           <caption className="sr-only">
-            Mapa de calor dos escores de risco por GHE (linha) e dimensão
-            psicossocial D1 a D11 (coluna). GHEs inelegíveis apresentam menos
-            de 5 respostas.
+            Mapa de calor dos escores de risco por GHE (linha) e dimensão psicossocial D1 a D11
+            (coluna). GHEs inelegíveis apresentam menos de 5 respostas.
           </caption>
           <thead className="sticky top-0 z-20">
             <tr>
@@ -361,17 +321,10 @@ function HeatMap({ heatmap }: { heatmap: DashboardData["heatmap"] }) {
 
 // ─── CompanyAvgBars ─────────────────────────────────────────────────────────
 
-function CompanyAvgBars({
-  companyAvg,
-}: {
-  companyAvg: DashboardData["companyAvg"];
-}) {
+function CompanyAvgBars({ companyAvg }: { companyAvg: DashboardData["companyAvg"] }) {
   const sorted = useMemo(
-    () =>
-      [...companyAvg].sort(
-        (a, b) => b.weightedAvgRiskScore - a.weightedAvgRiskScore
-      ),
-    [companyAvg]
+    () => [...companyAvg].sort((a, b) => b.weightedAvgRiskScore - a.weightedAvgRiskScore),
+    [companyAvg],
   );
 
   return (
@@ -382,8 +335,8 @@ function CompanyAvgBars({
           Média da empresa por dimensão
         </h2>
         <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-          Escore médio ponderado por número de respondentes em GHEs elegíveis.
-          Ordenado decrescente. Linhas de referência em 33 (médio) e 66 (alto).
+          Escore médio ponderado por número de respondentes em GHEs elegíveis. Ordenado decrescente.
+          Linhas de referência em 33 (médio) e 66 (alto).
         </p>
       </div>
       <div className="space-y-2.5">
@@ -412,22 +365,22 @@ function CompanyAvgBars({
             item.riskLevel === "HIGH"
               ? "var(--risk-high)"
               : item.riskLevel === "MEDIUM"
-              ? "var(--risk-medium)"
-              : "var(--risk-low)";
+                ? "var(--risk-medium)"
+                : "var(--risk-low)";
           const width = Math.max(2, Math.min(100, item.weightedAvgRiskScore));
           const ariaLabel = `${item.code} ${dim.namePtBr}: risco ${item.weightedAvgRiskScore.toFixed(0)} de 100, classificação ${RISK_LEVEL_LABELS[item.riskLevel]}`;
           const RiskIcon =
             item.riskLevel === "HIGH"
               ? AlertTriangle
               : item.riskLevel === "MEDIUM"
-              ? AlertCircle
-              : ShieldCheck;
+                ? AlertCircle
+                : ShieldCheck;
           const riskIconClass =
             item.riskLevel === "HIGH"
               ? "text-[var(--risk-high)]"
               : item.riskLevel === "MEDIUM"
-              ? "text-[var(--risk-medium)]"
-              : "text-[var(--risk-low)]";
+                ? "text-[var(--risk-medium)]"
+                : "text-[var(--risk-low)]";
           return (
             <div
               key={item.code}
@@ -443,9 +396,7 @@ function CompanyAvgBars({
                 >
                   {item.code}
                 </Badge>
-                <span className="text-foreground truncate min-w-0">
-                  {dim.namePtBr}
-                </span>
+                <span className="text-foreground truncate min-w-0">{dim.namePtBr}</span>
               </div>
               <div
                 className="relative h-7 rounded-md bg-[var(--surface)] overflow-hidden"
@@ -511,10 +462,7 @@ function CompanyAvgBars({
           {RISK_LEVEL_LABELS.HIGH}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <span
-            className="inline-block w-px h-3 bg-foreground/40"
-            aria-hidden="true"
-          />
+          <span className="inline-block w-px h-3 bg-foreground/40" aria-hidden="true" />
           <span>refs. 33 / 66</span>
         </div>
       </div>
@@ -544,7 +492,7 @@ function CriticalDimensionsTable({
 
   const sorted = useMemo(
     () => [...critical].sort((a, b) => b.avgRiskScore - a.avgRiskScore),
-    [critical]
+    [critical],
   );
 
   if (sorted.length === 0) {
@@ -592,16 +540,12 @@ function CriticalDimensionsTable({
           Dimensões críticas
         </h2>
         <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-          Dimensões com classificação HIGH na média da empresa. Priorize a
-          elaboração de inventário de fatores de risco e ações de melhoria das
-          condições de trabalho.
+          Dimensões com classificação HIGH na média da empresa. Priorize a elaboração de inventário
+          de fatores de risco e ações de melhoria das condições de trabalho.
         </p>
       </div>
       <div className="mb-3 flex items-center gap-2 rounded-md border border-[var(--risk-high)]/30 bg-[var(--surface)] px-3 py-2 text-sm">
-        <AlertTriangle
-          className="h-4 w-4 shrink-0 text-[var(--risk-high)]"
-          aria-hidden="true"
-        />
+        <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--risk-high)]" aria-hidden="true" />
         <span className="font-medium text-[var(--risk-high)]">
           Atenção: dimensões críticas identificadas
         </span>
@@ -633,9 +577,7 @@ function CriticalDimensionsTable({
               return (
                 <TableRow key={c.code} className="border-b border-border">
                   <TableCell className="py-3">
-                    <div className="font-display font-medium text-foreground">
-                      {c.name}
-                    </div>
+                    <div className="font-display font-medium text-foreground">{c.name}</div>
                     <div className="text-xs text-muted-foreground font-mono-numeric">
                       {c.code} · {dim.groupName}
                     </div>
@@ -707,21 +649,14 @@ function CriticalDimensionsTable({
 
 // ─── DimensionRadar ─────────────────────────────────────────────────────────
 
-function DimensionRadar({
-  companyAvg,
-}: {
-  companyAvg: DashboardData["companyAvg"];
-}) {
+function DimensionRadar({ companyAvg }: { companyAvg: DashboardData["companyAvg"] }) {
   const CX = 200;
   const CY = 200;
   const R_MAX = 150;
   const N = COPSOQ_DIMENSIONS.length;
 
   const scoreMap = useMemo(() => {
-    const m = new Map<
-      DimensionCode,
-      { score: number; riskLevel: RiskLevel }
-    >();
+    const m = new Map<DimensionCode, { score: number; riskLevel: RiskLevel }>();
     for (const item of companyAvg) {
       m.set(item.code, {
         score: item.weightedAvgRiskScore,
@@ -744,9 +679,7 @@ function DimensionRadar({
     return { dim: d, i, score, riskLevel, ...pointFor(i, score) };
   });
 
-  const polygonPoints = points
-    .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(" ");
+  const polygonPoints = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 
   const rings = [25, 50, 75, 100];
   const labelR = R_MAX + 18;
@@ -755,8 +688,8 @@ function DimensionRadar({
     level === "HIGH"
       ? "var(--risk-high)"
       : level === "MEDIUM"
-      ? "var(--risk-medium)"
-      : "var(--risk-low)";
+        ? "var(--risk-medium)"
+        : "var(--risk-low)";
 
   const ariaSummary =
     `Perfil psicossocial da empresa — radar de 11 dimensões COPSOQ II-BR ` +
@@ -765,7 +698,7 @@ function DimensionRadar({
         (p) =>
           `${p.dim.code} ${p.dim.namePtBr}: ${p.score.toFixed(0)} (${
             RISK_LEVEL_LABELS[p.riskLevel]
-          })`
+          })`,
       )
       .join("; ")}.`;
 
@@ -777,8 +710,8 @@ function DimensionRadar({
           Perfil psicossocial da empresa
         </h2>
         <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-          Distribuição do risco médio por dimensão COPSOQ II-BR (média ponderada
-          entre GHEs elegíveis).
+          Distribuição do risco médio por dimensão COPSOQ II-BR (média ponderada entre GHEs
+          elegíveis).
         </p>
       </div>
       <svg
@@ -886,13 +819,7 @@ function DimensionRadar({
         ))}
 
         {/* Center marker */}
-        <circle
-          cx={CX}
-          cy={CY}
-          r={1.5}
-          fill="var(--muted-foreground)"
-          opacity={0.5}
-        />
+        <circle cx={CX} cy={CY} r={1.5} fill="var(--muted-foreground)" opacity={0.5} />
       </svg>
 
       {/* Legend */}
@@ -935,8 +862,7 @@ function DimensionRadar({
       <div className="sr-only">
         <table>
           <caption>
-            Tabela alternativa ao radar: escore de risco médio ponderado por
-            dimensão COPSOQ II-BR.
+            Tabela alternativa ao radar: escore de risco médio ponderado por dimensão COPSOQ II-BR.
           </caption>
           <thead>
             <tr>
@@ -966,16 +892,9 @@ function DimensionRadar({
 
 // ─── DimensionDetailRows ────────────────────────────────────────────────────
 
-function DimensionDetailRows({
-  companyAvg,
-}: {
-  companyAvg: DashboardData["companyAvg"];
-}) {
+function DimensionDetailRows({ companyAvg }: { companyAvg: DashboardData["companyAvg"] }) {
   const scoreMap = useMemo(() => {
-    const m = new Map<
-      DimensionCode,
-      { score: number; riskLevel: RiskLevel }
-    >();
+    const m = new Map<DimensionCode, { score: number; riskLevel: RiskLevel }>();
     for (const item of companyAvg) {
       m.set(item.code, {
         score: item.weightedAvgRiskScore,
@@ -989,15 +908,15 @@ function DimensionDetailRows({
     level === "HIGH"
       ? "var(--risk-high)"
       : level === "MEDIUM"
-      ? "var(--risk-medium)"
-      : "var(--risk-low)";
+        ? "var(--risk-medium)"
+        : "var(--risk-low)";
 
   const riskTextClass = (level: RiskLevel) =>
     level === "HIGH"
       ? "text-[var(--risk-high)]"
       : level === "MEDIUM"
-      ? "text-[var(--risk-medium)]"
-      : "text-[var(--risk-low)]";
+        ? "text-[var(--risk-medium)]"
+        : "text-[var(--risk-low)]";
 
   return (
     <section aria-label="Detalhamento por dimensão" className="border-b border-border pb-8">
@@ -1024,10 +943,7 @@ function DimensionDetailRows({
             >
               {/* Left: code badge + risk dot */}
               <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="font-mono-numeric text-xs px-2"
-                >
+                <Badge variant="outline" className="font-mono-numeric text-xs px-2">
                   {d.code}
                 </Badge>
                 <span
@@ -1102,10 +1018,9 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
   const cycles = useMemo(
     () =>
       [...(trend ?? [])].sort(
-        (a, b) =>
-          new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime()
+        (a, b) => new Date(a.completedAt).getTime() - new Date(b.completedAt).getTime(),
       ),
-    [trend]
+    [trend],
   );
 
   if (cycles.length < 2) {
@@ -1121,8 +1036,7 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
             Evolução temporal
           </h2>
           <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-            Comparação de ciclos de avaliação concluídos por dimensão
-            psicossocial.
+            Comparação de ciclos de avaliação concluídos por dimensão psicossocial.
           </p>
         </div>
         <div className="flex flex-col items-center justify-center text-center py-10 gap-3 border border-dashed border-border rounded-lg">
@@ -1159,7 +1073,7 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
               x: xScale(i),
               y: yScale(s),
               score: s,
-            }
+            },
       )
       .filter((p): p is { x: number; y: number; score: number } => p !== null);
     return {
@@ -1182,9 +1096,8 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
           Evolução temporal por dimensão
         </h2>
         <p className="text-sm text-muted-foreground mt-1 max-w-3xl">
-          Escore médio de risco (0–100) por dimensão psicossocial ao longo dos
-          ciclos de avaliação concluídos. Linhas tracejadas marcam os limiares
-          de risco médio (33) e alto (66).
+          Escore médio de risco (0–100) por dimensão psicossocial ao longo dos ciclos de avaliação
+          concluídos. Linhas tracejadas marcam os limiares de risco médio (33) e alto (66).
         </p>
       </div>
       <div className="overflow-x-auto scroll-area">
@@ -1195,7 +1108,9 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
           role="img"
           aria-label={`Gráfico de evolução temporal: ${cycles.length} ciclos concluídos (${cycles
             .map((c) => fmtShortDate(c.completedAt))
-            .join(", ")}), ${lines.length} dimensões psicossociais. Eixo Y: escore de risco 0 a 100.`}
+            .join(
+              ", ",
+            )}), ${lines.length} dimensões psicossociais. Eixo Y: escore de risco 0 a 100.`}
         >
           {/* Y-axis */}
           <line
@@ -1293,9 +1208,7 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
           {lines.map((line) => {
             if (line.svgPoints.length < 2) return null;
             const path = line.svgPoints
-              .map((p, i) =>
-                `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`
-              )
+              .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
               .join(" ");
             return (
               <g key={line.code}>
@@ -1309,7 +1222,7 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
                 />
                 {line.svgPoints.map((p, i) => (
                   <circle
-                    key={i}
+                    key={`pt-${i}`}
                     cx={p.x}
                     cy={p.y}
                     r={3}
@@ -1339,18 +1252,13 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
       {/* Legend */}
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5">
         {lines.map((line) => (
-          <div
-            key={line.code}
-            className="flex items-center gap-2 text-xs min-w-0"
-          >
+          <div key={line.code} className="flex items-center gap-2 text-xs min-w-0">
             <span
               className="inline-block w-3 h-0.5 shrink-0"
               style={{ backgroundColor: line.color }}
               aria-hidden="true"
             />
-            <span className="font-mono-numeric text-muted-foreground shrink-0">
-              {line.code}
-            </span>
+            <span className="font-mono-numeric text-muted-foreground shrink-0">{line.code}</span>
             <span className="truncate" title={line.name}>
               {line.name}
             </span>
@@ -1361,10 +1269,7 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
       {/* sr-only data table alternative */}
       <div className="sr-only">
         <table>
-          <caption>
-            Tabela alternativa ao gráfico: escore de risco por dimensão e
-            ciclo.
-          </caption>
+          <caption>Tabela alternativa ao gráfico: escore de risco por dimensão e ciclo.</caption>
           <thead>
             <tr>
               <th scope="col">Dimensão</th>
@@ -1382,7 +1287,7 @@ function CycleComparisonChart({ trend }: { trend: CycleTrend[] | null | undefine
                   {line.code} {line.name}
                 </th>
                 {line.scores.map((s, i) => (
-                  <td key={i}>{s === null ? "—" : s.toFixed(0)}</td>
+                  <td key={`s-${i}`}>{s === null ? "—" : s.toFixed(0)}</td>
                 ))}
               </tr>
             ))}
@@ -1402,7 +1307,7 @@ function ResultadosSkeleton() {
       <div className="bg-[var(--surface)] rounded-lg p-5">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-3 first:pl-0 last:pr-0">
+            <div key={`skel-${i}`} className="px-3 first:pl-0 last:pr-0">
               <Skeleton className="h-2.5 w-20" />
               <Skeleton className="h-7 w-10 mt-2" />
               <Skeleton className="h-2.5 w-24 mt-1.5" />
@@ -1421,17 +1326,17 @@ function ResultadosSkeleton() {
           <div className="flex border-b border-border bg-[var(--surface)]">
             <Skeleton className="h-9 flex-1 m-2" />
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-14 m-2" />
+              <Skeleton key={`skel-h-${i}`} className="h-9 w-14 m-2" />
             ))}
           </div>
           {Array.from({ length: 5 }).map((_, r) => (
-            <div key={r} className="flex border-b border-border last:border-b-0">
+            <div key={`skel-r-${r}`} className="flex border-b border-border last:border-b-0">
               <div className="flex-1 flex items-center gap-2 p-2">
                 <Skeleton className="h-2 w-2 rounded-full" />
                 <Skeleton className="h-3.5 w-24" />
               </div>
               {Array.from({ length: 5 }).map((_, c) => (
-                <Skeleton key={c} className="h-8 w-14 m-2 rounded-sm" />
+                <Skeleton key={`skel-c-${c}`} className="h-8 w-14 m-2 rounded-sm" />
               ))}
             </div>
           ))}
@@ -1446,7 +1351,7 @@ function ResultadosSkeleton() {
         </div>
         <div className="rounded-md border border-border divide-y divide-border">
           {Array.from({ length: 3 }).map((_, r) => (
-            <div key={r} className="flex items-center gap-4 p-4">
+            <div key={`skel-r-${r}`} className="flex items-center gap-4 p-4">
               <Skeleton className="h-3 w-10" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-48" />
@@ -1462,7 +1367,7 @@ function ResultadosSkeleton() {
       {/* Dimension detail rows skeleton — 3 stacked expandable rows */}
       <div className="space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="rounded-md border border-border p-5 space-y-3">
+          <div key={`skel-${i}`} className="rounded-md border border-border p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Skeleton className="h-3 w-10" />
@@ -1516,9 +1421,7 @@ export function ResultadosView() {
         const [d, t] = await Promise.all([
           api.assessments.dashboard(assessmentId),
           a.companyId
-            ? api.assessments.trend(a.companyId).catch(
-                () => [] as CycleTrend[]
-              )
+            ? api.assessments.trend(a.companyId).catch(() => [] as CycleTrend[])
             : Promise.resolve([] as CycleTrend[]),
         ]);
         if (cancelled) return;
@@ -1535,9 +1438,7 @@ export function ResultadosView() {
           return;
         }
         const msg =
-          e instanceof ApiError
-            ? e.message
-            : "Erro inesperado ao carregar os resultados.";
+          e instanceof ApiError ? e.message : "Erro inesperado ao carregar os resultados.";
         setError(msg);
         setDashboard(null);
         setTrend(null);
@@ -1550,7 +1451,7 @@ export function ResultadosView() {
     return () => {
       cancelled = true;
     };
-  }, [assessmentId, refreshKey]);
+  }, [assessmentId]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -1563,12 +1464,9 @@ export function ResultadosView() {
             <BarChart3 className="h-6 w-6 text-muted-foreground" />
           </div>
           <div className="space-y-1">
-            <h2 className="font-display text-lg text-foreground">
-              Nenhuma avaliação selecionada
-            </h2>
+            <h2 className="font-display text-lg text-foreground">Nenhuma avaliação selecionada</h2>
             <p className="text-sm text-muted-foreground max-w-md">
-              Acesse uma avaliação concluída para visualizar os resultados
-              consolidados.
+              Acesse uma avaliação concluída para visualizar os resultados consolidados.
             </p>
           </div>
           <Button onClick={() => go("painel")}>
@@ -1583,10 +1481,10 @@ export function ResultadosView() {
   const subtitle = loading
     ? "Carregando…"
     : assessment
-    ? assessment.title
-    : error
-    ? "Resultado"
-    : "—";
+      ? assessment.title
+      : error
+        ? "Resultado"
+        : "—";
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
@@ -1611,10 +1509,9 @@ export function ResultadosView() {
                 {subtitle}
               </p>
               <p className="text-xs text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
-                Linguagem não-clínica: usa &ldquo;fator de risco&rdquo;,
-                &ldquo;dimensão psicossocial&rdquo; e &ldquo;condições de
-                trabalho&rdquo; (nunca &ldquo;diagnóstico&rdquo;,
-                &ldquo;transtorno&rdquo; ou &ldquo;doença&rdquo;).
+                Linguagem não-clínica: usa &ldquo;fator de risco&rdquo;, &ldquo;dimensão
+                psicossocial&rdquo; e &ldquo;condições de trabalho&rdquo; (nunca
+                &ldquo;diagnóstico&rdquo;, &ldquo;transtorno&rdquo; ou &ldquo;doença&rdquo;).
               </p>
             </div>
           </div>
@@ -1646,10 +1543,7 @@ export function ResultadosView() {
               <p className="text-sm text-muted-foreground max-w-md">{error}</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
-              <Button
-                variant="outline"
-                onClick={() => go("avaliacao", { assessmentId })}
-              >
+              <Button variant="outline" onClick={() => go("avaliacao", { assessmentId })}>
                 <ChevronLeft className="h-4 w-4" />
                 Voltar à avaliação
               </Button>
@@ -1665,12 +1559,10 @@ export function ResultadosView() {
               <Lock className="h-6 w-6 text-[var(--risk-medium)]" />
             </div>
             <div className="space-y-1">
-              <h2 className="font-display text-lg text-foreground">
-                Avaliação não concluída
-              </h2>
+              <h2 className="font-display text-lg text-foreground">Avaliação não concluída</h2>
               <p className="text-sm text-muted-foreground max-w-md">
-                Esta avaliação ainda não foi concluída. Encerre a coleta para
-                visualizar os resultados.
+                Esta avaliação ainda não foi concluída. Encerre a coleta para visualizar os
+                resultados.
               </p>
             </div>
             <Button onClick={() => go("avaliacao", { assessmentId })}>

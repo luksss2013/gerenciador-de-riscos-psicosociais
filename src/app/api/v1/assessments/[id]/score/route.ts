@@ -1,12 +1,12 @@
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
+import { runScoring } from "@/lib/scoring-service";
 import {
   errorJson,
   jsonResponse,
   requireProfessional,
   requireTenantOwnership,
 } from "@/lib/session";
-import { runScoring } from "@/lib/scoring-service";
 
 interface RouteCtx {
   params: Promise<{ id: string }>;

@@ -1,12 +1,12 @@
+import { COPSOQ_DIMENSIONS, type DimensionCode } from "@/lib/copsoq-data";
 import { db } from "@/lib/db";
 import { ERROR_CODES } from "@/lib/errors";
-import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 import {
-  companyWeightedAverage,
-  DimensionScoreResult,
   classifyRiskScore,
+  companyWeightedAverage,
+  type DimensionScoreResult,
 } from "@/lib/scoring";
-import { COPSOQ_DIMENSIONS, DimensionCode } from "@/lib/copsoq-data";
+import { errorJson, jsonResponse, requireProfessional } from "@/lib/session";
 
 // Per-company breakdown for the cross-company consolidated analytics view.
 //
@@ -66,10 +66,7 @@ export async function GET() {
         createdAt: Date;
       } | null = null;
       for (const a of companyAssessments) {
-        if (
-          !lastAssessment ||
-          a.createdAt.getTime() > lastAssessment.createdAt.getTime()
-        ) {
+        if (!lastAssessment || a.createdAt.getTime() > lastAssessment.createdAt.getTime()) {
           lastAssessment = {
             status: a.status,
             completedAt: a.completedAt,
@@ -132,8 +129,7 @@ export async function GET() {
       });
 
       const overallRiskScore = dimensions.length
-        ? dimensions.reduce((s, d) => s + d.weightedAvgRiskScore, 0) /
-          dimensions.length
+        ? dimensions.reduce((s, d) => s + d.weightedAvgRiskScore, 0) / dimensions.length
         : 0;
       const overallRiskLevel = classifyRiskScore(overallRiskScore);
 

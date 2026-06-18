@@ -16,13 +16,13 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     const professional = await requireProfessional();
     const { id, deptId } = await params;
     const company = await db.company.findUnique({ where: { id } });
-    if (!company || !company.isActive) {
+    if (!company?.isActive) {
       return errorJson(ERROR_CODES.COMPANY_NOT_FOUND, "Company not found");
     }
     await requireTenantOwnership(company.professionalId, professional.id);
 
     const dept = await db.department.findUnique({ where: { id: deptId } });
-    if (!dept || !dept.isActive || dept.companyId !== company.id) {
+    if (!dept?.isActive || dept.companyId !== company.id) {
       return errorJson(ERROR_CODES.NOT_FOUND, "Department not found");
     }
 
@@ -47,7 +47,10 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
           where: { companyId_name: { companyId: company.id, name: newName } },
         });
         if (dup) {
-          return errorJson(ERROR_CODES.DEPARTMENT_NAME_DUPLICATE, "Department name already used in this company");
+          return errorJson(
+            ERROR_CODES.DEPARTMENT_NAME_DUPLICATE,
+            "Department name already used in this company",
+          );
         }
       }
       data.name = newName;
@@ -70,15 +73,17 @@ export async function PATCH(request: Request, { params }: RouteCtx) {
     }
 
     const updated = await db.department.update({ where: { id: dept.id }, data });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "department.update",
-        resourceType: "department",
-        resourceId: updated.id,
-        metadataJson: JSON.stringify({ fields: Object.keys(body) }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "department.update",
+          resourceType: "department",
+          resourceId: updated.id,
+          metadataJson: JSON.stringify({ fields: Object.keys(body) }),
+        },
+      })
+      .catch(() => {});
     return jsonResponse({
       id: updated.id,
       companyId: updated.companyId,
@@ -128,20 +133,22 @@ export async function DELETE(_request: Request, { params }: RouteCtx) {
     if (activeAssessmentDept) {
       return errorJson(
         ERROR_CODES.DEPARTMENT_HAS_ACTIVE_ASSESSMENT,
-        "Department has active assessment; close or wait before deletion"
+        "Department has active assessment; close or wait before deletion",
       );
     }
 
     await db.department.update({ where: { id: dept.id }, data: { isActive: false } });
-    db.auditLog.create({
-      data: {
-        professionalId: professional.id,
-        action: "department.delete",
-        resourceType: "department",
-        resourceId: dept.id,
-        metadataJson: JSON.stringify({ name: dept.name }),
-      },
-    }).catch(() => {});
+    db.auditLog
+      .create({
+        data: {
+          professionalId: professional.id,
+          action: "department.delete",
+          resourceType: "department",
+          resourceId: dept.id,
+          metadataJson: JSON.stringify({ name: dept.name }),
+        },
+      })
+      .catch(() => {});
     return jsonResponse({ ok: true });
   } catch (e) {
     const code = (e as { code?: string })?.code;
