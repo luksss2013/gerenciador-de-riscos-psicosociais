@@ -5,6 +5,7 @@
 // Password hashing via Web Crypto PBKDF2 (no external bcrypt dep).
 
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { db } from "./db";
 import { ApiError, ERROR_CODES, errorResponse, HTTP_STATUS } from "./errors";
 
@@ -43,7 +44,7 @@ export async function clearSessionCookie(token: string): Promise<void> {
   }
 }
 
-export async function getCurrentProfessional() {
+export const getCurrentProfessional = cache(async () => {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -62,13 +63,13 @@ export async function getCurrentProfessional() {
   });
   if (!professional) return null;
   return professional;
-}
+});
 
-export async function requireProfessional() {
+export const requireProfessional = cache(async () => {
   const p = await getCurrentProfessional();
   if (!p) throw new ApiError(ERROR_CODES.UNAUTHORIZED, "Session required");
   return p;
-}
+});
 
 export async function requireTenantOwnership(resourceProfessionalId: string, currentId: string) {
   if (resourceProfessionalId !== currentId) {
