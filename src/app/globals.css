@@ -60,6 +60,9 @@
 :root {
   --radius: 0.5rem;
 
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
   /* ─── NR-1 Copsoq — Clinical-institutional, warm-editorial identity ─── */
   /* Primary: deep pine (institutional calm + health/well-being) */
   --brand: #2f4a43;
@@ -182,20 +185,22 @@
    Border-color + bg shift only, no transform/shadow. */
 .surface-hover {
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+    background-color 0.15s var(--ease-out),
+    border-color 0.15s var(--ease-out);
 }
-.surface-hover:hover {
-  background-color: var(--surface);
-  border-color: color-mix(in srgb, var(--brand-light) 40%, var(--border));
+@media (hover: hover) and (pointer: fine) {
+  .surface-hover:hover {
+    background-color: var(--surface);
+    border-color: color-mix(in srgb, var(--brand-light) 40%, var(--border));
+  }
 }
 
 /* Kept for backward-compat with existing component references —
    now a no-op alias so old markup doesn't break. */
 .card-hover {
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+    background-color 0.15s var(--ease-out),
+    border-color 0.15s var(--ease-out);
 }
 
 /* Animated ring for adesão */
@@ -208,7 +213,7 @@
   }
 }
 .ring-progress {
-  animation: ring-fill 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: ring-fill 0.9s var(--ease-out) forwards;
 }
 
 /* Skeleton shimmer — warm-stone gradient sweep, no flat gray */
@@ -228,7 +233,7 @@
     var(--surface) 75%
   );
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  animation: skeleton-shimmer 1.5s linear infinite;
 }
 
 /* Focus ring polish */

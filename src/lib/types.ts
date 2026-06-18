@@ -187,7 +187,7 @@ export interface ActionItem {
 }
 
 export interface ActionPlan {
-  id: string;
+  id: string | null;
   actionItems: ActionItem[];
 }
 

@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import * as React from "react";
+import { useEffect, useState } from "react";
 import { ConfiguracoesView } from "@/components/configuracoes/configuracoes-view";
 import { PainelView } from "@/components/painel/painel-view";
 import { BreadcrumbBar } from "@/components/shell/breadcrumb-bar";
@@ -221,11 +222,13 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
 // ─── Footer ─────────────────────────────────────────────────────────────────
 
 function AppFooter() {
+  const [year, setYear] = useState(new Date().getFullYear());
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+
   return (
-    <footer
-      className="mt-auto bg-[var(--surface)] text-muted-foreground border-t border-border"
-      role="contentinfo"
-    >
+    <footer className="mt-auto bg-[var(--surface)] text-muted-foreground border-t border-border">
       <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-3.5 w-3.5 text-[var(--brand)]" />
@@ -234,7 +237,7 @@ function AppFooter() {
           <span>COPSOQ II-BR (CC BY-NC-ND 4.0) · Conforme NR-1 / Portaria MTE 1.419/2024</span>
         </div>
         <div className="opacity-70">
-          © {new Date().getFullYear()} · Dados do trabalhador anonimizados por design (LGPD)
+          © {year} · Dados do trabalhador anonimizados por design (LGPD)
         </div>
       </div>
     </footer>

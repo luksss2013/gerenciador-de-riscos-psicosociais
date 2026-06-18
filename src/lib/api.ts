@@ -249,6 +249,8 @@ export const api = {
 
   actionPlan: {
     get: (assessmentId: string) => req<ActionPlan>(`/assessments/${assessmentId}/action-plan`),
+    create: (assessmentId: string) =>
+      req<ActionPlan>(`/assessments/${assessmentId}/action-plan`, { method: "POST" }),
     addItem: (assessmentId: string, body: Record<string, unknown>) =>
       req<ActionItem>(`/assessments/${assessmentId}/action-items`, { method: "POST", json: body }),
     updateItem: (itemId: string, body: Record<string, unknown>) =>

@@ -27,72 +27,90 @@ export async function GET(request: Request) {
 
     const pid = professional.id;
 
-    // Companies: name or CNPJ (formatted or raw)
-    const companiesRaw = await db.company.findMany({
-      where: {
-        professionalId: pid,
-        isActive: true,
-        OR: [
-          { name: { contains: q } },
-          { cnpj: { contains: q } },
-          { cnaePrimary: { contains: q } },
-          { city: { contains: q } },
-          { state: { contains: q } },
-        ],
-      },
-      take: 5,
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, cnpj: true, city: true, state: true },
-    });
-
-    // Departments: name (scoped to professional's companies)
-    const departmentsRaw = await db.department.findMany({
-      where: {
-        isActive: true,
-        company: { professionalId: pid, isActive: true },
-        OR: [{ name: { contains: q } }, { description: { contains: q } }],
-      },
-      take: 5,
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        workerCount: true,
-        company: { select: { id: true, name: true } },
-      },
-    });
-
-    // Assessments: title
-    const assessmentsRaw = await db.assessment.findMany({
-      where: {
-        professionalId: pid,
-        title: { contains: q },
-      },
-      take: 5,
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        company: { select: { id: true, name: true } },
-      },
-    });
-
-    // Action items: what / who
-    const actionItemsRaw = await db.actionItem.findMany({
-      where: {
-        actionPlan: { assessment: { professionalId: pid } },
-        OR: [{ what: { contains: q } }, { who: { contains: q } }, { why: { contains: q } }],
-      },
-      take: 5,
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        what: true,
-        status: true,
-        whenDate: true,
-        actionPlan: {
+    const [companiesRaw, departmentsRaw, assessmentsRaw, actionItemsRaw, inventoryItemsRaw] =
+      await Promise.all([
+        db.company.findMany({
+          where: {
+            professionalId: pid,
+            isActive: true,
+            OR: [
+              { name: { contains: q } },
+              { cnpj: { contains: q } },
+              { cnaePrimary: { contains: q } },
+              { city: { contains: q } },
+              { state: { contains: q } },
+            ],
+          },
+          take: 5,
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, cnpj: true, city: true, state: true },
+        }),
+        db.department.findMany({
+          where: {
+            isActive: true,
+            company: { professionalId: pid, isActive: true },
+            OR: [{ name: { contains: q } }, { description: { contains: q } }],
+          },
+          take: 5,
+          orderBy: { name: "asc" },
           select: {
+            id: true,
+            name: true,
+            workerCount: true,
+            company: { select: { id: true, name: true } },
+          },
+        }),
+        db.assessment.findMany({
+          where: {
+            professionalId: pid,
+            title: { contains: q },
+          },
+          take: 5,
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            company: { select: { id: true, name: true } },
+          },
+        }),
+        db.actionItem.findMany({
+          where: {
+            actionPlan: { assessment: { professionalId: pid } },
+            OR: [{ what: { contains: q } }, { who: { contains: q } }, { why: { contains: q } }],
+          },
+          take: 5,
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            what: true,
+            status: true,
+            whenDate: true,
+            actionPlan: {
+              select: {
+                assessment: {
+                  select: {
+                    id: true,
+                    title: true,
+                    company: { select: { id: true, name: true } },
+                  },
+                },
+              },
+            },
+          },
+        }),
+        db.riskInventoryItem.findMany({
+          where: {
+            assessment: { professionalId: pid },
+            OR: [{ hazardDescription: { contains: q } }, { possibleHarms: { contains: q } }],
+          },
+          take: 5,
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            hazardDescription: true,
+            mteFactorCode: true,
+            dimensionCode: true,
             assessment: {
               select: {
                 id: true,
@@ -101,32 +119,8 @@ export async function GET(request: Request) {
               },
             },
           },
-        },
-      },
-    });
-
-    // Risk inventory items: hazardDescription / possibleHarms
-    const inventoryItemsRaw = await db.riskInventoryItem.findMany({
-      where: {
-        assessment: { professionalId: pid },
-        OR: [{ hazardDescription: { contains: q } }, { possibleHarms: { contains: q } }],
-      },
-      take: 5,
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        hazardDescription: true,
-        mteFactorCode: true,
-        dimensionCode: true,
-        assessment: {
-          select: {
-            id: true,
-            title: true,
-            company: { select: { id: true, name: true } },
-          },
-        },
-      },
-    });
+        }),
+      ]);
 
     return jsonResponse({
       companies: companiesRaw.map((c) => ({

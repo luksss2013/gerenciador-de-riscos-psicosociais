@@ -145,17 +145,14 @@ export function GlobalSearch() {
       {/* Mobile: just a search icon that opens the same popover */}
       <button
         type="button"
-        onClick={() => {
-          setOpen(true);
-          setTimeout(() => inputRef.current?.focus(), 50);
-        }}
+        onClick={() => setOpen(true)}
         className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-md hover:bg-[var(--surface)] cursor-pointer"
         aria-label="Buscar"
       >
         <Search className="h-4 w-4" />
       </button>
       <PopoverContent
-        className="w-[95vw] max-w-2xl p-0"
+        className="w-[95vw] max-w-2xl p-0 data-[state=open]:animate-none data-[state=closed]:animate-none"
         align="center"
         onOpenAutoFocus={(e) => {
           e.preventDefault();

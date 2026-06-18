@@ -49,6 +49,19 @@ function serializeItem(i: {
   };
 }
 
+async function getPlan(assessmentId: string) {
+  const plan = await db.actionPlan.findUnique({
+    where: { assessmentId },
+    include: {
+      items: {
+        include: { department: { select: { name: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  return plan;
+}
+
 export async function GET(_request: Request, { params }: RouteCtx) {
   try {
     const professional = await requireProfessional();
@@ -59,16 +72,42 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     }
     await requireTenantOwnership(assessment.professionalId, professional.id);
 
-    // Get-or-create ActionPlan (idempotent)
-    let plan = await db.actionPlan.findUnique({
-      where: { assessmentId: assessment.id },
-      include: {
-        items: {
-          include: { department: { select: { name: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
+    const plan = await getPlan(assessment.id);
+    if (!plan) {
+      return jsonResponse({ id: null, assessmentId: id, actionItems: [] });
+    }
+
+    return jsonResponse({
+      id: plan.id,
+      assessmentId: plan.assessmentId,
+      actionItems: plan.items.map(serializeItem),
+      createdAt: plan.createdAt,
+      updatedAt: plan.updatedAt,
     });
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === ERROR_CODES.UNAUTHORIZED) {
+      return errorJson(ERROR_CODES.UNAUTHORIZED, "Session required");
+    }
+    if (code === ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS) {
+      return errorJson(ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS, "Cross-tenant access denied");
+    }
+    console.error("[action-plan GET]", e);
+    return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
+  }
+}
+
+export async function POST(_request: Request, { params }: RouteCtx) {
+  try {
+    const professional = await requireProfessional();
+    const { id } = await params;
+    const assessment = await db.assessment.findUnique({ where: { id } });
+    if (!assessment) {
+      return errorJson(ERROR_CODES.NOT_FOUND, "Assessment not found");
+    }
+    await requireTenantOwnership(assessment.professionalId, professional.id);
+
+    let plan = await getPlan(assessment.id);
     if (!plan) {
       plan = await db.actionPlan.create({
         data: { assessmentId: assessment.id },
@@ -93,7 +132,7 @@ export async function GET(_request: Request, { params }: RouteCtx) {
     if (code === ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS) {
       return errorJson(ERROR_CODES.UNAUTHORIZED_TENANT_ACCESS, "Cross-tenant access denied");
     }
-    console.error("[action-plan GET]", e);
+    console.error("[action-plan POST]", e);
     return errorJson(ERROR_CODES.INTERNAL_ERROR, "Internal error");
   }
 }

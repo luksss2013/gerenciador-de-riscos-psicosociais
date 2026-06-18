@@ -6,8 +6,10 @@ const db = new PrismaClient();
 async function main() {
   console.log("🌱 Starting seed...");
 
-  const itemCount = await db.copsoqItem.count();
-  const dimCount = await db.copsoqDimension.count();
+  const [itemCount, dimCount] = await Promise.all([
+    db.copsoqItem.count(),
+    db.copsoqDimension.count(),
+  ]);
 
   if (itemCount === 0 && dimCount === 0) {
     await db.$transaction([

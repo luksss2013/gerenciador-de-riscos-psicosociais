@@ -88,25 +88,25 @@ export function CompanyFormDialog({
   // backend error-mapping. Both render via the shared `FieldError` component.
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
 
-  // Sync form when modal opens / target changes.
+  // Reset form when modal opens / target changes.
   useEffect(() => {
     if (!open) return;
-    if (editing) {
-      setForm({
-        name: editing.name ?? "",
-        cnpj: formatCnpj(editing.cnpj),
-        cnaePrimary: editing.cnaePrimary ?? "",
-        employeeCount: editing.employeeCount != null ? String(editing.employeeCount) : "",
-        city: editing.city ?? "",
-        state: editing.state ?? "",
-        contactName: editing.contactName ?? "",
-        contactEmail: editing.contactEmail ?? "",
-        contactPhone: editing.contactPhone ?? "",
-        dpoPoc: editing.dpoPoc ?? "",
-      });
-    } else {
-      setForm(EMPTY_FORM);
-    }
+    setForm(
+      editing
+        ? {
+            name: editing.name ?? "",
+            cnpj: formatCnpj(editing.cnpj),
+            cnaePrimary: editing.cnaePrimary ?? "",
+            employeeCount: editing.employeeCount != null ? String(editing.employeeCount) : "",
+            city: editing.city ?? "",
+            state: editing.state ?? "",
+            contactName: editing.contactName ?? "",
+            contactEmail: editing.contactEmail ?? "",
+            contactPhone: editing.contactPhone ?? "",
+            dpoPoc: editing.dpoPoc ?? "",
+          }
+        : EMPTY_FORM,
+    );
     setErrors({});
   }, [open, editing]);
 

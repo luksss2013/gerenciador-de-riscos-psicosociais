@@ -1251,10 +1251,11 @@ export function PlanoView() {
       setLoading(true);
       setError(null);
       try {
-        const [plan, a] = await Promise.all([
-          api.actionPlan.get(assessmentId),
-          api.assessments.get(assessmentId),
-        ]);
+        let plan = await api.actionPlan.get(assessmentId);
+        if (!plan.id) {
+          plan = await api.actionPlan.create(assessmentId);
+        }
+        const [a] = await Promise.all([api.assessments.get(assessmentId)]);
         if (cancelled) return;
         setItems(plan.actionItems);
         setAssessment(a);
