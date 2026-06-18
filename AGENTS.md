@@ -19,7 +19,6 @@
 | Client state | **Zustand** only (view + auth) |
 | Package manager | **Bun** (lockfile: `bun.lock`) |
 | Linter + Formatter | **Biome 2.x** (`biome.json`) |
-| Spec | `upload/spec_nr1_copsoq_saas_v3.md` |
 | Architecture | `ARCHITECTURE.md` |
 | Design tokens | `DESIGN.md` |
 
@@ -32,7 +31,6 @@ file system. The worker questionnaire reuses the same route via
 
 ## 2. Key References (read once, keep in mind)
 
-*   `upload/spec_nr1_copsoq_saas_v3.md` — regulatory + product spec (NR-1 / COPSOQ II-BR).
 *   `ARCHITECTURE.md` — request lifecycle, multi-tenancy rules, API surface map.
 *   `DESIGN.md` — design tokens (CSS variable names to use, never hardcode colors).
 *   `src/lib/errors.ts` — `ERROR_CODES` + `HTTP_STATUS` map. **Always** throw via `ApiError(code, …)`; never return raw `Error.message`.
@@ -102,7 +100,6 @@ Non-negotiable. Violations break correctness, security, or compliance.
 │       ├── types.ts           # DTOs shared client/server
 │       └── utils.ts           # cn() className helper
 ├── scripts/maintenance.sh     # cron-driven: close-expired, run-pending-scoring, cleanup
-├── upload/spec_nr1_copsoq_saas_v3.md
 ├── ARCHITECTURE.md            # system architecture
 ├── DESIGN.md                  # design tokens
 ├── Caddyfile                  # production reverse proxy
@@ -113,10 +110,9 @@ Non-negotiable. Violations break correctness, security, or compliance.
 └── package.json               # scripts, deps, prisma.seed registry
 ```
 
-Top-level `db/` (contains a stale `custom.db` SQLite file) and `mini-services/`
-(empty) are **legacy artifacts from the pre-PostgreSQL build** — don't put new
-code there. `upload/` holds the spec + scratch paste buffer; don't import from
-it at runtime.
+Top-level `db/` (contains a stale `custom.db` SQLite file) and `upload/`
+(empty scratch buffer) are **legacy artifacts from the pre-PostgreSQL build** —
+don't put new code there.
 
 ---
 
@@ -258,7 +254,6 @@ A typical task:
 
 ## 10. When in Doubt
 
-*   Re-read the spec: `upload/spec_nr1_copsoq_saas_v3.md`.
 *   Check `ARCHITECTURE.md` for the data-flow question (multi-tenancy, scoring, state machine).
 *   Look at the closest neighbour component — copy the pattern, don't invent.
 *   Search for the type/error message in the repo first; the answer is usually already in `lib/errors.ts` or `lib/types.ts`.

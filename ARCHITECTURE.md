@@ -419,7 +419,5 @@ purged. There are no environment-specific assumptions outside `.env`.
 
 *   Not a tutorial. For "how do I add a feature", see `AGENTS.md` and the
     existing neighbour component.
-*   Not the spec. For the regulatory & product requirements, see
-    `spec_nr1_copsoq_saas_v3.md`.
 *   Not exhaustive. It documents the boundaries and the *why*. Inline
     code-level comments are intentionally scarce (per project rules).
