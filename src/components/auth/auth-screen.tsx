@@ -1,6 +1,7 @@
 "use client";
 
 import { Brain, ClipboardCheck, Eye, EyeOff, Loader2, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type * as React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -78,6 +79,23 @@ export function AuthScreen() {
           aria-hidden="true"
           className="hidden lg:flex flex-col justify-between p-10 xl:p-14 bg-[var(--brand)] text-[var(--accent-foreground)] relative overflow-hidden"
         >
+          {/* Subtle warm-paper grain + grid — gives depth without breaking the
+              clinical-institutional tone. Pure flat color reads as unfinished. */}
+          <div
+            className="absolute inset-0 opacity-[0.18] pointer-events-none"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 1px 1px, var(--brand-light) 1px, transparent 0)",
+              backgroundSize: "32px 32px",
+            }}
+          />
+          <div
+            className="absolute inset-0 opacity-25 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse at top right, var(--brand-light) 0%, transparent 55%)",
+            }}
+          />
           <div className="relative z-10">
             <div className="flex items-center gap-3">
               <ShieldCheck className="h-6 w-6 text-[var(--accent)]" aria-hidden />
@@ -154,6 +172,7 @@ export function AuthScreen() {
 
 function LoginForm() {
   const setProfessional = useAuth((s) => s.set);
+  const router = useRouter();
   const [form, setForm] = useState<LoginFields>({ email: "", password: "" });
   const [showPw, setShowPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -172,6 +191,7 @@ function LoginForm() {
       });
       setProfessional(professional);
       toast.success(`Bem-vindo(a), ${professional.name.split(" ")[0]}!`);
+      router.push("/painel");
     } catch (err) {
       if (err instanceof ApiError && err.code === "INVALID_CREDENTIALS") {
         toast.error("Credenciais inválidas. Verifique e-mail e senha.");
@@ -272,6 +292,7 @@ function LoginForm() {
 
 function RegisterForm() {
   const setProfessional = useAuth((s) => s.set);
+  const router = useRouter();
   const [form, setForm] = useState<RegisterFields>({
     name: "",
     email: "",
@@ -324,6 +345,7 @@ function RegisterForm() {
       });
       setProfessional(professional);
       toast.success("Conta criada! Bem-vindo(a) à plataforma.");
+      router.push("/painel");
     } catch (err) {
       if (err instanceof ApiError && err.code === "EMAIL_ALREADY_REGISTERED") {
         toast.error("E-mail já cadastrado. Faça login.");

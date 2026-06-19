@@ -13,13 +13,16 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
+import { SectionHeader } from "@/components/layout/section-header";
 import { type NrStatus, NrStatusBadge } from "@/components/shell/nr-status-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, api } from "@/lib/api";
 import { formatCnpj } from "@/lib/cnpj";
 import { ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
-import { useView } from "@/lib/store";
+import { useGo } from "@/lib/nav";
 import type { AssessmentStatus, CompanySummary, ProfessionalDashboard } from "@/lib/types";
 
 const TWO_YEARS_MS = 1000 * 60 * 60 * 24 * 365 * 2;
@@ -69,7 +72,7 @@ function statusAccentClass(status: NrStatus): string {
 // ─── View ───────────────────────────────────────────────────────────────────
 
 export function PainelView() {
-  const go = useView((s) => s.go);
+  const go = useGo();
   const [companies, setCompanies] = useState<CompanySummary[] | null>(null);
   const [dashboard, setDashboard] = useState<ProfessionalDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,9 +122,23 @@ export function PainelView() {
   const totalCompanies = dashboard?.kpis.totalCompanies ?? companies?.length ?? 0;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+    <PageContainer size="default">
       {/* Page header — compact, 1-liner title + subtitle + inline action */}
-      <HeroHeader onAddCompany={() => go("empresas")} />
+      <PageHeader
+        title="Painel de conformidade"
+        description="Visão geral das suas empresas e avaliações em andamento."
+        size="compact"
+        border
+        actions={
+          <Button
+            onClick={() => go("empresas")}
+            className="shrink-0 bg-[var(--brand)] text-[var(--accent-foreground)] hover:bg-[var(--brand-light)]"
+          >
+            <Plus className="h-4 w-4" />
+            Nova empresa
+          </Button>
+        }
+      />
 
       {/* Loading */}
       {loading && <PainelSkeleton />}
@@ -160,14 +177,12 @@ export function PainelView() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Primary: companies list (full-width list rows, not cards) */}
                 <section aria-label="Empresas" className="lg:col-span-2">
-                  <div className="flex items-baseline justify-between mb-4">
-                    <h2 className="font-display text-xl tracking-tight text-foreground">
-                      Empresas
-                    </h2>
-                    <span className="text-xs text-muted-foreground">
-                      {totalCompanies} {totalCompanies === 1 ? "cliente" : "clientes"}
-                    </span>
-                  </div>
+                  <SectionHeader
+                    title="Empresas"
+                    description={`${totalCompanies} ${totalCompanies === 1 ? "cliente" : "clientes"}`}
+                    size="default"
+                    className="mb-4"
+                  />
                   <div className="divide-y divide-border border-y border-border">
                     {companies.map((c) => (
                       <CompanyRow
@@ -196,31 +211,7 @@ export function PainelView() {
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Page header (compact, on warm paper — no marketing text) ───────────────
-
-function HeroHeader({ onAddCompany }: { onAddCompany: () => void }) {
-  return (
-    <header className="border-b border-border pb-6 mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="font-display text-xl sm:text-2xl tracking-tight text-foreground">
-          Painel de conformidade
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Visão geral das suas empresas e avaliações em andamento.
-        </p>
-      </div>
-      <Button
-        onClick={onAddCompany}
-        className="shrink-0 bg-[var(--brand)] text-[var(--accent-foreground)] hover:bg-[var(--brand-light)]"
-      >
-        <Plus className="h-4 w-4" />
-        Nova empresa
-      </Button>
-    </header>
+    </PageContainer>
   );
 }
 
@@ -396,14 +387,16 @@ function RecentAssessmentsSidebar({
 
   return (
     <div className="lg:sticky lg:top-4">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="font-display text-base sm:text-lg tracking-tight text-foreground">
-          Avaliações recentes
-        </h2>
-        <span className="text-xs text-muted-foreground">
-          {top.length} recente{top.length !== 1 ? "s" : ""}
-        </span>
-      </div>
+      <SectionHeader
+        title="Avaliações recentes"
+        size="default"
+        className="mb-4"
+        action={
+          <span className="text-xs text-muted-foreground">
+            {top.length} recente{top.length !== 1 ? "s" : ""}
+          </span>
+        }
+      />
 
       {top.length === 0 ? (
         <div className="py-8 text-center text-sm text-muted-foreground border-y border-border">

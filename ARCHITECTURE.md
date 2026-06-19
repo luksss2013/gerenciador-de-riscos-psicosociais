@@ -23,8 +23,8 @@
          ▼                     ▼                 ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Next.js 16 API Routes (src/app/api/v1)                              │
-│  ─ session guards (requireSession / requireAnonymous)                │
-│  ─ tenant checks (requireCompanyAccess / requireAssessmentAccess)    │
+│  ─ session guard (requireProfessional, reads nr1_session cookie)     │
+│  ─ tenant check (load → requireTenantOwnership on professionalId)    │
 │  ─ zod validation, ERROR_CODES → HTTP status                         │
 └────────┬─────────────────────────────────────────────────────────────┘
          │ Prisma 6 client
@@ -54,13 +54,15 @@ spot-checked during code review.
 incoming Request
   │
   ▼
-requireSession(req)        ← reads nr1_session cookie, loads Session + Professional
+requireProfessional()            ← reads nr1_session cookie, loads Session + Professional
+  │                                (cached via React `cache` for the request lifetime)
+  ▼
+load resource by id (Prisma findUnique)
   │
   ▼
-requireCompanyAccess(pro, id)     ← tenant isolation: pro.id must own the resource
-  │           (or)
-  ▼
-requireAssessmentAccess(pro, id)  ← traverse Assessment → Company → pro check
+requireTenantOwnership(resource.professionalId, pro.id)
+                                ← tenant isolation: pro.id must own the resource
+                                  traverse Assessment → Company → compare professionalId
   │
   ▼
 Zod parse of body / query / params
@@ -69,7 +71,7 @@ Zod parse of body / query / params
 Domain logic (Prisma queries)
   │
   ▼
-auditLog.write({ actor, action, resource, metadata })   ← for mutations
+logAudit({ actor, action, resource, metadata, request })   ← for mutations
   │
   ▼
 jsonResponse(payload, status)   ← never throw raw Error.message to client
@@ -178,14 +180,21 @@ The helpers in `src/lib/session.ts` are the **only** way to enter this
 graph:
 
 ```ts
-await requireCompanyAccess(professional, companyId);
-await requireAssessmentAccess(professional, assessmentId);
+const pro = await requireProfessional();        // throws UNAUTHORIZED if no session
+const company = await db.company.findUnique({ where: { id: companyId } });
+if (!company) return errorJson(ERROR_CODES.COMPANY_NOT_FOUND, ...);
+await requireTenantOwnership(company.professionalId, pro.id);
+// For nested resources, traverse first then compare:
+//   assessment = db.assessment.findUnique({ where: { id } });
+//   await requireTenantOwnership(assessment.professionalId, pro.id);
 ```
 
-A safe Prisma query always starts with `where: { id, professionalId: pro.id }`
-*or* a `requireXxxAccess` call before the query. **There is no
-`db.company.findUnique({ where: { id } })` in the codebase.** This is enforced
-by code review and a strict project rule.
+A safe Prisma query is always guarded by `requireProfessional` followed by
+`requireTenantOwnership(resource.professionalId, pro.id)`. A bare
+`db.company.findUnique({ where: { id } })` followed by a tenant check is the
+canonical pattern. **No query reads a resource row without first comparing its
+`professionalId` to the session's `professional.id`.** This is enforced by
+code review and a strict project rule.
 
 ---
 

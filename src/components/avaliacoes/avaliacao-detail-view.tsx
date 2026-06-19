@@ -26,6 +26,10 @@ import {
 import type * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { InventarioView } from "@/components/inventario/inventario-view";
+import { PageContainer } from "@/components/layout/page-container";
+import { PlanoView } from "@/components/plano/plano-view";
+import { ResultadosView } from "@/components/resultados/resultados-view";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -59,12 +63,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 import { ApiError, api } from "@/lib/api";
 import { ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
-import { useView } from "@/lib/store";
+import { useAssessmentIdParam, useCompanyIdParam, useGo } from "@/lib/nav";
 import type {
   Assessment,
   AssessmentDepartment,
@@ -1442,9 +1447,9 @@ function DetailSkeleton() {
 // ─── Main view ───────────────────────────────────────────────────────────────
 
 export function AvaliacaoDetailView() {
-  const assessmentId = useView((s) => s.assessmentId);
-  const companyId = useView((s) => s.companyId);
-  const go = useView((s) => s.go);
+  const assessmentId = useAssessmentIdParam();
+  const companyId = useCompanyIdParam();
+  const go = useGo();
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [progress, setProgress] = useState<AssessmentProgress | null>(null);
@@ -1461,6 +1466,12 @@ export function AvaliacaoDetailView() {
   const [simulateOpen, setSimulateOpen] = useState(false);
   const [simulateInitialDeptId, setSimulateInitialDeptId] = useState<string | null>(null);
   const [simulating, setSimulating] = useState(false);
+
+  // Tab state for completed assessments (overview | resultados | inventario | plano).
+  // Cross-tab navigation from CriticalDimensionsTable / Inventory "Criar Ação" sets this.
+  const [activeTab, setActiveTab] = useState<"overview" | "resultados" | "inventario" | "plano">(
+    "overview",
+  );
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -1655,7 +1666,7 @@ export function AvaliacaoDetailView() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full animate-in fade-in duration-300">
+    <PageContainer size="default" className="animate-in fade-in duration-300">
       {/* Top bar: back + refresh */}
       <nav className="mb-4 flex items-center justify-between gap-3" aria-label="Navegação">
         <Button
@@ -1716,56 +1727,130 @@ export function AvaliacaoDetailView() {
         </div>
       )}
 
-      {/* Status action buttons */}
-      <section className="mt-4 border-b border-border" aria-label="Ações da avaliação">
-        <StatusActions
-          status={status}
-          launching={launching}
-          closing={closing}
-          simulating={simulating}
-          onLaunch={() => void onLaunch()}
-          onClose={() => void onClose()}
-          onSimulate={() => onSimulateAll()}
-          onNavigate={onNavigate}
-        />
-      </section>
-
-      {/* GHE progress rows */}
-      <section className="mt-6" aria-label="Progresso por GHE">
-        <h2 className="font-display text-xl text-foreground mb-3">Progresso por GHE</h2>
-        {progress ? (
-          <GheProgressRows
-            byDept={progress.byDept}
-            status={status}
-            onSimulate={(d) => onSimulatePerGhe(d)}
-            simulatingId={simulating ? "__global__" : null}
-          />
-        ) : (
-          <div className="border border-dashed border-border rounded-lg py-8 flex flex-col items-center text-center gap-2">
-            <Users className="h-5 w-5 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              {isDraft
-                ? "Lance a avaliação para começar a acompanhar o progresso de coleta."
-                : "Sem dados de progresso disponíveis."}
-            </p>
+      {status === "completed" ? (
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) =>
+            setActiveTab(v as "overview" | "resultados" | "inventario" | "plano")
+          }
+          className="mt-6"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-border">
+            <TabsList>
+              <TabsTrigger value="overview">Visão geral</TabsTrigger>
+              <TabsTrigger value="resultados">Resultados</TabsTrigger>
+              <TabsTrigger value="inventario">Inventário</TabsTrigger>
+              <TabsTrigger value="plano">Plano de ação</TabsTrigger>
+            </TabsList>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                go("relatorio", {
+                  assessmentId: assessment.id,
+                  companyId: assessment.companyId,
+                })
+              }
+              className="shrink-0"
+            >
+              <FileText className="h-4 w-4" />
+              Ver relatório
+            </Button>
           </div>
-        )}
-      </section>
 
-      {/* Participation field */}
-      <section className="mt-8" aria-label="Registro de participação">
-        <ParticipationField
-          assessmentId={assessment.id}
-          initial={assessment.participationRegistration ?? ""}
-          disabled={!canEdit}
-        />
-      </section>
+          <TabsContent value="overview" className="mt-6 space-y-8">
+            <section aria-label="Progresso por GHE">
+              <h2 className="font-display text-xl text-foreground mb-3">Progresso por GHE</h2>
+              {progress ? (
+                <GheProgressRows
+                  byDept={progress.byDept}
+                  status={status}
+                  onSimulate={(d) => onSimulatePerGhe(d)}
+                  simulatingId={simulating ? "__global__" : null}
+                />
+              ) : (
+                <div className="border border-dashed border-border rounded-lg py-8 flex flex-col items-center text-center gap-2">
+                  <Users className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Sem dados de progresso disponíveis.
+                  </p>
+                </div>
+              )}
+            </section>
 
-      {/* Collection links — only while collecting */}
-      {isCollecting && assessment.departments && assessment.departments.length > 0 && (
-        <section className="mt-8" aria-label="Links de coleta">
-          <CollectionLinks departments={assessment.departments} assessmentId={assessment.id} />
-        </section>
+            <section aria-label="Registro de participação">
+              <ParticipationField
+                assessmentId={assessment.id}
+                initial={assessment.participationRegistration ?? ""}
+                disabled={!canEdit}
+              />
+            </section>
+          </TabsContent>
+
+          <TabsContent value="resultados" className="mt-6">
+            <ResultadosView hideHeader onNavigateToTab={setActiveTab} />
+          </TabsContent>
+          <TabsContent value="inventario" className="mt-6">
+            <InventarioView hideHeader onNavigateToTab={setActiveTab} />
+          </TabsContent>
+          <TabsContent value="plano" className="mt-6">
+            <PlanoView hideHeader />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <>
+          {/* Status action buttons */}
+          <section className="mt-4 border-b border-border" aria-label="Ações da avaliação">
+            <StatusActions
+              status={status}
+              launching={launching}
+              closing={closing}
+              simulating={simulating}
+              onLaunch={() => void onLaunch()}
+              onClose={() => void onClose()}
+              onSimulate={() => onSimulateAll()}
+              onNavigate={onNavigate}
+            />
+          </section>
+
+          {/* GHE progress rows */}
+          <section className="mt-6" aria-label="Progresso por GHE">
+            <h2 className="font-display text-xl text-foreground mb-3">Progresso por GHE</h2>
+            {progress ? (
+              <GheProgressRows
+                byDept={progress.byDept}
+                status={status}
+                onSimulate={(d) => onSimulatePerGhe(d)}
+                simulatingId={simulating ? "__global__" : null}
+              />
+            ) : (
+              <div className="border border-dashed border-border rounded-lg py-8 flex flex-col items-center text-center gap-2">
+                <Users className="h-5 w-5 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {isDraft
+                    ? "Lance a avaliação para começar a acompanhar o progresso de coleta."
+                    : "Sem dados de progresso disponíveis."}
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Participation field */}
+          <section className="mt-8" aria-label="Registro de participação">
+            <ParticipationField
+              assessmentId={assessment.id}
+              initial={assessment.participationRegistration ?? ""}
+              disabled={!canEdit}
+            />
+          </section>
+
+          {/* Collection links — only while collecting */}
+          {isCollecting && assessment.departments && assessment.departments.length > 0 && (
+            <section className="mt-8" aria-label="Links de coleta">
+              <CollectionLinks departments={assessment.departments} assessmentId={assessment.id} />
+            </section>
+          )}
+        </>
       )}
 
       {/* Simulate responses dialog (demo) */}
@@ -1798,6 +1883,6 @@ export function AvaliacaoDetailView() {
           refresh();
         }}
       />
-    </div>
+    </PageContainer>
   );
 }

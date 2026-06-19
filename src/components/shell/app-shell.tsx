@@ -8,21 +8,24 @@ import {
   Settings,
   ShieldCheck,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { ConfiguracoesView } from "@/components/configuracoes/configuracoes-view";
-import { PainelView } from "@/components/painel/painel-view";
 import { BreadcrumbBar } from "@/components/shell/breadcrumb-bar";
 import { Logo } from "@/components/shell/logo";
 import { TopBar } from "@/components/shell/top-bar";
-import { useView, type ViewName } from "@/lib/store";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/store";
 
-// ─── View router ────────────────────────────────────────────────────────────
+// ─── Sidebar nav ────────────────────────────────────────────────────────────
 
 interface NavItem {
-  view: ViewName;
+  href: string;
   label: string;
   icon: React.ElementType;
+  /** Active when the pathname starts with href (e.g. /empresas covers detail). */
+  prefixMatch?: boolean;
 }
 
 interface NavGroup {
@@ -34,86 +37,19 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Visão geral",
     items: [
-      { view: "painel", label: "Início", icon: LayoutDashboard },
-      { view: "consolidado", label: "Análise consolidada", icon: BarChart3 },
+      { href: "/painel", label: "Início", icon: LayoutDashboard },
+      { href: "/consolidado", label: "Análise consolidada", icon: BarChart3 },
     ],
   },
   {
     label: "Gestão",
-    items: [{ view: "empresas", label: "Empresas", icon: Building2 }],
+    items: [{ href: "/empresas", label: "Empresas", icon: Building2, prefixMatch: true }],
   },
   {
     label: "Conta",
-    items: [{ view: "configuracoes", label: "Configurações", icon: Settings }],
+    items: [{ href: "/configuracoes", label: "Configurações", icon: Settings }],
   },
 ];
-
-type AnyViewComponent = React.ComponentType<Record<string, never>>;
-
-/**
- * Lazy-load views owned by other agents. If their module file is absent,
- * fall back to a graceful placeholder so the build never breaks.
- *
- * The placeholder is a no-prop component, matching the `AnyViewComponent`
- * signature used by the router.
- */
-function lazyView(
-  loader: () => Promise<unknown>,
-  displayName: string,
-): React.ComponentType<Record<string, never>> {
-  return React.lazy(async () => {
-    try {
-      const mod = (await loader()) as {
-        default?: AnyViewComponent;
-      } & Record<string, AnyViewComponent>;
-      const Resolved = mod.default ?? Object.values(mod)[0];
-      if (!Resolved) throw new Error("module missing default export");
-      return { default: Resolved };
-    } catch {
-      const Placeholder: AnyViewComponent = () => <ViewMissingPlaceholder name={displayName} />;
-      return { default: Placeholder };
-    }
-  });
-}
-
-function ViewMissingPlaceholder({ name }: { name: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-6">
-      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-        <Loader2 className="h-6 w-6 text-muted-foreground animate-spin" />
-      </div>
-      <h2 className="text-lg font-semibold">{name}</h2>
-      <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-        Este módulo ainda está sendo carregado ou implementado por outra equipe. Tente novamente em
-        instantes.
-      </p>
-    </div>
-  );
-}
-
-const ConsolidadoView = lazyView(
-  () => import("@/components/consolidado/consolidado-view"),
-  "Consolidado",
-);
-const EmpresasView = lazyView(() => import("@/components/empresas/empresas-view"), "Empresas");
-const EmpresaDetailView = lazyView(
-  () => import("@/components/empresas/empresa-detail-view"),
-  "Detalhe da empresa",
-);
-const AvaliacaoDetailView = lazyView(
-  () => import("@/components/avaliacoes/avaliacao-detail-view"),
-  "Detalhe da avaliação",
-);
-const ResultadosView = lazyView(
-  () => import("@/components/resultados/resultados-view"),
-  "Resultados",
-);
-const InventarioView = lazyView(
-  () => import("@/components/inventario/inventario-view"),
-  "Inventário de Riscos",
-);
-const PlanoView = lazyView(() => import("@/components/plano/plano-view"), "Plano de Ação");
-const RelatorioView = lazyView(() => import("@/components/relatorio/relatorio-view"), "Relatório");
 
 function ViewLoader() {
   return (
@@ -124,36 +60,6 @@ function ViewLoader() {
   );
 }
 
-function renderView(view: ViewName): React.ReactNode {
-  switch (view) {
-    case "painel":
-      return <PainelView />;
-    case "consolidado":
-      return <ConsolidadoView />;
-    case "configuracoes":
-      return <ConfiguracoesView />;
-    case "empresas":
-      return <EmpresasView />;
-    case "empresa":
-      return <EmpresaDetailView />;
-    case "avaliacao":
-      return <AvaliacaoDetailView />;
-    case "resultados":
-      return <ResultadosView />;
-    case "inventario":
-      return <InventarioView />;
-    case "plano":
-      return <PlanoView />;
-    case "relatorio":
-      return <RelatorioView />;
-    case "worker":
-      // handled by page.tsx — render nothing.
-      return null;
-    default:
-      return <PainelView />;
-  }
-}
-
 // ─── Sidebar content ────────────────────────────────────────────────────────
 
 interface SidebarContentProps {
@@ -161,7 +67,7 @@ interface SidebarContentProps {
 }
 
 export function SidebarContent({ onNavigate }: SidebarContentProps) {
-  const { view, go } = useView();
+  const pathname = usePathname();
 
   return (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
@@ -187,25 +93,24 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
             <ul className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const active = view === item.view;
+                const active = item.prefixMatch
+                  ? pathname?.startsWith(item.href)
+                  : pathname === item.href;
                 return (
-                  <li key={item.view}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        go(item.view);
-                        onNavigate?.();
-                      }}
-                      className={`w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium cursor-pointer transition-colors border-l-2 ${
-                        active
-                          ? "border-[var(--brand)] bg-sidebar-accent text-[var(--brand)]"
-                          : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                      }`}
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
+                      className={`w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm cursor-pointer transition-colors ${
+                        active
+                          ? "bg-sidebar-accent text-[var(--brand)] font-medium"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground font-normal"
+                      }`}
                     >
                       <Icon className="h-4 w-4" />
                       <span>{item.label}</span>
-                    </button>
+                    </Link>
                   </li>
                 );
               })}
@@ -216,8 +121,6 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
     </div>
   );
 }
-
-// (MobileTopbar removed — TopBar handles both mobile + desktop)
 
 // ─── Footer ─────────────────────────────────────────────────────────────────
 
@@ -246,8 +149,44 @@ function AppFooter() {
 
 // ─── App shell ──────────────────────────────────────────────────────────────
 
-export function AppShell() {
-  const view = useView((s) => s.view);
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const { professional, loading, set, setLoading } = useAuth();
+
+  // Bootstrap session on mount (the server layout already verified the cookie;
+  // this populates useAuth for the TopBar profile + views that read it).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const p = await api.me.get();
+        if (!cancelled) set(p);
+      } catch {
+        if (!cancelled) set(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [set, setLoading]);
+
+  // Seed COPSOQ on first mount (idempotent) so demo works.
+  useEffect(() => {
+    api.system.seedCopsoq().catch(() => {});
+  }, []);
+
+  if (loading || !professional) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+          <p className="text-sm text-muted-foreground">Carregando…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -272,7 +211,7 @@ export function AppShell() {
             Pular para o conteúdo
           </a>
           <main id="main-content" className="flex-1 min-w-0">
-            <React.Suspense fallback={<ViewLoader />}>{renderView(view)}</React.Suspense>
+            <React.Suspense fallback={<ViewLoader />}>{children}</React.Suspense>
           </main>
         </div>
       </div>

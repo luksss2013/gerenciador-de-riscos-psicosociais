@@ -63,6 +63,7 @@ import { ApiError, api } from "@/lib/api";
 import { COPSOQ_DIMENSIONS, getDimension, MTE_FACTORS } from "@/lib/copsoq-data";
 import { RISK_LEVEL_LABELS } from "@/lib/errors";
 import { FIELD_ERROR_CLASS, FieldError, maskNumber, validateRequired } from "@/lib/form-utils";
+import { useAssessmentIdParam, useGo } from "@/lib/nav";
 import { classifyInventoryRisk } from "@/lib/scoring";
 import { useView } from "@/lib/store";
 import type { Assessment, DimensionCode, RiskInventoryItem, RiskLevel } from "@/lib/types";
@@ -1161,9 +1162,15 @@ function InventarioSkeleton() {
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
-export function InventarioView() {
-  const go = useView((s) => s.go);
-  const assessmentId = useView((s) => s.assessmentId);
+export function InventarioView({
+  hideHeader = false,
+  onNavigateToTab,
+}: {
+  hideHeader?: boolean;
+  onNavigateToTab?: (tab: "plano") => void;
+} = {}) {
+  const go = useGo();
+  const assessmentId = useAssessmentIdParam();
   const inventoryPrefill = useView((s) => s.inventoryPrefill);
   const setInventoryPrefill = useView((s) => s.setInventoryPrefill);
   const setActionItemPrefill = useView((s) => s.setActionItemPrefill);
@@ -1296,7 +1303,11 @@ export function InventarioView() {
       dimensionCode: item.dimensionCode ?? undefined,
       what: item.proposedMeasures ?? "",
     });
-    if (assessmentId) go("plano", { assessmentId });
+    if (onNavigateToTab) {
+      onNavigateToTab("plano");
+    } else if (assessmentId) {
+      go("plano", { assessmentId });
+    }
   };
 
   const openManualForm = (mteFactorCode?: string) => {
@@ -1330,47 +1341,52 @@ export function InventarioView() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
       <TooltipProvider delayDuration={200}>
-        {/* Header */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
-          <div className="flex items-start gap-2 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => go("avaliacao", { assessmentId })}
-              aria-label="Voltar à avaliação"
-              className="shrink-0 -ml-2 text-muted-foreground hover:text-[var(--brand)]"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
-                Inventário de Riscos
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Identificação de perigos e avaliação prioritária (NR-1)
-              </p>
-              {assessment ? (
-                <p className="text-xs text-muted-foreground mt-1 truncate" title={assessment.title}>
-                  {assessment.title}
+        {!hideHeader ? (
+          /* Header */
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
+            <div className="flex items-start gap-2 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => go("avaliacao", { assessmentId })}
+                aria-label="Voltar à avaliação"
+                className="shrink-0 -ml-2 text-muted-foreground hover:text-[var(--brand)]"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div className="min-w-0">
+                <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
+                  Inventário de Riscos
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Identificação de perigos e avaliação prioritária (NR-1)
                 </p>
-              ) : null}
+                {assessment ? (
+                  <p
+                    className="text-xs text-muted-foreground mt-1 truncate"
+                    title={assessment.title}
+                  >
+                    {assessment.title}
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
-            <Button size="sm" onClick={() => openManualForm()}>
-              <Plus className="h-4 w-4" />
-              Adicionar Risco Manual
-            </Button>
-          </div>
-        </header>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Atualizar</span>
+              </Button>
+              <Button size="sm" onClick={() => openManualForm()}>
+                <Plus className="h-4 w-4" />
+                Adicionar Risco Manual
+              </Button>
+            </div>
+          </header>
+        ) : null}
 
         {/* Summary chips */}
         <div className="flex flex-wrap items-center gap-2 mb-6">

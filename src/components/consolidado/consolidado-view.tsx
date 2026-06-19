@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
@@ -22,7 +24,7 @@ import { ApiError, api } from "@/lib/api";
 import { formatCnpj } from "@/lib/cnpj";
 import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
 import { ASSESSMENT_STATUS_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
-import { useView } from "@/lib/store";
+import { useGo } from "@/lib/nav";
 import type { CompanyBreakdown, DimensionCode, RiskLevel } from "@/lib/types";
 
 // ─── Color helpers (muted sage → ochre → clay ramp) ──────────────────────────
@@ -144,7 +146,7 @@ function SummaryKpis({ data }: { data: CompanyBreakdown[] }) {
 // ─── Heatmap table (companies × D1..D11 + Geral) — no Card wrapper ──────────
 
 function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
-  const go = useView((s) => s.go);
+  const go = useGo();
 
   return (
     <section aria-label="Mapa de calor por dimensão">
@@ -286,7 +288,7 @@ function HeatmapTable({ data }: { data: CompanyBreakdown[] }) {
             className="h-3 w-40 sm:w-48 rounded-sm border border-border"
             style={{
               background:
-                "linear-gradient(to right, hsl(120,45%,48%), hsl(45,45%,48%), hsl(10,45%,48%))",
+                "linear-gradient(to right, var(--risk-low), var(--risk-medium), var(--risk-high))",
             }}
             aria-hidden="true"
           />
@@ -449,7 +451,7 @@ function topRiskDimensions(c: CompanyBreakdown, n: number) {
 }
 
 function CompanyRow({ c }: { c: CompanyBreakdown }) {
-  const go = useView((s) => s.go);
+  const go = useGo();
   const top3 = topRiskDimensions(c, 3);
   const lastStatusLabel = c.lastAssessmentStatus
     ? (ASSESSMENT_STATUS_LABELS[c.lastAssessmentStatus] ?? c.lastAssessmentStatus)
@@ -700,7 +702,7 @@ function LoadingState() {
 }
 
 function EmptyState() {
-  const go = useView((s) => s.go);
+  const go = useGo();
   return (
     <section className="border border-dashed border-border rounded-lg py-16 flex flex-col items-center justify-center text-center gap-4">
       <div className="h-14 w-14 rounded-full bg-[var(--surface)] flex items-center justify-center">
@@ -753,29 +755,27 @@ interface HeaderProps {
 
 function Header({ onRefresh, refreshing }: HeaderProps) {
   return (
-    <header className="border-b border-border pb-6 mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-      <div>
-        <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
-          Análise Consolidada
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          Comparação de risco psicossocial entre todos os clientes
-        </p>
-      </div>
-      <Button
-        variant="outline"
-        onClick={onRefresh}
-        disabled={refreshing}
-        className="self-start sm:self-auto"
-      >
-        {refreshing ? (
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        ) : (
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-        )}
-        Atualizar
-      </Button>
-    </header>
+    <PageHeader
+      title="Análise Consolidada"
+      description="Comparação de risco psicossocial entre todos os clientes"
+      border
+      className="mb-8"
+      actions={
+        <Button
+          variant="outline"
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="self-start sm:self-auto"
+        >
+          {refreshing ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          )}
+          Atualizar
+        </Button>
+      }
+    />
   );
 }
 
@@ -812,7 +812,7 @@ export function ConsolidadoView() {
   }, [load]);
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+    <PageContainer size="default">
       <TooltipProvider delayDuration={200}>
         <Header onRefresh={() => load(true)} refreshing={refreshing} />
 
@@ -833,7 +833,7 @@ export function ConsolidadoView() {
           )}
         </div>
       </TooltipProvider>
-    </div>
+    </PageContainer>
   );
 }
 

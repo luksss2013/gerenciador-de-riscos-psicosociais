@@ -73,6 +73,7 @@ import {
   parseCurrencyBRL,
   validateRequired,
 } from "@/lib/form-utils";
+import { useAssessmentIdParam, useGo } from "@/lib/nav";
 import { useView } from "@/lib/store";
 import type {
   ActionItem,
@@ -1214,9 +1215,9 @@ function PlanoSkeleton() {
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
-export function PlanoView() {
-  const go = useView((s) => s.go);
-  const assessmentId = useView((s) => s.assessmentId);
+export function PlanoView({ hideHeader = false }: { hideHeader?: boolean } = {}) {
+  const go = useGo();
+  const assessmentId = useAssessmentIdParam();
   const actionItemPrefill = useView((s) => s.actionItemPrefill);
   const setActionItemPrefill = useView((s) => s.setActionItemPrefill);
 
@@ -1404,47 +1405,52 @@ export function PlanoView() {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
       <TooltipProvider delayDuration={200}>
-        {/* Header */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
-          <div className="flex items-start gap-2 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => go("avaliacao", { assessmentId })}
-              aria-label="Voltar à avaliação"
-              className="shrink-0 -ml-2 text-muted-foreground hover:text-[var(--brand)]"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
-                Plano de Ação 5W2H
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Priorização de medidas de intervenção (NR-1)
-              </p>
-              {assessment ? (
-                <p className="text-xs text-muted-foreground mt-1 truncate" title={assessment.title}>
-                  {assessment.title}
+        {!hideHeader ? (
+          /* Header */
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
+            <div className="flex items-start gap-2 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => go("avaliacao", { assessmentId })}
+                aria-label="Voltar à avaliação"
+                className="shrink-0 -ml-2 text-muted-foreground hover:text-[var(--brand)]"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div className="min-w-0">
+                <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
+                  Plano de Ação 5W2H
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Priorização de medidas de intervenção (NR-1)
                 </p>
-              ) : null}
+                {assessment ? (
+                  <p
+                    className="text-xs text-muted-foreground mt-1 truncate"
+                    title={assessment.title}
+                  >
+                    {assessment.title}
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              Nova Ação
-            </Button>
-          </div>
-        </header>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">Atualizar</span>
+              </Button>
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                Nova Ação
+              </Button>
+            </div>
+          </header>
+        ) : null}
 
         {/* Main content */}
         {error ? (

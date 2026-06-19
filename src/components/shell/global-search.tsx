@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { formatCnpj } from "@/lib/cnpj";
 import { ACTION_STATUS_LABELS, ASSESSMENT_STATUS_LABELS } from "@/lib/errors";
-import { useView } from "@/lib/store";
+import { useGo } from "@/lib/nav";
 import type { SearchResults } from "@/lib/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ function ResultItem({ icon: Icon, title, subtitle, badge, onSelect }: ResultItem
 // ─── Global search ──────────────────────────────────────────────────────────
 
 export function GlobalSearch() {
-  const go = useView((s) => s.go);
+  const go = useGo();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<SearchResults | null>(null);

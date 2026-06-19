@@ -28,8 +28,37 @@ export const metadata: Metadata = {
     "Plataforma SaaS multi-tenant para gerenciamento de Riscos Ocupacionais Psicossociais conforme NR-1, utilizando o instrumento canônico COPSOQ II-BR.",
   keywords: ["NR-1", "COPSOQ II-BR", "FRPRT", "Riscos Psicossociais", "PGR", "SST", "LGPD"],
   authors: [{ name: "NR-1 Copsoq Platform" }],
+  applicationName: "NR-1 Copsoq",
+  generator: "Next.js",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f0e9" },
+    { media: "(prefers-color-scheme: dark)", color: "#2f4a43" },
+  ],
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+  },
   icons: {
-    icon: "/logo.svg",
+    icon: [{ url: "/logo.svg", type: "image/svg+xml" }],
+    apple: "/apple-touch-icon.svg",
+  },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    title: "NR-1 Copsoq · Gestão de Riscos Psicossociais",
+    description:
+      "Gerencie Riscos Psicossociais conforme NR-1 com o instrumento canônico COPSOQ II-BR.",
+    siteName: "NR-1 Copsoq",
+  },
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
   },
 };
 

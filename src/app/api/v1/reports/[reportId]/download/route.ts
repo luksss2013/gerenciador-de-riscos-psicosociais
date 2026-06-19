@@ -196,7 +196,7 @@ function buildReportHtml(
   h1, h2, h3 { color: #2F4A43; }
   h1 { font-size: 1.5rem; border-bottom: 2px solid #2F4A43; padding-bottom: .5rem; }
   h2 { font-size: 1.15rem; margin-top: 2rem; }
-  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-family: Arial, sans-serif; font-size: .85rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: .85rem; }
   th, td { border: 1px solid #E4DDD2; padding: .4rem .6rem; text-align: left; }
   th { background: #F4F0E9; }
   .risk-LOW { background: #5B8A6A; color: #fff; }

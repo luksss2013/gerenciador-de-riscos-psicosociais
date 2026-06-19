@@ -34,6 +34,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ApiError, api } from "@/lib/api";
 import { COPSOQ_DIMENSIONS, getDimension, INVENTORY_TEMPLATES } from "@/lib/copsoq-data";
 import { RISK_LEVEL_LABELS } from "@/lib/errors";
+import { useAssessmentIdParam, useGo } from "@/lib/nav";
 import { useView } from "@/lib/store";
 import type {
   Assessment,
@@ -300,7 +301,7 @@ function HeatMap({ heatmap }: { heatmap: DashboardData["heatmap"] }) {
             className="h-3 w-40 sm:w-48 rounded-sm border border-border/40"
             style={{
               background:
-                "linear-gradient(to right, hsl(120,45%,48%), hsl(45,45%,48%), hsl(10,45%,48%))",
+                "linear-gradient(to right, var(--risk-low), var(--risk-medium), var(--risk-high))",
             }}
             aria-hidden="true"
           />
@@ -475,12 +476,14 @@ function CompanyAvgBars({ companyAvg }: { companyAvg: DashboardData["companyAvg"
 function CriticalDimensionsTable({
   critical,
   heatmap,
+  onNavigateToTab,
 }: {
   critical: DashboardData["criticalDimensions"];
   heatmap: DashboardData["heatmap"];
+  onNavigateToTab?: (tab: "inventario" | "plano") => void;
 }) {
-  const go = useView((s) => s.go);
-  const assessmentId = useView((s) => s.assessmentId);
+  const go = useGo();
+  const assessmentId = useAssessmentIdParam();
   const setActionItemPrefill = useView((s) => s.setActionItemPrefill);
   const setInventoryPrefill = useView((s) => s.setInventoryPrefill);
 
@@ -523,13 +526,21 @@ function CriticalDimensionsTable({
     if (!assessmentId) return;
     const mteFactorCode = INVENTORY_TEMPLATES[code].mteFactorCode;
     setInventoryPrefill({ mteFactorCode });
-    go("inventario", { assessmentId });
+    if (onNavigateToTab) {
+      onNavigateToTab("inventario");
+    } else {
+      go("inventario", { assessmentId });
+    }
   };
 
   const handleAction = (code: DimensionCode) => {
     if (!assessmentId) return;
     setActionItemPrefill({ dimensionCode: code, riskLevelTrigger: "HIGH" });
-    go("plano", { assessmentId });
+    if (onNavigateToTab) {
+      onNavigateToTab("plano");
+    } else {
+      go("plano", { assessmentId });
+    }
   };
 
   return (
@@ -1385,9 +1396,15 @@ function ResultadosSkeleton() {
 
 // ─── Main component ─────────────────────────────────────────────────────────
 
-export function ResultadosView() {
-  const go = useView((s) => s.go);
-  const assessmentId = useView((s) => s.assessmentId);
+export function ResultadosView({
+  hideHeader = false,
+  onNavigateToTab,
+}: {
+  hideHeader?: boolean;
+  onNavigateToTab?: (tab: "inventario" | "plano") => void;
+} = {}) {
+  const go = useGo();
+  const assessmentId = useAssessmentIdParam();
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -1455,8 +1472,8 @@ export function ResultadosView() {
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  // Empty state: no assessment selected.
-  if (!assessmentId) {
+  // Empty state: no assessment selected (standalone only — tab mode inherits from parent).
+  if (!hideHeader && !assessmentId) {
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
         <div className="border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-center py-12 gap-4">
@@ -1487,49 +1504,55 @@ export function ResultadosView() {
         : "—";
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+    <div
+      className={
+        !hideHeader ? "px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full" : "w-full"
+      }
+    >
       <TooltipProvider delayDuration={200}>
-        {/* Header */}
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
-          <div className="flex items-start gap-2 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => go("avaliacao", { assessmentId })}
-              aria-label="Voltar à avaliação"
-              className="shrink-0 -ml-2"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
-                Resultados
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1 truncate" title={subtitle}>
-                {subtitle}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
-                Linguagem não-clínica: usa &ldquo;fator de risco&rdquo;, &ldquo;dimensão
-                psicossocial&rdquo; e &ldquo;condições de trabalho&rdquo; (nunca
-                &ldquo;diagnóstico&rdquo;, &ldquo;transtorno&rdquo; ou &ldquo;doença&rdquo;).
-              </p>
+        {!hideHeader ? (
+          /* Header */
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between border-b border-border pb-6 mb-8">
+            <div className="flex items-start gap-2 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => go("avaliacao", { assessmentId })}
+                aria-label="Voltar à avaliação"
+                className="shrink-0 -ml-2"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div className="min-w-0">
+                <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground">
+                  Resultados
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1 truncate" title={subtitle}>
+                  {subtitle}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1.5 max-w-2xl leading-relaxed">
+                  Linguagem não-clínica: usa &ldquo;fator de risco&rdquo;, &ldquo;dimensão
+                  psicossocial&rdquo; e &ldquo;condições de trabalho&rdquo; (nunca
+                  &ldquo;diagnóstico&rdquo;, &ldquo;transtorno&rdquo; ou &ldquo;doença&rdquo;).
+                </p>
+              </div>
             </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refresh}
-            disabled={loading}
-            className="shrink-0"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            Atualizar
-          </Button>
-        </header>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refresh}
+              disabled={loading}
+              className="shrink-0"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Atualizar
+            </Button>
+          </header>
+        ) : null}
 
         {error ? (
           <div className="border border-dashed border-border rounded-lg flex flex-col items-center justify-center text-center py-12 gap-4">
@@ -1581,6 +1604,7 @@ export function ResultadosView() {
             <CriticalDimensionsTable
               critical={dashboard.criticalDimensions}
               heatmap={dashboard.heatmap}
+              onNavigateToTab={onNavigateToTab}
             />
             <DimensionDetailRows companyAvg={dashboard.companyAvg} />
             <CycleComparisonChart trend={trend ?? []} />

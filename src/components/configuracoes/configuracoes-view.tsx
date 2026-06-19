@@ -30,6 +30,8 @@ import {
 import type * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,13 +82,13 @@ interface ProfileFormState {
 
 export function ConfiguracoesView() {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-4xl mx-auto w-full">
-      <header className="border-b border-border pb-6 mb-2">
-        <h1 className="font-display text-2xl sm:text-3xl tracking-tight">Configurações</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Gerencie seu perfil, conta e preferências de segurança.
-        </p>
-      </header>
+    <PageContainer size="narrow">
+      <PageHeader
+        title="Configurações"
+        description="Gerencie seu perfil, conta e preferências de segurança."
+        border
+        className="mb-2"
+      />
 
       <div>
         <ProfileSection />
@@ -95,7 +97,7 @@ export function ConfiguracoesView() {
         <AuditLogSection />
         <AboutSection />
       </div>
-    </div>
+    </PageContainer>
   );
 }
 

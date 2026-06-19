@@ -18,13 +18,15 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CompanyFormDialog } from "@/components/empresas/company-form-dialog";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, api } from "@/lib/api";
 import { formatCnpj, sanitizeCnpj } from "@/lib/cnpj";
-import { useView } from "@/lib/store";
+import { useGo } from "@/lib/nav";
 import type { CompanySummary } from "@/lib/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -83,7 +85,7 @@ const STATUS_LABEL: Record<RowStatus, string> = {
 // ─── View ────────────────────────────────────────────────────────────────────
 
 export function EmpresasView() {
-  const go = useView((s) => s.go);
+  const go = useGo();
 
   const [companies, setCompanies] = useState<CompanySummary[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -175,20 +177,20 @@ export function EmpresasView() {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+    <PageContainer size="default">
       {/* Page header */}
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-border pb-6 mb-6">
-        <div>
-          <h1 className="font-display text-2xl sm:text-3xl tracking-tight">Empresas</h1>
-          <p className="text-sm text-muted-foreground mt-1.5">
-            Gerencie seus clientes e seus ciclos de avaliação.
-          </p>
-        </div>
-        <Button onClick={openCreate} className="shrink-0">
-          <Plus className="h-4 w-4" />
-          Nova Empresa
-        </Button>
-      </header>
+      <PageHeader
+        title="Empresas"
+        description="Gerencie seus clientes e seus ciclos de avaliação."
+        border
+        className="mb-6"
+        actions={
+          <Button onClick={openCreate} className="shrink-0">
+            <Plus className="h-4 w-4" />
+            Nova Empresa
+          </Button>
+        }
+      />
 
       {/* Search bar */}
       <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -327,7 +329,7 @@ export function EmpresasView() {
         onCreated={onCreated}
         onUpdated={onUpdated}
       />
-    </div>
+    </PageContainer>
   );
 }
 

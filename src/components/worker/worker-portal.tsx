@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ApiError, api } from "@/lib/api";
 import { LIKERT_SCALE } from "@/lib/copsoq-data";
-import { useView } from "@/lib/store";
 import type { CopsoqItemDTO } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -86,8 +85,6 @@ function firstUnansweredIndex(
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function WorkerPortal({ token }: { token: string }) {
-  const closeWorker = useView((s) => s.closeWorker);
-
   const [screen, setScreen] = useState<Screen>("welcome");
   const [bootLoading, setBootLoading] = useState(true);
   const [items, setItems] = useState<CopsoqItemDTO[]>([]);
@@ -97,6 +94,18 @@ export function WorkerPortal({ token }: { token: string }) {
   const [selectedValue, setSelectedValue] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [infoMsg, setInfoMsg] = useState<string>("");
+
+  // Exit the portal: clear local answers and return to the welcome screen.
+  // The portal is an isolated route (no professional session) — there is no
+  // "back to painel" to navigate to; exit resets the questionnaire context.
+  const exitPortal = useCallback(() => {
+    setAnswers({});
+    setSelectedValue(null);
+    setErrorMsg("");
+    setInfoMsg("");
+    setCurrentIndex(1);
+    setScreen("welcome");
+  }, []);
 
   const complete = useCallback(async () => {
     try {
@@ -287,7 +296,7 @@ export function WorkerPortal({ token }: { token: string }) {
           </div>
           <button
             type="button"
-            onClick={closeWorker}
+            onClick={exitPortal}
             aria-label="Sair da pesquisa"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors px-2 py-1.5 rounded-md hover:bg-[var(--surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -318,12 +327,12 @@ export function WorkerPortal({ token }: { token: string }) {
           ) : screen === "questions" && !currentItem ? (
             <WorkerError
               message="Não foi possível carregar a questão. Tente recarregar a página."
-              onClose={closeWorker}
+              onClose={exitPortal}
             />
           ) : screen === "thanks" ? (
             <WorkerThanks />
           ) : (
-            <WorkerError message={errorMsg} onClose={closeWorker} />
+            <WorkerError message={errorMsg} onClose={exitPortal} />
           )}
         </div>
       </main>

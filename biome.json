@@ -22,7 +22,9 @@
       "!*.db",
       "!dev.db*",
       "!*.db-journal",
-      "!next-env.d.ts"
+      "!next-env.d.ts",
+      "!.opencode/skills/impeccable",
+      "!.impeccable"
     ]
   },
   "formatter": {

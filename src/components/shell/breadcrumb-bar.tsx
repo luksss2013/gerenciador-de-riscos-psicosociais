@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useParams, usePathname } from "next/navigation";
 import * as React from "react";
 import {
   Breadcrumb,
@@ -10,115 +12,33 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { api } from "@/lib/api";
-import { useView, type ViewName } from "@/lib/store";
 
 // ─── Module-level name caches ───────────────────────────────────────────────
 // Populated on-demand by the breadcrumb bar so repeated renders don't refetch.
-// Kept simple (Map<string, string>) per task constraints — no context, no SWR.
 
 const companyNameCache = new Map<string, string>();
 const assessmentTitleCache = new Map<string, string>();
 
-type GoFn = (
-  view: ViewName,
-  opts?: {
-    companyId?: string | null;
-    assessmentId?: string | null;
-    workerToken?: string | null;
-  },
-) => void;
-
-interface Crumb {
-  label: string;
-  /** Render as the current (bold, non-navigable) page crumb. */
-  current?: boolean;
-  /** Navigate when clicked (only for non-current ancestors). */
-  onNavigate?: () => void;
-}
-
-const LEAF_LABEL: Partial<Record<ViewName, string>> = {
+const LEAF_LABEL: Record<string, string> = {
   resultados: "Resultados",
   inventario: "Inventário",
-  plano: "Plano de ação",
+  "plano-de-acao": "Plano de ação",
   relatorio: "Relatório",
 };
 
-function buildTrail(opts: {
-  view: ViewName;
-  companyId: string | null;
-  assessmentId: string | null;
-  companyName: string | null;
-  assessmentTitle: string | null;
-  go: GoFn;
-}): Crumb[] {
-  const { view, companyId, assessmentId, companyName, assessmentTitle, go } = opts;
-
-  const inicio: Crumb =
-    view === "painel"
-      ? { label: "Início", current: true }
-      : { label: "Início", onNavigate: () => go("painel") };
-
-  switch (view) {
-    case "painel":
-      return [inicio];
-
-    case "consolidado":
-      return [inicio, { label: "Análise consolidada", current: true }];
-
-    case "empresas":
-      return [inicio, { label: "Empresas", current: true }];
-
-    case "configuracoes":
-      return [inicio, { label: "Configurações", current: true }];
-
-    case "empresa": {
-      const crumbs: Crumb[] = [inicio, { label: "Empresas", onNavigate: () => go("empresas") }];
-      crumbs.push({
-        label: companyName ?? "Empresa",
-        current: true,
-      });
-      return crumbs;
-    }
-
-    case "avaliacao":
-    case "resultados":
-    case "inventario":
-    case "plano":
-    case "relatorio": {
-      const title = assessmentTitle ?? "Avaliação";
-      const crumbs: Crumb[] = [
-        inicio,
-        { label: "Empresas", onNavigate: () => go("empresas") },
-        {
-          label: companyName ?? "Empresa",
-          onNavigate: companyId ? () => go("empresa", { companyId }) : undefined,
-        },
-      ];
-
-      if (view === "avaliacao") {
-        crumbs.push({ label: title, current: true });
-      } else {
-        crumbs.push({
-          label: title,
-          onNavigate: assessmentId ? () => go("avaliacao", { assessmentId }) : undefined,
-        });
-        crumbs.push({ label: LEAF_LABEL[view] ?? "Detalhe", current: true });
-      }
-      return crumbs;
-    }
-
-    default:
-      return [inicio];
-  }
+interface Crumb {
+  label: string;
+  href?: string;
+  current?: boolean;
 }
 
-// ─── Component ──────────────────────────────────────────────────────────────
-
 export function BreadcrumbBar() {
-  const view = useView((s) => s.view);
-  const companyId = useView((s) => s.companyId);
-  const assessmentId = useView((s) => s.assessmentId);
-  const go = useView((s) => s.go);
+  const pathname = usePathname() ?? "";
+  const params = useParams<{ companyId?: string | string[]; assessmentId?: string | string[] }>();
+  const companyId = Array.isArray(params?.companyId) ? params.companyId[0] : params?.companyId;
+  const assessmentId = Array.isArray(params?.assessmentId)
+    ? params.assessmentId[0]
+    : params?.assessmentId;
 
   const [companyName, setCompanyName] = React.useState<string | null>(() =>
     companyId ? (companyNameCache.get(companyId) ?? null) : null,
@@ -127,7 +47,6 @@ export function BreadcrumbBar() {
     assessmentId ? (assessmentTitleCache.get(assessmentId) ?? null) : null,
   );
 
-  // Fetch company name on-demand when an id is present and not yet cached.
   React.useEffect(() => {
     if (!companyId) {
       setCompanyName(null);
@@ -153,7 +72,6 @@ export function BreadcrumbBar() {
     };
   }, [companyId]);
 
-  // Fetch assessment title on-demand when an id is present and not yet cached.
   React.useEffect(() => {
     if (!assessmentId) {
       setAssessmentTitle(null);
@@ -179,14 +97,45 @@ export function BreadcrumbBar() {
     };
   }, [assessmentId]);
 
-  const trail = buildTrail({
-    view,
-    companyId,
-    assessmentId,
-    companyName,
-    assessmentTitle,
-    go,
-  });
+  const trail = React.useMemo<Crumb[]>(() => {
+    const inicio: Crumb =
+      pathname === "/painel"
+        ? { label: "Início", current: true }
+        : { label: "Início", href: "/painel" };
+
+    if (pathname === "/painel") return [inicio];
+    if (pathname === "/consolidado")
+      return [inicio, { label: "Análise consolidada", current: true }];
+    if (pathname === "/configuracoes") return [inicio, { label: "Configurações", current: true }];
+
+    if (pathname === "/empresas") return [inicio, { label: "Empresas", current: true }];
+
+    if (pathname.startsWith("/empresas/")) {
+      const crumbs: Crumb[] = [inicio, { label: "Empresas", href: "/empresas" }];
+      if (!companyId) return crumbs;
+      const companyHref = `/empresas/${companyId}`;
+      const hasAssessment = pathname.includes("/avaliacoes/");
+      crumbs.push({
+        label: companyName ?? "Empresa",
+        href: hasAssessment ? companyHref : undefined,
+        current: !hasAssessment,
+      });
+      if (hasAssessment && assessmentId) {
+        const assessmentHref = `/empresas/${companyId}/avaliacoes/${assessmentId}`;
+        const leaf = pathname.split("/").pop() ?? "";
+        const isLeaf = leaf in LEAF_LABEL;
+        crumbs.push({
+          label: assessmentTitle ?? "Avaliação",
+          href: isLeaf ? assessmentHref : undefined,
+          current: !isLeaf,
+        });
+        if (isLeaf) crumbs.push({ label: LEAF_LABEL[leaf], current: true });
+      }
+      return crumbs;
+    }
+
+    return [inicio];
+  }, [pathname, companyId, assessmentId, companyName, assessmentTitle]);
 
   if (trail.length === 0) return null;
 
@@ -200,9 +149,9 @@ export function BreadcrumbBar() {
           {trail.map((crumb, idx) => {
             const isLast = idx === trail.length - 1;
             return (
-              <React.Fragment key={crumb.label}>
+              <React.Fragment key={`${crumb.label}-${idx}`}>
                 <BreadcrumbItem>
-                  {crumb.current ? (
+                  {crumb.current || !crumb.href ? (
                     <BreadcrumbPage className="font-semibold text-foreground">
                       {crumb.label}
                     </BreadcrumbPage>
@@ -211,9 +160,7 @@ export function BreadcrumbBar() {
                       asChild
                       className="cursor-pointer text-muted-foreground hover:text-foreground hover:underline"
                     >
-                      <button type="button" onClick={crumb.onNavigate} className="text-left">
-                        {crumb.label}
-                      </button>
+                      <Link href={crumb.href}>{crumb.label}</Link>
                     </BreadcrumbLink>
                   )}
                 </BreadcrumbItem>

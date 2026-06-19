@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,7 +54,8 @@ import { ApiError, api } from "@/lib/api";
 import { formatCnpj } from "@/lib/cnpj";
 import { COPSOQ_DIMENSIONS, getDimension } from "@/lib/copsoq-data";
 import { ASSESSMENT_STATUS_LABELS, PROFESSION_TYPE_LABELS, RISK_LEVEL_LABELS } from "@/lib/errors";
-import { useAuth, useView } from "@/lib/store";
+import { useAssessmentIdParam, useGo } from "@/lib/nav";
+import { useAuth } from "@/lib/store";
 import type {
   ActionPlan,
   Assessment,
@@ -195,7 +198,7 @@ const FAILED_CHECK_LABELS: Record<string, string> = {
 
 function EmptyState({ onBack }: { onBack: () => void }) {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+    <PageContainer size="default">
       <section className="border border-dashed border-border rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-3">
         <div className="h-12 w-12 rounded-full bg-[var(--surface)] flex items-center justify-center">
           <FileText className="h-6 w-6 text-[var(--brand)]" aria-hidden="true" />
@@ -210,7 +213,7 @@ function EmptyState({ onBack }: { onBack: () => void }) {
           Voltar ao painel
         </Button>
       </section>
-    </div>
+    </PageContainer>
   );
 }
 
@@ -218,7 +221,7 @@ function EmptyState({ onBack }: { onBack: () => void }) {
 
 function LoadingState() {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-8">
+    <PageContainer size="default" className="space-y-8">
       <div className="flex items-center justify-between">
         <Skeleton className="h-8 w-56" />
         <Skeleton className="h-9 w-36" />
@@ -227,7 +230,7 @@ function LoadingState() {
       <Skeleton className="h-56 w-full" />
       <Skeleton className="h-72 w-full" />
       <Skeleton className="h-56 w-full" />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -1447,8 +1450,8 @@ function ReportPreviewDialog({
 // ─── Main view ───────────────────────────────────────────────────────────────
 
 export function RelatorioView() {
-  const go = useView((s) => s.go);
-  const assessmentId = useView((s) => s.assessmentId);
+  const go = useGo();
+  const assessmentId = useAssessmentIdParam();
   const { professional } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -1770,7 +1773,7 @@ export function RelatorioView() {
 
   if (error) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+      <PageContainer size="default">
         <section className="border border-dashed border-[var(--risk-high)]/30 rounded-lg py-12 px-6 flex flex-col items-center justify-center text-center gap-3">
           <div className="h-12 w-12 rounded-full risk-high-bg flex items-center justify-center">
             <AlertTriangle className="h-6 w-6" aria-hidden="true" />
@@ -1792,7 +1795,7 @@ export function RelatorioView() {
             </Button>
           </div>
         </section>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -1836,43 +1839,38 @@ export function RelatorioView() {
         />
       )}
 
-      <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full space-y-8">
-        {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border pb-6">
-          <div className="flex items-start gap-3 min-w-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => go("avaliacao", { assessmentId })}
-              className="shrink-0 text-muted-foreground hover:text-[var(--brand)]"
-              aria-label="Voltar à avaliação"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="hidden sm:inline">Voltar</span>
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-[var(--brand)] shrink-0" aria-hidden="true" />
-                <h1 className="font-display text-2xl sm:text-3xl tracking-tight text-foreground truncate">
-                  Relatório PGR
-                </h1>
+      <PageContainer size="default" className="space-y-8">
+        <PageHeader
+          eyebrow={{ label: "Avaliação", icon: ShieldCheck }}
+          title="Relatório PGR"
+          description={
+            assessment
+              ? `${assessment.title} · ${ASSESSMENT_STATUS_LABELS[assessment.status] ?? assessment.status}`
+              : "—"
+          }
+          border
+          actions={
+            <div className="flex flex-col items-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => go("avaliacao", { assessmentId })}
+                className="text-muted-foreground hover:text-[var(--brand)]"
+                aria-label="Voltar à avaliação"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Voltar
+              </Button>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono-numeric">
+                <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>
+                  {formatDateShort(assessment?.startDate ?? null)} a{" "}
+                  {formatDateShort(assessment?.endDate ?? null)}
+                </span>
               </div>
-              <p className="text-sm text-muted-foreground mt-1 truncate">
-                {assessment?.title ?? "—"} ·{" "}
-                {assessment
-                  ? (ASSESSMENT_STATUS_LABELS[assessment.status] ?? assessment.status)
-                  : "—"}
-              </p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono-numeric">
-            <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>
-              {formatDateShort(assessment?.startDate ?? null)} a{" "}
-              {formatDateShort(assessment?.endDate ?? null)}
-            </span>
-          </div>
-        </header>
+          }
+        />
 
         {/* Prerequisites checklist */}
         <PrerequisitesChecklist items={prereqItems} />
@@ -1905,7 +1903,7 @@ export function RelatorioView() {
           onRegenerate={handleRegenerate}
           regeneratingId={regeneratingId}
         />
-      </div>
+      </PageContainer>
 
       {/* Report preview dialog */}
       <ReportPreviewDialog

@@ -1,6 +1,8 @@
 "use client";
 
 import { Loader2, LogOut, Menu, Settings, X } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -29,13 +31,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { api } from "@/lib/api";
-import { useAuth, useView } from "@/lib/store";
+import { useAuth } from "@/lib/store";
 
 // ─── Top bar (desktop + mobile) ─────────────────────────────────────────────
 
 export function TopBar() {
   const { professional } = useAuth();
-  const go = useView((s) => s.go);
+  const router = useRouter();
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -51,6 +53,7 @@ export function TopBar() {
       toast.success("Sessão encerrada.");
       setSigningOut(false);
       setSignOutOpen(false);
+      router.push("/auth");
     }
   };
 
@@ -109,9 +112,8 @@ export function TopBar() {
         </Sheet>
 
         {/* Logo + wordmark (left) */}
-        <button
-          type="button"
-          onClick={() => go("painel")}
+        <Link
+          href="/painel"
           className="flex items-center gap-2.5 shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
           aria-label="Ir para o início"
         >
@@ -122,7 +124,7 @@ export function TopBar() {
             </span>
             <span className="text-[11px] text-muted-foreground block">Riscos psicossociais</span>
           </span>
-        </button>
+        </Link>
 
         {/* Global search (center, flex-1) */}
         <div className="flex-1 flex justify-center px-2 sm:px-4">
@@ -160,7 +162,7 @@ export function TopBar() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => go("configuracoes")}>
+              <DropdownMenuItem onSelect={() => router.push("/configuracoes")}>
                 <Settings className="h-4 w-4" />
                 Configurações
               </DropdownMenuItem>

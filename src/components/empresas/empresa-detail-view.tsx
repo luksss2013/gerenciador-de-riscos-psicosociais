@@ -27,6 +27,8 @@ import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CompanyFormDialog } from "@/components/empresas/company-form-dialog";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { type NrStatus, NrStatusBadge } from "@/components/shell/nr-status-badge";
 import {
   AlertDialog,
@@ -72,7 +74,7 @@ import {
   maskNumber,
   validateRequired,
 } from "@/lib/form-utils";
-import { useView } from "@/lib/store";
+import { useCompanyIdParam, useGo } from "@/lib/nav";
 import type { Assessment, CompanySummary, Department } from "@/lib/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -116,8 +118,8 @@ function fmtPeriod(start: string | null, end: string | null): string {
 // ─── View ────────────────────────────────────────────────────────────────────
 
 export function EmpresaDetailView() {
-  const companyId = useView((s) => s.companyId);
-  const go = useView((s) => s.go);
+  const companyId = useCompanyIdParam();
+  const go = useGo();
 
   const [company, setCompany] = useState<CompanySummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +206,7 @@ export function EmpresaDetailView() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto w-full">
+    <PageContainer size="default">
       {/* Back link */}
       <nav className="mb-4" aria-label="Navegação breadcrumb">
         <Button
@@ -243,7 +245,7 @@ export function EmpresaDetailView() {
           refresh();
         }}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -265,32 +267,30 @@ function CompanyDetailHeader({
       : null;
 
   return (
-    <header className="border-b border-border pb-6">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1.5">
-            <Building2 className="h-3.5 w-3.5" />
-            <span>Empresa</span>
-          </div>
-          <h1 className="font-display text-2xl sm:text-3xl tracking-tight leading-tight">
-            {company.name}
-          </h1>
-          <p className="font-mono-numeric text-sm text-muted-foreground mt-1.5">
+    <>
+      <PageHeader
+        eyebrow={{ label: "Empresa", icon: Building2 }}
+        title={company.name}
+        description={
+          <span className="font-mono-numeric text-sm text-muted-foreground">
             {formatCnpj(company.cnpj)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <NrStatusBadge status={status} />
-          <Button variant="outline" size="sm" onClick={onRefresh}>
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="sr-only">Atualizar</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="h-3.5 w-3.5" />
-            Editar
-          </Button>
-        </div>
-      </div>
+          </span>
+        }
+        border
+        actions={
+          <div className="flex items-center gap-2 shrink-0">
+            <NrStatusBadge status={status} />
+            <Button variant="outline" size="sm" onClick={onRefresh}>
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="sr-only">Atualizar</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </Button>
+          </div>
+        }
+      />
 
       {/* Quick metadata strip */}
       {(location ||
@@ -336,7 +336,7 @@ function CompanyDetailHeader({
           )}
         </dl>
       )}
-    </header>
+    </>
   );
 }
 
@@ -975,7 +975,7 @@ function AssessmentsTab({
   onAssessmentCreated: (a: Assessment) => void;
   onRefresh: () => void;
 }) {
-  const go = useView((s) => s.go);
+  const go = useGo();
   const [assessments, setAssessments] = useState<Assessment[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

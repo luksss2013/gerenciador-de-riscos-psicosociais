@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <title>NR-1 Copsoq</title>
+  <rect x="8" y="8" width="84" height="84" rx="14" fill="#2f4a43" />
+  <path d="M28 72 V28 L42 56 V28 H50 V72 H42 L28 44 V72 Z" fill="#f6eee1" />
+  <rect x="56" y="28" width="8" height="44" fill="#b8623e" />
+  <rect x="56" y="28" width="20" height="8" fill="#b8623e" />
+</svg>
